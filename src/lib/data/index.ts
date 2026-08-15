@@ -12,6 +12,7 @@ import {
   mockAdjustmentReasonRepository,
   mockCustomerRepository,
   mockProductRepository,
+  mockPurchaseOrderRepository,
   mockReceivingRepository,
   mockSalesOrderRepository,
   mockStockAdjustmentRepository,
@@ -39,6 +40,7 @@ export const stockMovementRepository = mockStockMovementRepository;
 export const supplierRepository = mockSupplierRepository;
 export const customerRepository = mockCustomerRepository;
 export const receivingRepository = mockReceivingRepository;
+export const purchaseOrderRepository = mockPurchaseOrderRepository;
 export const transferRepository = mockTransferRepository;
 export const salesOrderRepository = mockSalesOrderRepository;
 export const adjustmentReasonRepository = mockAdjustmentReasonRepository;

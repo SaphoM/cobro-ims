@@ -19,6 +19,7 @@ import type {
   Product,
   ProductBomLine,
   PurchaseOrder,
+  PurchaseOrderLine,
   SalesOrder,
   StockAdjustment,
   StockLedgerEntry,
@@ -29,12 +30,15 @@ import type {
 import type {
   AdjustmentReasonRepository,
   CreateCustomerInput,
+  CreatePurchaseOrderInput,
   CreateProductInput,
   CreateSalesOrderInput,
   CreateSupplierInput,
   CustomerRepository,
   InitiateTransferInput,
   ProductRepository,
+  PurchaseOrderRepository,
+  PurchaseOrderWithLine,
   QuickReceiveInput,
   ReceivingRepository,
   RecordMovementInput,
@@ -71,6 +75,7 @@ const state = {
   transfers: [] as InterWarehouseTransfer[],
   adjustments: [] as StockAdjustment[],
   salesOrders: [] as SalesOrder[],
+  purchaseOrderLines: new Map<string, PurchaseOrderLine>(),
 };
 
 let poCounter = 1000;
@@ -294,6 +299,100 @@ export const mockReceivingRepository: ReceivingRepository = {
     });
 
     return { purchaseOrder, goodsReceipt };
+  },
+};
+
+function withLine(po: PurchaseOrder): PurchaseOrderWithLine {
+  const line = state.purchaseOrderLines.get(po.id);
+  if (!line) throw new Error(`Purchase order ${po.poNumber} has no line — data inconsistency.`);
+  return { ...po, line };
+}
+
+export const mockPurchaseOrderRepository: PurchaseOrderRepository = {
+  async list() {
+    return [...state.purchaseOrders].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(withLine);
+  },
+  async create(input: CreatePurchaseOrderInput) {
+    poCounter += 1;
+    const now = new Date().toISOString();
+    const po: PurchaseOrder = {
+      id: randomUUID(),
+      poNumber: `PO-${poCounter}`,
+      supplierId: input.supplierId,
+      warehouseId: input.warehouseId,
+      status: 'draft',
+      orderedAt: null,
+      expectedAt: null,
+      createdBy: input.createdBy,
+      createdAt: now,
+    };
+    const line: PurchaseOrderLine = {
+      id: randomUUID(),
+      purchaseOrderId: po.id,
+      productId: input.productId,
+      quantityOrdered: input.quantity,
+      quantityReceived: 0,
+      unitCost: input.unitCost,
+    };
+    state.purchaseOrders.push(po);
+    state.purchaseOrderLines.set(po.id, line);
+    return withLine(po);
+  },
+  async issue(poId) {
+    const po = state.purchaseOrders.find((p) => p.id === poId);
+    if (!po) throw new Error('Purchase order not found.');
+    if (po.status !== 'draft') throw new Error(`Purchase order is already ${po.status}.`);
+    po.status = 'issued';
+    po.orderedAt = new Date().toISOString();
+    return withLine(po);
+  },
+  async receive(poId, quantity, receivedBy) {
+    const po = state.purchaseOrders.find((p) => p.id === poId);
+    if (!po) throw new Error('Purchase order not found.');
+    if (po.status !== 'issued' && po.status !== 'partially_received') {
+      throw new Error(`Purchase order must be issued before it can be received (currently ${po.status}).`);
+    }
+    const line = state.purchaseOrderLines.get(poId);
+    if (!line) throw new Error('Purchase order line not found.');
+
+    const remaining = line.quantityOrdered - line.quantityReceived;
+    if (quantity <= 0) throw new Error('Quantity received must be a positive number.');
+    if (quantity > remaining + 1e-9) {
+      throw new Error(`Cannot receive more than the ${remaining} units still outstanding on this order.`);
+    }
+
+    grnCounter += 1;
+    const now = new Date().toISOString();
+    const goodsReceipt: GoodsReceipt = {
+      id: randomUUID(),
+      grnNumber: `GRN-${grnCounter}`,
+      purchaseOrderId: poId,
+      warehouseId: po.warehouseId,
+      status: 'posted',
+      receivedBy,
+      receivedAt: now,
+      createdAt: now,
+    };
+    state.goodsReceipts.push(goodsReceipt);
+
+    await postMovement({
+      productId: line.productId,
+      warehouseId: po.warehouseId,
+      movementType: 'receipt',
+      quantity: Math.abs(quantity),
+      unitCost: line.unitCost, // received at the PO's quoted cost, not re-negotiated per receipt
+      referenceType: 'goods_receipt',
+      referenceId: goodsReceipt.id,
+      createdBy: receivedBy,
+    });
+
+    line.quantityReceived = Math.round((line.quantityReceived + quantity) * 1000) / 1000;
+    po.status = line.quantityReceived >= line.quantityOrdered - 1e-9 ? 'received' : 'partially_received';
+
+    return { purchaseOrder: withLine(po), goodsReceipt };
+  },
+  async getStatus(poId) {
+    return state.purchaseOrders.find((p) => p.id === poId)?.status ?? null;
   },
 };
 

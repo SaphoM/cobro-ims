@@ -14,9 +14,11 @@ import type {
   Customer,
   GoodsReceipt,
   InterWarehouseTransfer,
+  PoStatus,
   Product,
   ProductBomLine,
   PurchaseOrder,
+  PurchaseOrderLine,
   SalesOrder,
   SalesOrderStatus,
   StockAdjustment,
@@ -123,15 +125,47 @@ export interface QuickReceiveInput {
 
 /**
  * GRN receiving. `quickReceive` creates the PO + PO line + GRN + GRN line in
- * one step and immediately posts the stock movement — a deliberate
- * simplification while full Purchase Order lifecycle management (RFQ Phase
- * 3) doesn't exist yet. The schema still models PO -> GRN properly
- * underneath, so this isn't a shortcut that needs undoing later, just a
- * thinner entry point into it.
+ * one step and immediately posts the stock movement, for the legitimate
+ * ad-hoc case (no formal PO was ever raised). `receiveAgainstPurchaseOrder`
+ * on PurchaseOrderRepository below is the other path — receiving against an
+ * already-issued PO, with partial-receipt support.
  */
 export interface ReceivingRepository {
   listRecentReceipts(limit?: number): Promise<GoodsReceipt[]>;
   quickReceive(input: QuickReceiveInput): Promise<{ purchaseOrder: PurchaseOrder; goodsReceipt: GoodsReceipt }>;
+}
+
+export interface CreatePurchaseOrderInput {
+  supplierId: string;
+  warehouseId: string;
+  productId: string;
+  quantity: number;
+  unitCost: number;
+  createdBy: string;
+}
+
+/** A PurchaseOrder joined with its (single, see domain comment) line, for list/detail views. */
+export interface PurchaseOrderWithLine extends PurchaseOrder {
+  line: PurchaseOrderLine;
+}
+
+/**
+ * Full PO lifecycle: draft (editable, nothing posted) -> issue (sent to
+ * supplier, locks the line) -> receive one or more times against it
+ * (partial receipts supported; each posts a GRN + a 'receipt' stock
+ * movement at the PO's quoted unit cost) until quantity_received reaches
+ * quantity_ordered, at which point status becomes 'received'.
+ */
+export interface PurchaseOrderRepository {
+  list(): Promise<PurchaseOrderWithLine[]>;
+  create(input: CreatePurchaseOrderInput): Promise<PurchaseOrderWithLine>;
+  issue(poId: string): Promise<PurchaseOrderWithLine>;
+  receive(
+    poId: string,
+    quantity: number,
+    receivedBy: string
+  ): Promise<{ purchaseOrder: PurchaseOrderWithLine; goodsReceipt: GoodsReceipt }>;
+  getStatus(poId: string): Promise<PoStatus | null>;
 }
 
 export interface InitiateTransferInput {

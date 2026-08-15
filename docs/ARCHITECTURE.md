@@ -38,6 +38,12 @@ resulting WAC math checked by hand):
   on-hand by exactly the ordered quantity while releasing the reservation.
 - **Suppliers** (`/dashboard/suppliers`) and **Customers** (`/dashboard/customers`) — list + add, feeding
   the pickers on receiving and sales orders respectively.
+- **Purchase orders** (`/dashboard/purchase-orders`, closing the RFQ Phase 3 gap) — draft → issue →
+  receive one or more times against it (partial receipts supported, each posts its own GRN + `receipt`
+  movement at the PO's quoted cost) until fully received. `Goods receiving`'s quick-receive remains the
+  path for genuine ad-hoc receipts with no PO. Verified: a 100-unit PO partially received at 60 then the
+  remaining 40 — status moved draft → issued → partially received → received exactly on quantity, and
+  the ledger's WAC recalculated correctly after each receipt.
 
 What exists as the underlying substrate is a **schema-and-engine-first vertical slice**, not a partial
 ERP:
@@ -98,7 +104,8 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 | Audit trail immutability | Table exists (`audit_log`), DB-level enforcement (revoke UPDATE/DELETE or a
   blocking trigger) not yet built — that's explicitly Security Hardening phase work per the RFQ |
 | Sales orders & dispatch (reservation + dispatch) | Real logic and UI — see §1 |
-| Full Purchase Order lifecycle (issue/approve, beyond quick-receive), Invoicing, Accounting Integration | Not started (RFQ Phases 3-4) |
+| Purchase order lifecycle (draft/issue/partial-receive) | Real logic and UI — see §1 |
+| Invoicing, Accounting Integration | Not started (RFQ Phase 4) |
 | Reporting, Barcode Scanning | Not started (RFQ Phase 5) |
 
 ## 5. BUSINESS DECISION REQUIRED — do not resolve these by assumption

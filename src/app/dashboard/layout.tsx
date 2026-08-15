@@ -8,6 +8,7 @@ import { NavLink } from '@/app/dashboard/nav-link';
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Overview' },
   { href: '/dashboard/products', label: 'Product catalogue' },
+  { href: '/dashboard/purchase-orders', label: 'Purchase orders' },
   { href: '/dashboard/receiving', label: 'Goods receiving' },
   { href: '/dashboard/suppliers', label: 'Suppliers' },
   { href: '/dashboard/transfers', label: 'Transfers' },
