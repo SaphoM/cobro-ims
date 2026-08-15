@@ -1,30 +1,316 @@
 # Cobro IMS
 
-Cobro Concrete's inventory management system. Built and maintained by X Spark.
+**Cobro Concrete's inventory management system.** Cobro owns the system and the data; **X Spark** designs,
+develops, and supports it. This README is the single "read this first" document — it should be enough for
+anyone (or any future session picking this project back up) to understand what exists, why, and what's
+still open, without re-reading the whole commit history.
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for current phase status, what's real vs. mocked, and
-the open business decisions that need a client conversation before proceeding further.
+Current version: **see `package.json`** (also shown live on the login page footer). Full version history
+in [`CHANGELOG.md`](CHANGELOG.md).
 
-## Running locally
+---
+
+## 1. What this is
+
+A cloud-based, multi-warehouse Inventory Management System replacing Cobro's fragmented spreadsheet-based
+stock tracking with one audit-trailed platform covering procurement, warehousing, dispatch, invoicing, and
+(eventually) accounting integration.
+
+**Business context:**
+
+- **Client:** Cobro Concrete (Pty) Ltd — a small KwaZulu-Natal manufacturer, up to 5 warehouse/factory/store
+  locations, fewer than 20 users.
+- **Technology partner:** X Spark — responsible for product discovery, architecture, UX/UI, development,
+  security, DevOps, testing, deployment, documentation, training, and post-implementation support.
+- **Funded via:** Productivity SA (Region 1), under an approved Scope of Work. Purchase Order **PO-9522**,
+  **R171,695 (incl. VAT)**, **8-week** delivery window, due **30/09/2026**. Includes 6 months post-delivery
+  support and hosting.
+- **Primary source of truth:** the actual RFQ documents in the parent folder — `Scope of Work Request_IMS.docx`,
+  `PO9522- Cobro - Inventory System.pdf`, `Cobro IMS System Map.png`. Read those before changing scope here;
+  this README summarizes them but isn't a substitute.
+- **Budget/timeline reality check:** the full RFQ scope (procurement → warehouse → sales → invoicing →
+  accounting integration → RBAC/2FA → immutable audit trail → 15+ reports → barcode scanning → POPIA/VAT
+  compliance → 99.5% uptime SLA) is large for an 8-week, R171,695 engagement. This is flagged as an open
+  **BUSINESS DECISION REQUIRED** — see §7 — not silently absorbed.
+
+**Ownership principle:** production ownership (Supabase project, database, storage, domain, backups,
+credentials) is meant to end up with Cobro, not X Spark. Development is currently happening against mock
+data specifically so that a live Supabase project doesn't get provisioned under the wrong account by
+default — see §4.
+
+---
+
+## 2. Current status
+
+Development has been **progressive**, following the brief's own staged plan:
+
+```
+DISCOVER → ARCHITECT → FOUNDATION → [AUTHENTICATION] → CORE DATA / INVENTORY ENGINE →
+WAREHOUSE OPERATIONS → PROCUREMENT → SALES & DISPATCH → INVOICING → ACCOUNTING →
+REPORTING → SECURITY HARDENING → UAT → PRODUCTION
+```
+
+**Done and browser-verified** (not just written — every workflow below was clicked through end-to-end with
+the resulting numbers hand-checked):
+
+| RFQ Phase | Module | Status |
+| --- | --- | --- |
+| Foundation | Schema, WAC inventory engine, mock data layer, login + dashboard shell | ✅ |
+| Phase 2 — Core Inventory Operations | Product catalogue | ✅ |
+| | Goods receiving (quick-receive, ad-hoc) | ✅ |
+| | Inter-warehouse transfers | ✅ |
+| | Write-offs & adjustments (with approval gate) | ✅ |
+| Phase 3 — Sales, Procurement & Suppliers | Sales orders & dispatch (reserve → dispatch) | ✅ |
+| | Full purchase order lifecycle (draft → issue → partial/full receive) | ✅ |
+| | Suppliers, Customers | ✅ |
+| Phase 4 — Invoicing, Billing & Accounting | Invoicing & billing (VAT, payments, ageing) | ✅ |
+| | Accounting integration (Sage/QuickBooks/Xero) | ⏳ blocked on §7.5 |
+| Phase 5 — Dashboards, Reporting, Barcode Scanning | — | Not started |
+| Phase 6 — User Management, Security, Audit Trail | RBAC enforcement, 2FA, immutable audit log | Not started |
+| Authentication | Real Supabase Auth | **Deferred by explicit direction**, not oversight |
+| Core Data | Live Supabase project | **Deferred by explicit direction** — see §4 |
+| Testing, Training, UAT, Production | — | Not started |
+
+**Right now, this is a schema-and-engine-first vertical slice, not a partial ERP.** Every module that *is*
+built goes all the way from UI → server action → repository → the WAC inventory engine → the (mocked)
+ledger, and was verified live rather than assumed correct. Nothing that *isn't* built has a half-finished
+UI sitting on top of nothing.
+
+For the detailed, ongoing decision log (what's real vs. mocked, open business decisions, next steps in
+order), see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). For the version-by-version build history, see
+[`CHANGELOG.md`](CHANGELOG.md).
+
+---
+
+## 3. Running it locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000 — you'll land on `/login`. Demo credentials are shown on the page itself
-(also in `src/lib/auth.ts`). There is no real backend yet: the app runs entirely on in-memory mock data
-that resets on every server restart.
-
-## Project layout
+Open http://localhost:3000 (or whatever port `next dev` picks) — you'll land on `/login`. Demo credentials
+are shown on the page itself (also in `src/lib/demo-credentials.ts`):
 
 ```
-supabase/migrations/     Postgres schema (schema-as-code, not yet applied to any project)
-src/lib/domain/          TypeScript types mirroring the schema
-src/lib/data/            Repository interfaces + the mock implementation of them
-src/lib/services/        Business logic (the WAC inventory engine)
-src/lib/auth.ts          Mock session/auth — replaced wholesale in the Authentication phase
-src/app/login/           Sign-in screen
-src/app/dashboard/       Authenticated shell: KPIs, stock ledger, "record a movement" demo
-docs/                    Architecture notes and the business-decision log
+Email:    demo@cobroconcrete.co.za
+Password: CobroDemo2026
 ```
+
+There is **no real backend**. The entire app runs on an in-memory mock data layer (`src/lib/data/mock`)
+that resets every time the dev server restarts. This is deliberate for the current phase — see §4.
+
+---
+
+## 4. Why mock data instead of a live Supabase project (for now)
+
+Decided explicitly, not by default:
+
+- Production ownership is meant to end up with **Cobro**, and no Cobro-controlled Supabase org exists yet.
+  Provisioning a project now would default to X Spark's own org — workable as a stopgap, but not something
+  to do silently on a client's behalf.
+- It doesn't block development on that account-setup conversation happening in parallel.
+
+Instead, development proceeds against:
+
+1. **Real schema-as-code** (`supabase/migrations/*.sql`) — written for and ready to apply to a real
+   Supabase/Postgres project the moment one exists.
+2. **A real repository interface layer** (`src/lib/data/repositories.ts`) that any real backend must
+   satisfy.
+3. **A mock implementation** of that exact interface (`src/lib/data/mock/`) standing in today.
+
+**When a real Supabase project exists:** run the migrations in `supabase/migrations/`, write
+`src/lib/data/supabase/*.ts` implementing the same interfaces, and flip `DATA_SOURCE=supabase` in
+`src/lib/data/index.ts`. No calling code — services, pages, server actions — should need to change, because
+none of it imports the mock layer directly; everything imports from `src/lib/data/index.ts`.
+
+The same logic applies to auth: `src/lib/auth.ts` is a deliberately minimal mock session (one hardcoded
+demo user, a cookie, no password hashing, no MFA) standing in for real Supabase Auth. It exposes exactly
+two functions — `getSession()` and the sign-in/out actions — so replacing it wholesale doesn't ripple
+through every page that currently calls `getSession()`.
+
+---
+
+## 5. Tech stack
+
+- **Frontend:** Next.js 16 (App Router, Server Components + Server Actions), React 19, TypeScript, Tailwind
+  v4.
+- **Data (target):** Supabase — Postgres, Auth, Storage, Edge Functions. Not yet provisioned.
+- **Data (current):** in-memory mock repositories behind the exact interfaces the Supabase layer will
+  implement.
+
+This matches the RFQ's own system map (responsive SPA, RESTful data access, relational DB, OAuth/2FA)
+without needing a separate Node/.NET API tier — Supabase's generated REST/Postgres access plus Edge
+Functions cover that role directly, which matters given the tight budget and timeline (§1, §7.1).
+
+---
+
+## 6. How the app is put together
+
+**The golden rule this codebase follows:** `DATA → DOMAIN → API → BUSINESS LOGIC → SECURITY → UI →
+REPORTING` — never `UI → fake data → database later`. Concretely:
+
+```
+supabase/migrations/          Postgres schema, schema-as-code (target: Supabase; not yet applied anywhere)
+        ↓
+src/lib/domain/inventory.ts   TypeScript types mirroring that schema, by hand
+        ↓
+src/lib/data/repositories.ts  Repository INTERFACES — the seam. Services and UI only ever depend on these.
+        ↓
+src/lib/data/mock/            The current implementation of those interfaces (in-memory, resettable)
+        ↓
+src/lib/services/             Business logic — pure functions with no I/O (the WAC inventory engine)
+        ↓
+src/app/                      Next.js routes: Server Components (read), Server Actions (write)
+```
+
+**The inventory engine** (`src/lib/services/inventory-engine.ts`) is the one place stock quantity and cost
+math happens — Weighted-Average-Cost (WAC) costing, per the RFQ's explicit requirement (not an assumption).
+Every stock-affecting workflow (GRN receiving, dispatch, inter-warehouse transfer, adjustment/write-off)
+posts through the same `applyMovement` function, so the stock ledger is always a true derivation of an
+append-only movement log — which is exactly what makes the audit trail meaningful later. It's implemented
+as pure, unit-testable functions with zero I/O.
+
+**Reservation is separate from movement.** Confirming a sales order reserves stock
+(`stock_ledger.quantity_reserved`) without posting a stock movement or touching WAC — it's a ledger-state
+change, handled by `adjustReserved`, distinct from `applyMovement`. Only dispatch posts the real outbound
+movement and releases the reservation.
+
+**Every mutating Server Action re-checks the session itself** (`getSession()` at the top of each action) —
+Server Functions in Next.js are reachable via direct POST requests, not just through the rendered UI, so
+"the page was behind a login redirect" is not sufficient authorization on its own.
+
+---
+
+## 7. What each module actually does
+
+- **Product catalogue** (`/dashboard/products`) — list + add SKUs, unit of measure, barcode, reorder
+  point/quantity.
+- **Goods receiving** (`/dashboard/receiving`) — "quick receive": creates a PO + PO line + GRN + GRN line
+  and posts the stock movement in one step, for genuine ad-hoc receipts with no formal PO raised.
+- **Purchase orders** (`/dashboard/purchase-orders`) — the formal lifecycle: draft → issue → receive one
+  or more times against it (partial receipts supported, each posts its own GRN + `receipt` movement at the
+  PO's quoted unit cost) until fully received.
+- **Inter-warehouse transfers** (`/dashboard/transfers`) — initiate posts a `transfer_out` at the source
+  immediately (in-transit, out of that warehouse's ledger); complete posts the matching `transfer_in` at
+  the destination, carrying the **source's WAC** as the transferred cost — so a transfer never fabricates
+  value, it just moves stock at its existing cost.
+- **Write-offs & adjustments** (`/dashboard/adjustments`) — request stays `pending_approval` and never
+  touches the ledger; approving posts the movement (the sign of the quantity delta decides `adjustment` vs.
+  `write_off`); rejecting never does. Any signed-in mock user can currently approve — real RBAC (who's
+  allowed to approve what) is an open decision, see §7.2.
+- **Sales orders & dispatch** (`/dashboard/sales`) — draft (nothing reserved) → confirm (reserves stock,
+  no ledger movement, no WAC change) → dispatch (posts the real outbound movement at the ledger's current
+  WAC, releases the reservation) or cancel from draft/confirmed (releases any reservation, posts nothing).
+- **Suppliers** (`/dashboard/suppliers`) and **Customers** (`/dashboard/customers`) — list + add, feeding
+  the pickers on receiving/purchase orders and sales orders respectively.
+- **Invoicing & billing** (`/dashboard/invoices`) — one VAT-compliant invoice generated per dispatched
+  sales order (15% VAT, the current SARS rate; 30-day payment terms matching Cobro's own terms as vendor
+  to Productivity SA). Payments — partial or full — move status `unpaid` → `partially_paid` → `paid`;
+  ageing is computed against the due date. A dispatched order can't be invoiced twice.
+- **Dashboard overview** (`/dashboard`) — live KPIs (SKUs tracked, total stock value, below-reorder-point
+  count) and the multi-warehouse stock ledger table, plus a generic "record a movement" form that exercises
+  the engine directly (the original proof-of-concept before the dedicated workflow pages existed).
+
+Every workflow above was exercised live in the browser during development — not just written and assumed
+correct — with the resulting quantities/costs/VAT amounts hand-verified against the expected math. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §1 for the specific numbers checked for each module.
+
+---
+
+## 8. What's real vs. mocked
+
+| Area | Status |
+| --- | --- |
+| UI (login, dashboard shell + nav, every module page) | Real, matches the approved visual design |
+| WAC costing math | Real business logic, pure functions, exercised by every workflow |
+| Every module in §7 | Real logic and UI, running against the mock data layer |
+| Database schema | Written (`supabase/migrations/`), **not applied anywhere yet** |
+| Auth | Mock — one hardcoded demo user/password, cookie session. **Deferred by direction.** No password hashing, no MFA (RFQ requires 2FA for privileged users), no real Supabase Auth. |
+| RBAC | Schema has `roles`/`permissions`; **not enforced** — any signed-in mock user can do anything a signed-in user can do |
+| Audit trail immutability | Table exists (`audit_log`); DB-level enforcement (revoke UPDATE/DELETE or a blocking trigger) not built — explicitly Security Hardening phase work |
+| Accounting integration (Sage/QuickBooks/Xero) | Not started — blocked on choosing a platform (§7.5) |
+| Reporting (15+ reports), barcode/QR scanning | Not started (RFQ Phase 5) |
+
+---
+
+## 9. Business decisions required — do not resolve these by assumption
+
+These affect stock valuation, financial calculations, approval authority, VAT, or user permissions, and
+the RFQ / SoW does not define them. Confirm with Cobro before further engineering commits to an assumption:
+
+1. **MVP cut-line for the 8-week/R171,695 window.** What ships by 30/09/2026 vs. what falls into the
+   6-month post-delivery support window — the full RFQ scope is a lot for this budget/timeline.
+2. **Permission matrix per role.** Who can approve write-offs, issue POs, edit prices, etc. — not defined
+   anywhere in the RFQ.
+3. **BOM structure.** Currently one-level (parent → component). Does Cobro need nested/multi-level BOM?
+4. **Adjustment reason codes.** Seeded with plausible defaults (`BREAKAGE`, `CYCLE_COUNT`, `THEFT_LOSS`,
+   `FOUND_STOCK`) — confirm the real list and which roles approve which reasons.
+5. **Accounting integration target.** RFQ allows Sage, QuickBooks, or Xero "or equivalent" — not chosen.
+6. **Reorder point scope.** One global `reorder_point` per product today — does Cobro want per-warehouse
+   thresholds instead?
+7. **VAT-exempt sales.** Every invoice is standard-rated (15%) today — do any customers (e.g. exports)
+   need a 0%-rated path?
+8. **Payment terms.** Invoices default to 30 days, mirroring Cobro's own terms as vendor to Productivity
+   SA — confirm this is actually Cobro's customer-facing policy.
+
+Full detail and rationale for each lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §5.
+
+---
+
+## 10. Project layout
+
+```
+supabase/migrations/            Postgres schema, schema-as-code, not yet applied to any project
+  20260815120000_...sql           Foundation + Phase 2: warehouses, products, BOM, suppliers, minimal POs,
+                                   GRN, transfers, adjustments, stock ledger/movements, roles, audit log
+  20260815130000_...sql           Phase 3 sales half: customers, sales_orders, sales_order_lines
+  20260815140000_...sql           Phase 4: invoices, invoice_payments
+
+src/lib/domain/inventory.ts     TypeScript types mirroring the schema, by hand, kept in sync manually
+src/lib/data/
+  repositories.ts                 Repository INTERFACES — the seam every service/page depends on
+  index.ts                        Single entry point; DATA_SOURCE switch (mock today, supabase later)
+  mock/
+    seed.ts                         Seed data: warehouses, products, suppliers, customers, users, roles
+    repositories.ts                 The mock implementation of every repository interface
+src/lib/services/inventory-engine.ts   The WAC costing engine — pure functions, no I/O
+src/lib/auth.ts                 Mock session/auth — replaced wholesale in the real Authentication phase
+src/lib/demo-credentials.ts     The one demo login (kept separate so a 'use client' component can safely
+                                 import it without pulling next/headers into the client bundle)
+src/lib/now.ts                  Tiny wrapper around Date.now() so Server Components can read wall-clock
+                                 time without tripping the react-hooks/purity lint rule
+
+src/app/
+  page.tsx                        Redirects to /login or /dashboard based on session
+  login/                          Sign-in screen (server action + client form)
+  dashboard/
+    layout.tsx                      Sidebar nav + session gate for every /dashboard/* route
+    page.tsx                        Overview: KPIs, stock ledger, generic "record a movement" demo
+    products/                       Product catalogue
+    receiving/                      Ad-hoc GRN quick-receive
+    purchase-orders/                Full PO lifecycle: draft → issue → receive
+    transfers/                      Inter-warehouse transfers
+    adjustments/                    Write-offs & adjustments with approval gate
+    sales/                          Sales orders & dispatch
+    suppliers/, customers/          List + add pickers
+    invoices/                       Invoicing & billing, payments, ageing
+
+docs/ARCHITECTURE.md            The running decision log — phase status, what's real/mocked, open
+                                 business decisions, next steps in order. Update it as phases complete.
+CHANGELOG.md                    Version-by-version build history (semver, pre-1.0)
+```
+
+---
+
+## 11. Next steps (in order)
+
+1. **Resolve §9.1 (MVP cut-line) with the client** before committing further engineering time — this
+   materially changes phase sequencing.
+2. **Authentication phase:** real Supabase project + Supabase Auth, replacing `src/lib/auth.ts`.
+3. **Core Data phase:** apply the migrations to that project, replace the mock repositories with real
+   Supabase-backed ones behind the same interfaces.
+4. **Accounting integration:** once §9.5 is decided, build the Sage/QuickBooks/Xero sync.
+5. **Phase 5:** Dashboards & Reporting (15+ standard reports), barcode/QR scanning.
+6. **Phase 6:** RBAC enforcement, 2FA for privileged users, DB-level immutable audit trail.
+7. **Phase 8:** system testing, UAT, training materials, production cutover.
