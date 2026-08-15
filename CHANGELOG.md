@@ -4,6 +4,15 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.7.0 — 2026-08-15
+
+**Documentation: full-context README.**
+- Rewrote `README.md` as the single "read this first" entry point — business context (client, funding,
+  budget/timeline reality check), current status per RFQ phase, what's real vs. mocked, demo credentials,
+  how the codebase is put together (golden rule, inventory engine, reservation-vs-movement), what every
+  module actually does, the open business-decision log, full project layout, and next steps in order.
+  `docs/ARCHITECTURE.md` remains the more detailed, living decision log this README points to.
+
 ## v0.6.0 — 2026-08-15
 
 **RFQ Phase 4 (partial): Invoicing & Billing, plus the version number is now shown on the login footer.**
