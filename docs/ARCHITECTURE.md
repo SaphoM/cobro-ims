@@ -44,6 +44,13 @@ resulting WAC math checked by hand):
   path for genuine ad-hoc receipts with no PO. Verified: a 100-unit PO partially received at 60 then the
   remaining 40 — status moved draft → issued → partially received → received exactly on quantity, and
   the ledger's WAC recalculated correctly after each receipt.
+- **Invoicing & billing** (`/dashboard/invoices`, RFQ Phase 4) — one VAT-compliant invoice per dispatched
+  sales order (`VAT_RATE` = 15%, the current SARS rate), 30-day payment terms matching Cobro's own terms
+  as vendor to Productivity SA. Payments (partial or full) move status unpaid → partially paid → paid;
+  ageing is computed from `dueAt` against wall-clock time. Verified: a 20-bag order at R200/bag produced
+  exactly subtotal R4,000.00 / VAT R600.00 / total R4,600.00 due 30 days out; a R2,000 partial payment
+  then the R2,600 remainder moved the invoice through partially-paid to paid exactly, and the sales page
+  correctly blocks double-invoicing a dispatched order.
 
 What exists as the underlying substrate is a **schema-and-engine-first vertical slice**, not a partial
 ERP:
@@ -105,7 +112,8 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
   blocking trigger) not yet built — that's explicitly Security Hardening phase work per the RFQ |
 | Sales orders & dispatch (reservation + dispatch) | Real logic and UI — see §1 |
 | Purchase order lifecycle (draft/issue/partial-receive) | Real logic and UI — see §1 |
-| Invoicing, Accounting Integration | Not started (RFQ Phase 4) |
+| Invoicing & billing (VAT, payments, ageing) | Real logic and UI — see §1 |
+| Accounting Integration (Sage/QuickBooks/Xero) | Not started — blocked on §5.5 (which platform) |
 | Reporting, Barcode Scanning | Not started (RFQ Phase 5) |
 
 ## 5. BUSINESS DECISION REQUIRED — do not resolve these by assumption
@@ -127,6 +135,10 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 6. **Reorder point scope.** Currently modelled as one `reorder_point` per product (implicitly applied per
    warehouse in the dashboard's low-stock flag). Confirm whether Cobro wants per-warehouse reorder
    thresholds instead of one global figure per SKU.
+7. **VAT-exempt sales.** Every invoice generated today is standard-rated at 15%. Confirm whether any
+   Cobro customers (e.g. export sales) need a 0%-rated invoice path — the current model doesn't have one.
+8. **Payment terms.** Invoices default to 30-day terms, matching Cobro's own terms as vendor to
+   Productivity SA. Confirm this is actually Cobro's customer-facing policy — it may differ by customer.
 
 ## 6. Next steps (in order)
 

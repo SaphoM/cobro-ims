@@ -14,6 +14,8 @@ import type {
   Customer,
   GoodsReceipt,
   InterWarehouseTransfer,
+  Invoice,
+  InvoicePayment,
   PoStatus,
   Product,
   ProductBomLine,
@@ -227,6 +229,22 @@ export interface SalesOrderRepository {
   dispatch(orderId: string, dispatchedBy: string): Promise<SalesOrder>;
   cancel(orderId: string): Promise<SalesOrder>;
   getStatus(orderId: string): Promise<SalesOrderStatus | null>;
+}
+
+/**
+ * One invoice per dispatched sales order. `generateFromSalesOrder` computes
+ * subtotal/VAT/total from the order's quantity*unitPrice and the current
+ * VAT_RATE (src/lib/domain/inventory.ts), and sets a 30-day due date —
+ * matching Cobro's own payment terms as vendor to Productivity SA. Throws if
+ * the order isn't dispatched yet or already has an invoice.
+ */
+export interface InvoiceRepository {
+  list(): Promise<Invoice[]>;
+  getBySalesOrderId(salesOrderId: string): Promise<Invoice | null>;
+  generateFromSalesOrder(salesOrderId: string, createdBy: string): Promise<Invoice>;
+  /** Partial payments supported — status becomes 'partially_paid' or 'paid' depending on the running total. */
+  recordPayment(invoiceId: string, amount: number, recordedBy: string): Promise<{ invoice: Invoice; payment: InvoicePayment }>;
+  listPayments(invoiceId: string): Promise<InvoicePayment[]>;
 }
 
 export interface UserRepository {

@@ -258,3 +258,42 @@ export interface SalesOrder {
   confirmedAt: ISODateTime | null;
   dispatchedAt: ISODateTime | null;
 }
+
+// ---------------------------------------------------------------------------
+// RFQ Phase 4 — Invoicing & Billing
+// ---------------------------------------------------------------------------
+
+export type InvoiceStatus = 'unpaid' | 'partially_paid' | 'paid' | 'cancelled';
+
+/**
+ * The current SARS VAT rate. Not a Claude Code assumption — 15% is the
+ * factual current rate. What IS an open question (BUSINESS DECISION
+ * REQUIRED, see docs/ARCHITECTURE.md): whether any Cobro customers are
+ * VAT-exempt (e.g. export sales) and need a 0%-rated invoice path, which
+ * this model doesn't handle yet — every invoice here is standard-rated.
+ */
+export const VAT_RATE = 0.15;
+
+/** One invoice per dispatched sales order (mirrors the order's single-line simplification). */
+export interface Invoice {
+  id: UUID;
+  invoiceNumber: string;
+  salesOrderId: UUID;
+  customerId: UUID;
+  subtotal: number; // ex-VAT, quantityOrdered * unitPrice from the sales order
+  vatAmount: number;
+  total: number;
+  amountPaid: number;
+  status: InvoiceStatus;
+  issuedAt: ISODateTime;
+  dueAt: ISODateTime; // issuedAt + payment terms (30 days, matching Cobro's own PO terms)
+  createdBy: UUID;
+}
+
+export interface InvoicePayment {
+  id: UUID;
+  invoiceId: UUID;
+  amount: number;
+  paidAt: ISODateTime;
+  recordedBy: UUID;
+}

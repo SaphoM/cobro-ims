@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { LoginForm } from '@/app/login/login-form';
+import packageJson from '../../../package.json';
 
 export default async function LoginPage() {
   const session = await getSession();
@@ -11,6 +12,8 @@ export default async function LoginPage() {
       <LoginForm />
       <p className="text-center font-mono-brand text-[0.68rem] font-medium tracking-[0.08em] text-text-faint uppercase">
         Built by <span className="text-text-muted">X Spark</span>
+        <span className="mx-1.5 text-accent/40">·</span>
+        <span>v{packageJson.version}</span>
       </p>
     </div>
   );

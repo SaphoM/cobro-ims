@@ -1,24 +1,28 @@
 import {
   customerRepository,
+  invoiceRepository,
   productRepository,
   salesOrderRepository,
   warehouseRepository,
 } from '@/lib/data';
 import { SalesOrderForm } from '@/app/dashboard/sales/sales-order-form';
 import { cancelSalesOrderAction, confirmSalesOrderAction, dispatchSalesOrderAction } from '@/app/dashboard/sales/actions';
+import { generateInvoiceAction } from '@/app/dashboard/invoices/actions';
 import type { SalesOrderStatus } from '@/lib/domain/inventory';
 
 export default async function SalesPage() {
-  const [customers, warehouses, products, orders] = await Promise.all([
+  const [customers, warehouses, products, orders, invoices] = await Promise.all([
     customerRepository.list(),
     warehouseRepository.list(),
     productRepository.list(),
     salesOrderRepository.list(),
+    invoiceRepository.list(),
   ]);
 
   const customerById = new Map(customers.map((c) => [c.id, c]));
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
   const productById = new Map(products.map((p) => [p.id, p]));
+  const invoicedOrderIds = new Set(invoices.map((i) => i.salesOrderId));
 
   return (
     <div className="flex flex-col gap-6">
@@ -99,6 +103,18 @@ export default async function SalesPage() {
                                 Cancel
                               </button>
                             </form>
+                          )}
+                          {o.status === 'dispatched' && !invoicedOrderIds.has(o.id) && (
+                            <form action={generateInvoiceAction.bind(null, o.id)}>
+                              <button type="submit" className="text-[0.8rem] font-semibold text-accent hover:text-accent-hover">
+                                Generate invoice
+                              </button>
+                            </form>
+                          )}
+                          {o.status === 'dispatched' && invoicedOrderIds.has(o.id) && (
+                            <a href="/dashboard/invoices" className="text-[0.8rem] font-semibold text-text-faint hover:text-accent">
+                              Invoiced
+                            </a>
                           )}
                         </div>
                       </td>

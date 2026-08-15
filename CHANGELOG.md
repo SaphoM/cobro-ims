@@ -4,6 +4,20 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.6.0 — 2026-08-15
+
+**RFQ Phase 4 (partial): Invoicing & Billing, plus the version number is now shown on the login footer.**
+- Schema: `invoices`, `invoice_payments`
+- One VAT-compliant invoice per dispatched sales order (`VAT_RATE` = 15%, current SARS rate), 30-day
+  payment terms; "Generate invoice" appears on a dispatched order once, then reads "Invoiced"
+- Payments (partial or full) move status unpaid → partially paid → paid; `/dashboard/invoices` shows
+  outstanding total, overdue count, and per-invoice ageing against the due date
+- Login page footer now reads live from `package.json` (`Built by X Spark · v{version}`) instead of a
+  static string
+- Verified: a 20-bag order at R200/bag produced exactly R4,000.00 subtotal / R600.00 VAT / R4,600.00
+  total due 30 days out; a R2,000 partial payment then the R2,600 remainder moved the invoice through
+  partially-paid to paid exactly
+
 ## v0.5.0 — 2026-08-15
 
 **Closes the RFQ Phase 3 gap: full Purchase Order lifecycle.**

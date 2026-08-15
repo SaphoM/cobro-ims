@@ -16,6 +16,8 @@ import type {
   Customer,
   GoodsReceipt,
   InterWarehouseTransfer,
+  Invoice,
+  InvoicePayment,
   Product,
   ProductBomLine,
   PurchaseOrder,
@@ -27,6 +29,7 @@ import type {
   Supplier,
   Warehouse,
 } from '@/lib/domain/inventory';
+import { VAT_RATE } from '@/lib/domain/inventory';
 import type {
   AdjustmentReasonRepository,
   CreateCustomerInput,
@@ -36,6 +39,7 @@ import type {
   CreateSupplierInput,
   CustomerRepository,
   InitiateTransferInput,
+  InvoiceRepository,
   ProductRepository,
   PurchaseOrderRepository,
   PurchaseOrderWithLine,
@@ -76,6 +80,8 @@ const state = {
   adjustments: [] as StockAdjustment[],
   salesOrders: [] as SalesOrder[],
   purchaseOrderLines: new Map<string, PurchaseOrderLine>(),
+  invoices: [] as Invoice[],
+  invoicePayments: [] as InvoicePayment[],
 };
 
 let poCounter = 1000;
@@ -83,6 +89,7 @@ let grnCounter = 1000;
 let transferCounter = 1000;
 let adjustmentCounter = 1000;
 let salesOrderCounter = 1000;
+let invoiceCounter = 1000;
 
 function ledgerKey(productId: string, warehouseId: string) {
   return `${productId}::${warehouseId}`;
@@ -623,6 +630,80 @@ export const mockSalesOrderRepository: SalesOrderRepository = {
   },
   async getStatus(orderId) {
     return state.salesOrders.find((o) => o.id === orderId)?.status ?? null;
+  },
+};
+
+const INVOICE_PAYMENT_TERMS_DAYS = 30; // matches Cobro's own PO terms as vendor to Productivity SA
+
+export const mockInvoiceRepository: InvoiceRepository = {
+  async list() {
+    return [...state.invoices].sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
+  },
+  async getBySalesOrderId(salesOrderId) {
+    return state.invoices.find((i) => i.salesOrderId === salesOrderId) ?? null;
+  },
+  async generateFromSalesOrder(salesOrderId, createdBy) {
+    const order = state.salesOrders.find((o) => o.id === salesOrderId);
+    if (!order) throw new Error('Sales order not found.');
+    if (order.status !== 'dispatched') {
+      throw new Error('Only dispatched orders can be invoiced.');
+    }
+    if (state.invoices.some((i) => i.salesOrderId === salesOrderId)) {
+      throw new Error('This order already has an invoice.');
+    }
+
+    invoiceCounter += 1;
+    const subtotal = Math.round(order.quantityOrdered * order.unitPrice * 100) / 100;
+    const vatAmount = Math.round(subtotal * VAT_RATE * 100) / 100;
+    const total = Math.round((subtotal + vatAmount) * 100) / 100;
+    const issuedAt = new Date();
+    const dueAt = new Date(issuedAt.getTime() + INVOICE_PAYMENT_TERMS_DAYS * 24 * 60 * 60 * 1000);
+
+    const invoice: Invoice = {
+      id: randomUUID(),
+      invoiceNumber: `INV-${invoiceCounter}`,
+      salesOrderId,
+      customerId: order.customerId,
+      subtotal,
+      vatAmount,
+      total,
+      amountPaid: 0,
+      status: 'unpaid',
+      issuedAt: issuedAt.toISOString(),
+      dueAt: dueAt.toISOString(),
+      createdBy,
+    };
+    state.invoices.push(invoice);
+    return invoice;
+  },
+  async recordPayment(invoiceId, amount, recordedBy) {
+    const invoice = state.invoices.find((i) => i.id === invoiceId);
+    if (!invoice) throw new Error('Invoice not found.');
+    if (invoice.status === 'paid' || invoice.status === 'cancelled') {
+      throw new Error(`Invoice is already ${invoice.status}.`);
+    }
+    if (amount <= 0) throw new Error('Payment amount must be positive.');
+    const outstanding = Math.round((invoice.total - invoice.amountPaid) * 100) / 100;
+    if (amount > outstanding + 1e-9) {
+      throw new Error(`Cannot pay more than the R${outstanding.toFixed(2)} outstanding on this invoice.`);
+    }
+
+    const payment: InvoicePayment = {
+      id: randomUUID(),
+      invoiceId,
+      amount,
+      paidAt: new Date().toISOString(),
+      recordedBy,
+    };
+    state.invoicePayments.push(payment);
+
+    invoice.amountPaid = Math.round((invoice.amountPaid + amount) * 100) / 100;
+    invoice.status = invoice.amountPaid >= invoice.total - 1e-9 ? 'paid' : 'partially_paid';
+
+    return { invoice, payment };
+  },
+  async listPayments(invoiceId) {
+    return state.invoicePayments.filter((p) => p.invoiceId === invoiceId);
   },
 };
 
