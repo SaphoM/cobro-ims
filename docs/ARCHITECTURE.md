@@ -9,12 +9,30 @@ phases complete — don't let it drift from the code.
 
 ## 1. Current phase
 
-**FOUNDATION** — in progress. Repository discovery and requirements review are done (this doc + the RFQ
-docs are the output). Not yet started: AUTHENTICATION (real Supabase auth), CORE DATA (real database),
-WAREHOUSE OPERATIONS, PROCUREMENT, SALES & DISPATCH, INVOICING, ACCOUNTING, REPORTING, SECURITY
-HARDENING, UAT, PRODUCTION.
+**FOUNDATION done; INVENTORY ENGINE (RFQ Phase 2) workflows built on top of it.** Real AUTHENTICATION
+(Supabase Auth) and CORE DATA (a live Supabase project) are explicitly deferred for now — by direction,
+not oversight — so the mock auth and mock data layer described below are still current. Not yet started:
+WAREHOUSE OPERATIONS beyond what's listed here, PROCUREMENT (full PO lifecycle & supplier management),
+SALES & DISPATCH, INVOICING, ACCOUNTING, REPORTING, SECURITY HARDENING, UAT, PRODUCTION.
 
-What exists today is a **schema-and-engine-first vertical slice**, not a partial ERP:
+Built and browser-verified (not just written — each flow below was exercised end-to-end and the
+resulting WAC math checked by hand):
+
+- **Product catalogue** (`/dashboard/products`) — list + add product.
+- **Goods receiving** (`/dashboard/receiving`) — a "quick receive" flow that creates the PO, PO line, GRN
+  and GRN line, then posts the stock movement. Deliberately skips a separate PO-issuing step since full
+  Purchase Order lifecycle management is RFQ Phase 3, not Phase 2 — the schema still models PO → GRN
+  properly underneath.
+- **Inter-warehouse transfers** (`/dashboard/transfers`) — initiate posts a `transfer_out` at the source
+  immediately (in-transit); complete posts the matching `transfer_in` at the destination, carrying the
+  source's WAC as the transferred cost. Verified: transferring stock correctly re-derives the
+  destination's WAC using the source's cost, not the destination's placeholder cost.
+- **Write-offs & adjustments** (`/dashboard/adjustments`) — request stays `pending_approval` and never
+  touches the ledger; approving posts the movement (sign of `quantityDelta` decides `adjustment` vs.
+  `write_off`), rejecting never does. Verified end-to-end including the approval gate.
+
+What exists as the underlying substrate is a **schema-and-engine-first vertical slice**, not a partial
+ERP:
 
 - A Postgres schema (`supabase/migrations/`) covering Foundation + RFQ Phase 2 (Core Inventory
   Operations), written for Supabase but not applied to any live project yet.
@@ -57,16 +75,22 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 
 | Area | Status |
 | --- | --- |
-| UI (login, dashboard shell) | Real, matches the approved visual design |
-| WAC costing math | Real business logic, pure functions, in `inventory-engine.ts` |
+| UI (login, dashboard shell + nav, product/receiving/transfers/adjustments pages) | Real, matches the
+  approved visual design |
+| WAC costing math | Real business logic, pure functions, in `inventory-engine.ts`, exercised by every
+  workflow above (not just the original demo form) |
+| GRN receiving, transfers, adjustment approval workflows | Real logic and real UI, running against the
+  mock data layer — see §1 |
 | Database schema | Written (`supabase/migrations`), **not applied anywhere** |
-| Auth | Mock — one hardcoded demo user/password in `src/lib/auth.ts`, cookie session. **Not the
-  Authentication phase deliverable.** No password hashing, no MFA (RFQ requires 2FA for privileged
-  users), no real Supabase Auth yet. |
-| RBAC | Schema has `roles`/`permissions`, nothing enforces it yet |
+| Auth | Mock — one hardcoded demo user/password in `src/lib/auth.ts`, cookie session. **Deferred by
+  direction**, not the Authentication phase deliverable. No password hashing, no MFA (RFQ requires 2FA
+  for privileged users), no real Supabase Auth yet. |
+| RBAC | Schema has `roles`/`permissions`; not enforced yet — any signed-in mock user can approve
+  adjustments, which is flagged inline in the adjustments UI |
 | Audit trail immutability | Table exists (`audit_log`), DB-level enforcement (revoke UPDATE/DELETE or a
   blocking trigger) not yet built — that's explicitly Security Hardening phase work per the RFQ |
-| Procurement, Sales & Dispatch, Invoicing, Accounting Integration | Not started (RFQ Phases 3-4) |
+| Full Purchase Order lifecycle & Supplier Management, Sales & Dispatch, Invoicing, Accounting
+  Integration | Not started (RFQ Phases 3-4) |
 | Reporting, Barcode Scanning | Not started (RFQ Phase 5) |
 
 ## 5. BUSINESS DECISION REQUIRED — do not resolve these by assumption
