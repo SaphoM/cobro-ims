@@ -7,6 +7,7 @@
 
 import type {
   AdjustmentReasonCode,
+  Customer,
   Product,
   Role,
   StockLedgerEntry,
@@ -66,6 +67,12 @@ export const suppliers: Supplier[] = [
   { id: 'sup-natal-cement', name: 'Natal Cement Distributors', contactEmail: 'orders@natalcement.co.za', contactPhone: '031 555 0142', address: 'Pinetown, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
   { id: 'sup-kzn-aggregates', name: 'KZN Aggregates & Quarries', contactEmail: 'sales@kznaggregates.co.za', contactPhone: '031 555 0199', address: 'Camperdown, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
   { id: 'sup-steel-supply', name: 'Steel Supply Co.', contactEmail: 'accounts@steelsupply.co.za', contactPhone: '033 555 0177', address: 'Pietermaritzburg, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
+];
+
+export const customers: Customer[] = [
+  { id: 'cust-thabo-construction', name: 'Thabo Construction', contactEmail: 'procurement@thaboconstruction.co.za', contactPhone: '031 555 0301', address: 'Umlazi, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
+  { id: 'cust-kzn-builders', name: 'KZN Builders Merchant', contactEmail: 'orders@kznbuilders.co.za', contactPhone: '033 555 0288', address: 'Pietermaritzburg, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
+  { id: 'cust-msunduzi-dev', name: 'Msunduzi Developments', contactEmail: 'accounts@msunduzidev.co.za', contactPhone: '033 555 0412', address: 'Msunduzi, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
 ];
 
 export const adjustmentReasonCodes: AdjustmentReasonCode[] = [

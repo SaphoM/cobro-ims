@@ -13,11 +13,13 @@
 import { randomUUID } from 'crypto';
 import type {
   AdjustmentReasonCode,
+  Customer,
   GoodsReceipt,
   InterWarehouseTransfer,
   Product,
   ProductBomLine,
   PurchaseOrder,
+  SalesOrder,
   StockAdjustment,
   StockLedgerEntry,
   StockMovement,
@@ -26,13 +28,18 @@ import type {
 } from '@/lib/domain/inventory';
 import type {
   AdjustmentReasonRepository,
+  CreateCustomerInput,
   CreateProductInput,
+  CreateSalesOrderInput,
+  CreateSupplierInput,
+  CustomerRepository,
   InitiateTransferInput,
   ProductRepository,
   QuickReceiveInput,
   ReceivingRepository,
   RecordMovementInput,
   RequestAdjustmentInput,
+  SalesOrderRepository,
   StockAdjustmentRepository,
   StockLedgerRepository,
   StockMovementRepository,
@@ -44,6 +51,7 @@ import type {
 import { applyMovement } from '@/lib/services/inventory-engine';
 import {
   adjustmentReasonCodes,
+  customers as seedCustomers,
   products as seedProducts,
   stockLedger as seedLedger,
   suppliers as seedSuppliers,
@@ -54,18 +62,22 @@ import {
 // Module-level mutable state, seeded once per server process.
 const state = {
   products: [...seedProducts] as Product[],
+  suppliers: [...seedSuppliers] as Supplier[],
+  customers: [...seedCustomers] as Customer[],
   ledger: new Map<string, StockLedgerEntry>(seedLedger.map((e) => [ledgerKey(e.productId, e.warehouseId), { ...e }])),
   movements: [] as StockMovement[],
   purchaseOrders: [] as PurchaseOrder[],
   goodsReceipts: [] as GoodsReceipt[],
   transfers: [] as InterWarehouseTransfer[],
   adjustments: [] as StockAdjustment[],
+  salesOrders: [] as SalesOrder[],
 };
 
 let poCounter = 1000;
 let grnCounter = 1000;
 let transferCounter = 1000;
 let adjustmentCounter = 1000;
+let salesOrderCounter = 1000;
 
 function ledgerKey(productId: string, warehouseId: string) {
   return `${productId}::${warehouseId}`;
@@ -155,6 +167,27 @@ export const mockStockLedgerRepository: StockLedgerRepository = {
   async get(productId, warehouseId) {
     return state.ledger.get(ledgerKey(productId, warehouseId)) ?? null;
   },
+  async adjustReserved(productId, warehouseId, delta) {
+    const key = ledgerKey(productId, warehouseId);
+    const current = state.ledger.get(key);
+    if (!current) throw new Error('No stock ledger entry to reserve against.');
+
+    const nextReserved = current.quantityReserved + delta;
+    if (nextReserved < -1e-9) {
+      throw new Error('Cannot release more stock than is currently reserved.');
+    }
+    if (nextReserved > current.quantityOnHand + 1e-9) {
+      throw new Error('Not enough available stock to reserve that quantity.');
+    }
+
+    const updated: StockLedgerEntry = {
+      ...current,
+      quantityReserved: Math.round(nextReserved * 1000) / 1000,
+      updatedAt: new Date().toISOString(),
+    };
+    state.ledger.set(key, updated);
+    return updated;
+  },
 };
 
 export const mockStockMovementRepository: StockMovementRepository = {
@@ -173,7 +206,39 @@ export const mockStockMovementRepository: StockMovementRepository = {
 
 export const mockSupplierRepository: SupplierRepository = {
   async list(): Promise<Supplier[]> {
-    return seedSuppliers;
+    return state.suppliers;
+  },
+  async create(input: CreateSupplierInput) {
+    const supplier: Supplier = {
+      id: randomUUID(),
+      name: input.name,
+      contactEmail: input.contactEmail ?? null,
+      contactPhone: input.contactPhone ?? null,
+      address: input.address ?? null,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+    state.suppliers.push(supplier);
+    return supplier;
+  },
+};
+
+export const mockCustomerRepository: CustomerRepository = {
+  async list(): Promise<Customer[]> {
+    return state.customers;
+  },
+  async create(input: CreateCustomerInput) {
+    const customer: Customer = {
+      id: randomUUID(),
+      name: input.name,
+      contactEmail: input.contactEmail ?? null,
+      contactPhone: input.contactPhone ?? null,
+      address: input.address ?? null,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+    state.customers.push(customer);
+    return customer;
   },
 };
 
@@ -380,6 +445,87 @@ export const mockStockAdjustmentRepository: StockAdjustmentRepository = {
 };
 
 const pendingAdjustmentLines = new Map<string, { productId: string; quantityDelta: number; unitCost: number }>();
+
+export const mockSalesOrderRepository: SalesOrderRepository = {
+  async list() {
+    return [...state.salesOrders].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  async create(input: CreateSalesOrderInput) {
+    salesOrderCounter += 1;
+    const order: SalesOrder = {
+      id: randomUUID(),
+      orderNumber: `SO-${salesOrderCounter}`,
+      customerId: input.customerId,
+      warehouseId: input.warehouseId,
+      productId: input.productId,
+      quantityOrdered: input.quantity,
+      unitPrice: input.unitPrice,
+      status: 'draft',
+      createdBy: input.createdBy,
+      createdAt: new Date().toISOString(),
+      confirmedAt: null,
+      dispatchedAt: null,
+    };
+    state.salesOrders.push(order);
+    return order;
+  },
+  async confirm(orderId) {
+    const order = state.salesOrders.find((o) => o.id === orderId);
+    if (!order) throw new Error('Sales order not found.');
+    if (order.status !== 'draft') throw new Error(`Order is already ${order.status}.`);
+
+    // Reserving is a ledger-state change (quantity_reserved), not a stock
+    // movement — no WAC impact, nothing posted to stock_movements yet.
+    await mockStockLedgerRepository.adjustReserved(order.productId, order.warehouseId, order.quantityOrdered);
+
+    order.status = 'confirmed';
+    order.confirmedAt = new Date().toISOString();
+    return order;
+  },
+  async dispatch(orderId, dispatchedBy) {
+    const order = state.salesOrders.find((o) => o.id === orderId);
+    if (!order) throw new Error('Sales order not found.');
+    if (order.status !== 'confirmed') throw new Error('Only confirmed orders can be dispatched.');
+
+    const ledger = state.ledger.get(ledgerKey(order.productId, order.warehouseId));
+    if (!ledger) throw new Error('No stock ledger entry for this product/warehouse.');
+
+    // Post the actual outbound movement at the ledger's current WAC (the
+    // sale's unit_price is revenue, not cost — COGS is valued at WAC).
+    await postMovement({
+      productId: order.productId,
+      warehouseId: order.warehouseId,
+      movementType: 'dispatch',
+      quantity: -Math.abs(order.quantityOrdered),
+      unitCost: ledger.weightedAverageCost,
+      referenceType: 'sales_order',
+      referenceId: order.id,
+      createdBy: dispatchedBy,
+    });
+    // Release the reservation now that the stock has actually left.
+    await mockStockLedgerRepository.adjustReserved(order.productId, order.warehouseId, -order.quantityOrdered);
+
+    order.status = 'dispatched';
+    order.dispatchedAt = new Date().toISOString();
+    return order;
+  },
+  async cancel(orderId) {
+    const order = state.salesOrders.find((o) => o.id === orderId);
+    if (!order) throw new Error('Sales order not found.');
+    if (order.status === 'dispatched' || order.status === 'cancelled') {
+      throw new Error(`Order is already ${order.status}.`);
+    }
+
+    if (order.status === 'confirmed') {
+      await mockStockLedgerRepository.adjustReserved(order.productId, order.warehouseId, -order.quantityOrdered);
+    }
+    order.status = 'cancelled';
+    return order;
+  },
+  async getStatus(orderId) {
+    return state.salesOrders.find((o) => o.id === orderId)?.status ?? null;
+  },
+};
 
 export const mockUserRepository: UserRepository = {
   async findByEmail(email) {

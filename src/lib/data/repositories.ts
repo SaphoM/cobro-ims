@@ -11,11 +11,14 @@
 import type {
   AdjustmentReasonCode,
   AdjustmentStatus,
+  Customer,
   GoodsReceipt,
   InterWarehouseTransfer,
   Product,
   ProductBomLine,
   PurchaseOrder,
+  SalesOrder,
+  SalesOrderStatus,
   StockAdjustment,
   StockLedgerEntry,
   StockMovement,
@@ -52,6 +55,14 @@ export interface StockLedgerRepository {
   listAll(): Promise<StockLedgerEntry[]>;
   listByWarehouse(warehouseId: string): Promise<StockLedgerEntry[]>;
   get(productId: string, warehouseId: string): Promise<StockLedgerEntry | null>;
+  /**
+   * Adjusts quantity_reserved directly — this is a ledger-state change, not
+   * a stock movement (it doesn't affect quantity_on_hand or WAC), which is
+   * why it lives here rather than going through applyMovement. Positive
+   * delta reserves more; negative releases. Throws if it would take
+   * reserved above on-hand or below zero.
+   */
+  adjustReserved(productId: string, warehouseId: string, delta: number): Promise<StockLedgerEntry>;
 }
 
 export interface RecordMovementInput {
@@ -77,8 +88,28 @@ export interface StockMovementRepository {
   record(input: RecordMovementInput): Promise<{ movement: StockMovement; ledger: StockLedgerEntry }>;
 }
 
+export interface CreateSupplierInput {
+  name: string;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  address?: string | null;
+}
+
 export interface SupplierRepository {
   list(): Promise<Supplier[]>;
+  create(input: CreateSupplierInput): Promise<Supplier>;
+}
+
+export interface CreateCustomerInput {
+  name: string;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  address?: string | null;
+}
+
+export interface CustomerRepository {
+  list(): Promise<Customer[]>;
+  create(input: CreateCustomerInput): Promise<Customer>;
 }
 
 export interface QuickReceiveInput {
@@ -138,6 +169,30 @@ export interface StockAdjustmentRepository {
   request(input: RequestAdjustmentInput): Promise<StockAdjustment>;
   /** Approving posts the stock movement (adjustment or write_off, by sign); rejecting never touches the ledger. */
   decide(adjustmentId: string, decision: Exclude<AdjustmentStatus, 'pending_approval'>, decidedBy: string): Promise<StockAdjustment>;
+}
+
+export interface CreateSalesOrderInput {
+  customerId: string;
+  warehouseId: string;
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  createdBy: string;
+}
+
+/**
+ * Order flow: draft (nothing reserved yet) -> confirm (reserves stock,
+ * quantity_reserved only, no movement) -> dispatch (posts the 'dispatch'
+ * stock_movements row and releases the matching reservation) or cancel from
+ * draft/confirmed (releases any reservation, posts nothing).
+ */
+export interface SalesOrderRepository {
+  list(): Promise<SalesOrder[]>;
+  create(input: CreateSalesOrderInput): Promise<SalesOrder>;
+  confirm(orderId: string): Promise<SalesOrder>;
+  dispatch(orderId: string, dispatchedBy: string): Promise<SalesOrder>;
+  cancel(orderId: string): Promise<SalesOrder>;
+  getStatus(orderId: string): Promise<SalesOrderStatus | null>;
 }
 
 export interface UserRepository {

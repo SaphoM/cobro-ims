@@ -30,6 +30,14 @@ resulting WAC math checked by hand):
 - **Write-offs & adjustments** (`/dashboard/adjustments`) — request stays `pending_approval` and never
   touches the ledger; approving posts the movement (sign of `quantityDelta` decides `adjustment` vs.
   `write_off`), rejecting never does. Verified end-to-end including the approval gate.
+- **Sales orders & dispatch** (`/dashboard/sales`, RFQ Phase 3) — draft → confirm (reserves stock via
+  `quantity_reserved`, no ledger movement, no WAC change) → dispatch (posts a real `dispatch` movement at
+  the ledger's current WAC and releases the reservation) or cancel from draft/confirmed (releases any
+  reservation, posts nothing). Verified: confirming moved reserved +200 with on-hand/WAC untouched;
+  cancelling a confirmed order released it back exactly; dispatching posted the movement and dropped
+  on-hand by exactly the ordered quantity while releasing the reservation.
+- **Suppliers** (`/dashboard/suppliers`) and **Customers** (`/dashboard/customers`) — list + add, feeding
+  the pickers on receiving and sales orders respectively.
 
 What exists as the underlying substrate is a **schema-and-engine-first vertical slice**, not a partial
 ERP:
@@ -89,8 +97,8 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
   adjustments, which is flagged inline in the adjustments UI |
 | Audit trail immutability | Table exists (`audit_log`), DB-level enforcement (revoke UPDATE/DELETE or a
   blocking trigger) not yet built — that's explicitly Security Hardening phase work per the RFQ |
-| Full Purchase Order lifecycle & Supplier Management, Sales & Dispatch, Invoicing, Accounting
-  Integration | Not started (RFQ Phases 3-4) |
+| Sales orders & dispatch (reservation + dispatch) | Real logic and UI — see §1 |
+| Full Purchase Order lifecycle (issue/approve, beyond quick-receive), Invoicing, Accounting Integration | Not started (RFQ Phases 3-4) |
 | Reporting, Barcode Scanning | Not started (RFQ Phase 5) |
 
 ## 5. BUSINESS DECISION REQUIRED — do not resolve these by assumption

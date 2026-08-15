@@ -220,3 +220,41 @@ export interface StockLedgerView extends StockLedgerEntry {
   stockValue: number; // quantityOnHand * weightedAverageCost
   isBelowReorderPoint: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// RFQ Phase 3 — Sales, Procurement and Supplier Management
+// ---------------------------------------------------------------------------
+
+export interface Customer {
+  id: UUID;
+  name: string;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  address: string | null;
+  isActive: boolean;
+  createdAt: ISODateTime;
+}
+
+export type SalesOrderStatus = 'draft' | 'confirmed' | 'dispatched' | 'cancelled';
+
+/**
+ * Modelled as a single line per order for now (matches the interaction
+ * pattern already established by GRN/transfer/adjustment quick-entry
+ * flows). Multi-line orders are a natural UI extension later — nothing in
+ * the shape below blocks it, `sales_order_lines` is still a proper child
+ * table, this is just the current UI's scope.
+ */
+export interface SalesOrder {
+  id: UUID;
+  orderNumber: string;
+  customerId: UUID;
+  warehouseId: UUID;
+  productId: UUID;
+  quantityOrdered: number;
+  unitPrice: number;
+  status: SalesOrderStatus;
+  createdBy: UUID;
+  createdAt: ISODateTime;
+  confirmedAt: ISODateTime | null;
+  dispatchedAt: ISODateTime | null;
+}
