@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cobro IMS
 
-## Getting Started
+Cobro Concrete's inventory management system. Built and maintained by X Spark.
 
-First, run the development server:
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for current phase status, what's real vs. mocked, and
+the open business decisions that need a client conversation before proceeding further.
+
+## Running locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 — you'll land on `/login`. Demo credentials are shown on the page itself
+(also in `src/lib/auth.ts`). There is no real backend yet: the app runs entirely on in-memory mock data
+that resets on every server restart.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project layout
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+supabase/migrations/     Postgres schema (schema-as-code, not yet applied to any project)
+src/lib/domain/          TypeScript types mirroring the schema
+src/lib/data/            Repository interfaces + the mock implementation of them
+src/lib/services/        Business logic (the WAC inventory engine)
+src/lib/auth.ts          Mock session/auth — replaced wholesale in the Authentication phase
+src/app/login/           Sign-in screen
+src/app/dashboard/       Authenticated shell: KPIs, stock ledger, "record a movement" demo
+docs/                    Architecture notes and the business-decision log
+```

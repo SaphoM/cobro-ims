@@ -1,0 +1,99 @@
+# Cobro IMS — Architecture & Decision Log
+
+**Client:** Cobro Concrete (Pty) Ltd · **Technology partner:** X Spark
+**Source of truth:** `../Scope of Work Request_IMS.docx`, `../PO9522- Cobro - Inventory System.pdf`,
+`../Cobro IMS System Map.png` (all in the parent folder — read before changing scope here)
+
+This document is the running record of what's been decided, what's still open, and why. Update it as
+phases complete — don't let it drift from the code.
+
+## 1. Current phase
+
+**FOUNDATION** — in progress. Repository discovery and requirements review are done (this doc + the RFQ
+docs are the output). Not yet started: AUTHENTICATION (real Supabase auth), CORE DATA (real database),
+WAREHOUSE OPERATIONS, PROCUREMENT, SALES & DISPATCH, INVOICING, ACCOUNTING, REPORTING, SECURITY
+HARDENING, UAT, PRODUCTION.
+
+What exists today is a **schema-and-engine-first vertical slice**, not a partial ERP:
+
+- A Postgres schema (`supabase/migrations/`) covering Foundation + RFQ Phase 2 (Core Inventory
+  Operations), written for Supabase but not applied to any live project yet.
+- The domain model in TypeScript (`src/lib/domain`) mirroring that schema by hand.
+- The **inventory engine** (`src/lib/services/inventory-engine.ts`) — the Weighted-Average-Cost costing
+  logic that every stock-affecting workflow must go through. This is the "critical inventory engine" to
+  prove before building outward into procurement/sales/invoicing, and it's implemented as pure,
+  unit-testable functions with no I/O.
+- A **mock data layer** (`src/lib/data/mock`) implementing the exact repository interfaces
+  (`src/lib/data/repositories.ts`) a real Supabase-backed layer will later implement, so swapping is a
+  one-file change in `src/lib/data/index.ts`, not a rewrite.
+- A working login screen and an authenticated dashboard that reads the mock stock ledger, computes KPIs,
+  and can post a stock movement live — proving data flows end-to-end: mock data → repository → inventory
+  engine → UI, per the Golden Rule (DATA → DOMAIN → API → BUSINESS LOGIC → SECURITY → UI → REPORTING).
+
+## 2. Why mock data instead of a live Supabase project
+
+Decided explicitly for the Foundation phase: build against schema-as-code and a swappable mock repository
+layer rather than provisioning a live Supabase project immediately. Reasons:
+
+- Production ownership is meant to end up with Cobro (per the brief's Ownership Principle), and no
+  Cobro-controlled Supabase org exists yet — provisioning now would default to X Spark's own org, which
+  is workable but not something to do silently.
+- Doesn't block development on that account-setup conversation.
+
+**When a real Supabase project exists:** run the migration in `supabase/migrations/`, implement
+`src/lib/data/supabase/*.ts` against the same repository interfaces, and flip `DATA_SOURCE=supabase` in
+`src/lib/data/index.ts`. No calling code (services, pages, actions) should need to change.
+
+## 3. Stack
+
+- **Frontend:** Next.js 16 (App Router), React 19, TypeScript, Tailwind v4.
+- **Data (target):** Supabase — Postgres, Auth, Storage, Edge Functions. Not yet provisioned (see §2).
+- **Data (current):** in-memory mock repositories, same interfaces the Supabase layer will implement.
+- This matches the system map's intent (responsive SPA, RESTful data access, relational DB, OAuth/2FA)
+  without a separate Node/.NET API tier — Supabase's generated REST/Postgres + Edge Functions cover that
+  role, which matters given the budget/timeline (§5).
+
+## 4. What's real vs. mocked right now
+
+| Area | Status |
+| --- | --- |
+| UI (login, dashboard shell) | Real, matches the approved visual design |
+| WAC costing math | Real business logic, pure functions, in `inventory-engine.ts` |
+| Database schema | Written (`supabase/migrations`), **not applied anywhere** |
+| Auth | Mock — one hardcoded demo user/password in `src/lib/auth.ts`, cookie session. **Not the
+  Authentication phase deliverable.** No password hashing, no MFA (RFQ requires 2FA for privileged
+  users), no real Supabase Auth yet. |
+| RBAC | Schema has `roles`/`permissions`, nothing enforces it yet |
+| Audit trail immutability | Table exists (`audit_log`), DB-level enforcement (revoke UPDATE/DELETE or a
+  blocking trigger) not yet built — that's explicitly Security Hardening phase work per the RFQ |
+| Procurement, Sales & Dispatch, Invoicing, Accounting Integration | Not started (RFQ Phases 3-4) |
+| Reporting, Barcode Scanning | Not started (RFQ Phase 5) |
+
+## 5. BUSINESS DECISION REQUIRED — do not resolve these by assumption
+
+1. **MVP cut-line for the 8-week/R171,695 delivery window.** The full RFQ scope (procurement → warehouse
+   → sales → invoicing → accounting integration → RBAC/2FA → immutable audit trail → 15+ reports →
+   barcode scanning → POPIA/VAT compliance → 99.5% uptime SLA) is large for the budget and timeline on
+   the Purchase Order. Needs an explicit conversation with Cobro/Productivity SA about what ships by
+   30/09/2026 vs. what falls into the 6-month post-delivery support window.
+2. **Permission matrix per role.** `roles.permissions` exists as a jsonb column; the actual matrix (who
+   can approve write-offs, issue POs, edit prices, etc.) is not defined anywhere in the RFQ.
+3. **BOM structure.** Schema currently models one-level (parent → component) BOM. Confirm whether Cobro
+   needs nested/multi-level BOM (e.g. a palletised product built from sub-assemblies).
+4. **Adjustment reason codes.** Seeded with plausible defaults (`BREAKAGE`, `CYCLE_COUNT`, `THEFT_LOSS`,
+   `FOUND_STOCK`) and "requires approval" defaulted to true for all — confirm the real list and which
+   roles approve which reasons.
+5. **Accounting integration target.** RFQ allows Sage, QuickBooks, or Xero "or equivalent" — not yet
+   chosen. This affects the Phase 4 integration design materially.
+6. **Reorder point scope.** Currently modelled as one `reorder_point` per product (implicitly applied per
+   warehouse in the dashboard's low-stock flag). Confirm whether Cobro wants per-warehouse reorder
+   thresholds instead of one global figure per SKU.
+
+## 6. Next steps (in order)
+
+1. Resolve §5.1 (MVP cut-line) with the client before committing further engineering time — this
+   materially changes phase sequencing.
+2. AUTHENTICATION phase: real Supabase project + Supabase Auth, replacing `src/lib/auth.ts`.
+3. CORE DATA phase: apply the migration to that project, replace the mock repositories.
+4. Finish INVENTORY ENGINE phase: GRN receiving flow, inter-warehouse transfers, write-off approval
+   workflow — all routed through `applyMovement`, all UI, no more manual "record a movement" form.
