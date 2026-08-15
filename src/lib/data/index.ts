@@ -11,8 +11,12 @@
 import {
   mockAdjustmentReasonRepository,
   mockProductRepository,
+  mockReceivingRepository,
+  mockStockAdjustmentRepository,
   mockStockLedgerRepository,
   mockStockMovementRepository,
+  mockSupplierRepository,
+  mockTransferRepository,
   mockUserRepository,
   mockWarehouseRepository,
 } from '@/lib/data/mock/repositories';
@@ -30,7 +34,11 @@ export const warehouseRepository = mockWarehouseRepository;
 export const productRepository = mockProductRepository;
 export const stockLedgerRepository = mockStockLedgerRepository;
 export const stockMovementRepository = mockStockMovementRepository;
+export const supplierRepository = mockSupplierRepository;
+export const receivingRepository = mockReceivingRepository;
+export const transferRepository = mockTransferRepository;
 export const adjustmentReasonRepository = mockAdjustmentReasonRepository;
+export const stockAdjustmentRepository = mockStockAdjustmentRepository;
 export const userRepository = mockUserRepository;
 
 export const isUsingMockData = DATA_SOURCE === 'mock';

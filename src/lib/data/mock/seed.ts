@@ -10,6 +10,7 @@ import type {
   Product,
   Role,
   StockLedgerEntry,
+  Supplier,
   User,
   Warehouse,
 } from '@/lib/domain/inventory';
@@ -59,6 +60,12 @@ export const stockLedger: StockLedgerEntry[] = [
   { productId: 'prod-paver-60', warehouseId: 'wh-pmb', quantityOnHand: 265, quantityReserved: 40, weightedAverageCost: 148.2, updatedAt: '2026-08-07T10:00:00Z' },
   { productId: 'prod-aggregate-19', warehouseId: 'wh-dbn', quantityOnHand: 38, quantityReserved: 0, weightedAverageCost: 410, updatedAt: '2026-08-12T07:45:00Z' },
   { productId: 'prod-rebar-y12', warehouseId: 'wh-rbb', quantityOnHand: 640, quantityReserved: 0, weightedAverageCost: 118.75, updatedAt: '2026-08-06T13:00:00Z' },
+];
+
+export const suppliers: Supplier[] = [
+  { id: 'sup-natal-cement', name: 'Natal Cement Distributors', contactEmail: 'orders@natalcement.co.za', contactPhone: '031 555 0142', address: 'Pinetown, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
+  { id: 'sup-kzn-aggregates', name: 'KZN Aggregates & Quarries', contactEmail: 'sales@kznaggregates.co.za', contactPhone: '031 555 0199', address: 'Camperdown, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
+  { id: 'sup-steel-supply', name: 'Steel Supply Co.', contactEmail: 'accounts@steelsupply.co.za', contactPhone: '033 555 0177', address: 'Pietermaritzburg, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
 ];
 
 export const adjustmentReasonCodes: AdjustmentReasonCode[] = [

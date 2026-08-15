@@ -1,15 +1,9 @@
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/auth';
-import { productRepository, stockLedgerRepository, warehouseRepository, isUsingMockData } from '@/lib/data';
+import { productRepository, stockLedgerRepository, warehouseRepository } from '@/lib/data';
 import { stockValue } from '@/lib/services/inventory-engine';
 import { RecordMovementForm } from '@/app/dashboard/record-movement-form';
-import { signOutAction } from '@/app/dashboard/actions';
 import type { StockLedgerView } from '@/lib/domain/inventory';
 
-export default async function DashboardPage() {
-  const session = await getSession();
-  if (!session) redirect('/login');
-
+export default async function DashboardOverviewPage() {
   const [products, warehouses, ledgerEntries] = await Promise.all([
     productRepository.list(),
     warehouseRepository.list(),
@@ -40,39 +34,7 @@ export default async function DashboardPage() {
   const lowStockCount = ledgerView.filter((row) => row.isBelowReorderPoint).length;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2.5">
-          <svg viewBox="-36 -20 72 40" className="h-8 w-8 overflow-visible" aria-hidden="true">
-            <rect x="-30" y="1" width="28" height="14" rx="2" fill="none" stroke="var(--accent)" strokeOpacity="0.4" strokeWidth="2" />
-            <rect x="-14" y="-15" width="28" height="14" rx="2" fill="var(--accent)" stroke="var(--ink)" strokeOpacity="0.25" strokeWidth="1" />
-            <rect x="2" y="1" width="28" height="14" rx="2" fill="none" stroke="var(--accent)" strokeOpacity="0.7" strokeWidth="2" />
-          </svg>
-          <span className="flex items-center gap-2 font-display leading-none">
-            <span className="text-[1.3rem] font-extrabold text-text">COBRO</span>
-            <span className="rounded-full border border-accent/40 bg-surface-2 px-2 py-0.5 font-body text-[0.62rem] font-bold tracking-[0.12em] text-accent">
-              IMS
-            </span>
-          </span>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <span className="text-[0.85rem] text-text-muted">{session.fullName}</span>
-          <form action={signOutAction}>
-            <button type="submit" className="text-[0.85rem] text-text-faint hover:text-accent">
-              Sign out
-            </button>
-          </form>
-        </div>
-      </header>
-
-      {isUsingMockData && (
-        <div className="rounded-xl border border-accent/30 bg-accent/[0.08] px-4 py-2.5 text-[0.82rem] text-accent">
-          Running on mock data — no Supabase project is connected yet. See docs/ARCHITECTURE.md for the plan to
-          swap this for real data.
-        </div>
-      )}
-
+    <div className="flex flex-col gap-6">
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatTile label="SKUs tracked" value={products.length.toLocaleString()} />
         <StatTile
