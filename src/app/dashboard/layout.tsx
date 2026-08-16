@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/invoices', label: 'Invoicing & billing' },
   { href: '/dashboard/reports', label: 'Dashboards & reports' },
   { href: '/dashboard/scan', label: 'Barcode / QR scan' },
+  { href: '/dashboard/labels', label: 'Product labels' },
   { href: '/dashboard/audit-log', label: 'Audit log' },
   { href: '/dashboard/security', label: 'Security (2FA)' },
 ];
@@ -29,7 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-60 flex-none flex-col gap-6 border-r border-accent/[0.14] bg-surface px-4 py-6">
+      <aside className="no-print flex w-60 flex-none flex-col gap-6 border-r border-accent/[0.14] bg-surface px-4 py-6">
         <Link href="/dashboard" className="flex items-center gap-2.5 px-1">
           <svg viewBox="-36 -20 72 40" className="h-7 w-7 overflow-visible" aria-hidden="true">
             <rect x="-30" y="1" width="28" height="14" rx="2" fill="none" stroke="var(--accent)" strokeOpacity="0.4" strokeWidth="2" />
@@ -69,7 +70,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
       <div className="flex flex-1 flex-col">
         {isUsingMockData && (
-          <div className="border-b border-accent/30 bg-accent/[0.08] px-6 py-2 text-center text-[0.8rem] text-accent">
+          <div className="no-print border-b border-accent/30 bg-accent/[0.08] px-6 py-2 text-center text-[0.8rem] text-accent">
             Running on mock data — no Supabase project is connected yet.
           </div>
         )}

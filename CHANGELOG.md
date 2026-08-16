@@ -4,6 +4,22 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.13.0 — 2026-08-16
+
+**Product label printing (RFQ Phase 5).**
+- New `/dashboard/labels`: pick a product + copy count, get a print-ready sheet — SKU, product name, and
+  barcode number in large, clear monospace text per label
+- `@media print` + a `.no-print` convention (applied to the sidebar and the mock-data banner) so the
+  printed page shows only the label sheet; `print:break-inside-avoid` keeps cards from splitting across
+  a page break
+- Deliberately does **not** render a Code 128/QR barcode symbol graphic — that needs the full standard
+  bar-width lookup table, which this pass had no way to verify against a real scanner, and a wrong symbol
+  would look legitimate on screen while not actually decoding. A human/scanner-readable text code was the
+  honest choice over a fabricated barcode image; the page says so explicitly.
+- "Print labels" action added to each row on the product catalogue
+- Verified: generated a 6-copy sheet for `CEM-42.5-50KG`, correct SKU/name/barcode on every card, clean
+  render with no console errors
+
 ## v0.12.0 — 2026-08-16
 
 **2FA for privileged users (RFQ Phase 6) — mock enrollment gating the most sensitive action.**

@@ -14,7 +14,7 @@ underway (RBAC enforcement, 2FA gate on the most sensitive action, append-only a
 immutability trigger written but not applied).** Real AUTHENTICATION (Supabase Auth) and CORE DATA (a
 live Supabase project) are explicitly deferred for now — by direction, not oversight — so the mock auth
 and mock data layer described below are still current. Not yet started: accounting integration,
-camera-based barcode scanning, label printing, UAT, PRODUCTION.
+camera-based barcode scanning, UAT, PRODUCTION.
 
 Built and browser-verified (not just written — each flow below was exercised end-to-end and the
 resulting WAC math checked by hand):
@@ -77,8 +77,17 @@ resulting WAC math checked by hand):
   selected `BLK-STD-140` in the product dropdown; an unknown barcode showed a clear not-found message.
   **Not built:** camera-based scanning (`getUserMedia` + a barcode-decoding library) — RFQ allows
   "browser-based camera scanning and/or USB scanner support", so USB-only satisfies the requirement as
-  written, but camera support would need real hardware to test properly. Label printing (also mentioned
-  in the RFQ under barcode scanning) isn't built either.
+  written, but camera support would need real hardware to test properly.
+- **Product labels** (`/dashboard/labels`, RFQ Phase 5) — pick a product and a copy count, get a
+  print-ready sheet (`@media print` hides the sidebar/nav via a `.no-print` convention, `print:` variant
+  keeps label cards from splitting across a page break). Each label shows SKU, product name, and the
+  barcode number in large, clear monospace text. **Deliberately not** a rendered Code 128/QR barcode
+  symbol graphic — implementing that correctly needs the full standard bar-width lookup table, which this
+  pass had no way to verify against a real scanner, and a wrong symbol would look legitimate on screen
+  while not actually decoding; the honest choice was a human/scanner-readable text code over a fabricated
+  image. Linked from the product catalogue's "Print labels" action per row. Verified: generated a 6-copy
+  sheet for `CEM-42.5-50KG`, correct SKU/name/barcode on every card, page renders cleanly with no console
+  errors.
 - **RBAC & audit log** (RFQ Phase 6, partial) — a real permission matrix (`src/lib/permissions.ts`,
   `Permission` type + `ROLE_PERMISSIONS`) enforced in every mutating Server Action, checked the same way
   every action already re-checks `getSession()` rather than trusting the page's login redirect. Four demo
@@ -171,7 +180,8 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 | Accounting Integration (Sage/QuickBooks/Xero) | Not started — blocked on §5.5 (which platform) |
 | Dashboards & reports (10 of 15+, CSV export) | Real logic and UI — see §1 |
 | Barcode/QR scanning (USB scanner, lookup + receiving) | Real logic and UI — see §1 |
-| Camera-based scanning, label printing | Not built |
+| Product labels (`/dashboard/labels`, print-ready sheets) | Real logic and UI — see §1 |
+| Camera-based scanning, rendered barcode symbol graphic (Code 128/QR) | Not built |
 | 2FA for privileged users | **Real gate** on `approve_adjustments` — mock enrollment (`/dashboard/security`), no real authenticator app |
 
 ## 5. BUSINESS DECISION REQUIRED — do not resolve these by assumption
@@ -212,5 +222,5 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 4. CORE DATA phase: apply all migrations (including the audit-log immutability trigger) to that project,
    replace the mock repositories with real Supabase-backed ones behind the same interfaces.
 5. Accounting integration once §5.5 is decided.
-6. Remainder of Phase 5: ~9 more reports, camera-based barcode scanning, label printing.
+6. Remainder of Phase 5: ~5 more reports, camera-based barcode scanning, rendered barcode symbol graphics.
 7. Phase 8: system testing, UAT, training materials, production cutover.

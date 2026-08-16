@@ -59,3 +59,17 @@ body {
 * {
   border-color: var(--border);
 }
+
+/* Label printing (RFQ Phase 5) — the dashboard chrome (sidebar, mock-data
+   banner) never belongs on a printed page, and labels print on plain
+   paper/label stock, not the dark app theme. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}

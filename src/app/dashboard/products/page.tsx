@@ -31,6 +31,7 @@ export default async function ProductsPage() {
                 <th className="px-5 py-2.5 font-medium">UoM</th>
                 <th className="px-5 py-2.5 font-medium">Barcode</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Reorder point</th>
+                <th className="px-5 py-2.5 font-medium"></th>
               </tr>
             </thead>
             <tbody>
@@ -42,6 +43,13 @@ export default async function ProductsPage() {
                   <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{p.barcode ?? '—'}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">
                     {p.reorderPoint?.toLocaleString() ?? '—'}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    {p.barcode && (
+                      <a href={`/dashboard/labels?productId=${p.id}`} className="text-[0.78rem] font-semibold text-accent hover:underline">
+                        Print labels
+                      </a>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -67,7 +67,8 @@ the resulting numbers hand-checked):
 | | Accounting integration (Sage/QuickBooks/Xero) | ⏳ blocked on §7.5 |
 | Phase 5 — Dashboards, Reporting, Barcode Scanning | Dashboards & reports (10 of 15+, CSV export) | ✅ |
 | | Barcode/QR scanning (USB scanner: lookup + receiving) | ✅ |
-| | Camera-based scanning, label printing | Not started |
+| | Product labels (print-ready sheets) | ✅ |
+| | Camera-based scanning, rendered barcode symbol graphic | Not started |
 | Phase 6 — User Management, Security, Audit Trail | RBAC enforcement (real, 4 demo roles) + audit log | ✅ |
 | | DB-level audit log immutability trigger | ⏳ written, not applied (no live DB) |
 | | 2FA gate on the most sensitive action (approve/reject adjustments) | ✅ |
@@ -231,8 +232,13 @@ applied (see `supabase/migrations/20260816100000_audit_log_immutability.sql`).
   eventual 15+.
 - **Barcode / QR scan** (`/dashboard/scan`) — scan or type a barcode to look up a product and its stock
   across every warehouse; USB scanners work today (they act as keyboard input, submitting a plain form on
-  Enter). Also wired into Goods Receiving as a "scan to select product" field. Camera-based scanning and
-  label printing aren't built yet.
+  Enter). Also wired into Goods Receiving as a "scan to select product" field. Camera-based scanning isn't
+  built yet.
+- **Product labels** (`/dashboard/labels`) — pick a product and copy count, get a print-ready sheet (SKU,
+  name, barcode number in large text). Deliberately a human/scanner-readable text code, not a rendered
+  Code 128/QR symbol graphic — a wrong encoding would look legitimate but not scan, and this pass had no
+  way to verify one against a real scanner (full rationale in `docs/ARCHITECTURE.md` §1). Linked from the
+  product catalogue's "Print labels" action.
 - **Audit log** (`/dashboard/audit-log`) — append-only record of every approval, issue, receipt, dispatch,
   invoice, and catalogue change, with who did it and when. Real DB-level immutability needs a live
   Postgres project (trigger is written, not applied) — see §6.
@@ -260,7 +266,8 @@ correct — with the resulting quantities/costs/VAT amounts hand-verified agains
 | Accounting integration (Sage/QuickBooks/Xero) | Not started — blocked on choosing a platform (§7.5) |
 | Dashboards & reports (10 of eventual 15+, CSV export) | Real logic and UI |
 | Barcode/QR scanning (USB scanner: lookup + receiving) | Real logic and UI |
-| Camera-based scanning, label printing | Not started |
+| Product labels (print-ready sheets) | Real logic and UI |
+| Camera-based scanning, rendered barcode symbol graphic | Not started |
 | 2FA for privileged users | **Real gate** on approving/rejecting adjustments (`/dashboard/security`) — mock enrollment, no real authenticator app |
 
 ---
@@ -335,6 +342,7 @@ src/app/
     invoices/                       Invoicing & billing, payments, ageing
     reports/                        Dashboards & reports (10 of 15+), CSV export per table
     scan/                            Barcode/QR lookup (USB scanner-friendly plain GET form)
+    labels/                          Print-ready product label sheets (@media print, .no-print convention)
     audit-log/                      Append-only audit trail viewer
     security/                       Mock 2FA enrollment, gating the most sensitive action
 
@@ -355,5 +363,6 @@ CHANGELOG.md                    Version-by-version build history (semver, pre-1.
 3. **Core Data phase:** apply all migrations (including the audit-log immutability trigger) to that
    project, replace the mock repositories with real Supabase-backed ones behind the same interfaces.
 4. **Accounting integration:** once §9.5 is decided, build the Sage/QuickBooks/Xero sync.
-5. **Rest of Phase 5:** the remaining ~5 reports toward 15+, camera-based scanning, label printing.
+5. **Rest of Phase 5:** the remaining ~5 reports toward 15+, camera-based scanning, a rendered barcode
+   symbol graphic (Code 128/QR) for labels.
 6. **Phase 8:** system testing, UAT, training materials, production cutover.
