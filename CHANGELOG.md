@@ -4,6 +4,20 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.8.0 — 2026-08-16
+
+**RFQ Phase 5 (partial): Dashboards & Reports.**
+- `src/lib/services/reports.ts` — pure report-building functions: stock valuation (by warehouse, with
+  subtotals + grand total), low stock/reorder suggestions, sales order summary, purchase order summary,
+  invoice ageing (current/1-30/31-60/61-90/90+ buckets), stock movement history
+- New `/dashboard/reports` page rendering all six, each with a "Export CSV" button
+  (`src/components/export-csv-button.tsx`) — satisfies the RFQ's "exportable to Excel/CSV at any time"
+  requirement
+- Verified: a manual receipt (50 units @ R98) immediately reflected correctly in both the stock
+  valuation report (WAC recalculated to R92.65) and movement history; CSV export ran with no console
+  errors
+- Not yet built: barcode/QR scanning, and the remaining ~9 reports toward the RFQ's eventual 15+
+
 ## v0.7.0 — 2026-08-15
 
 **Documentation: full-context README.**

@@ -51,6 +51,19 @@ resulting WAC math checked by hand):
   exactly subtotal R4,000.00 / VAT R600.00 / total R4,600.00 due 30 days out; a R2,000 partial payment
   then the R2,600 remainder moved the invoice through partially-paid to paid exactly, and the sales page
   correctly blocks double-invoicing a dispatched order.
+- **Dashboards & reports** (`/dashboard/reports`, RFQ Phase 5, partial) — six of the RFQ's eventual 15+:
+  stock valuation (by warehouse, with subtotals + grand total), low stock/reorder suggestions, sales
+  order summary, purchase order summary, invoice ageing (standard AR buckets: current/1-30/31-60/61-90/
+  90+), and stock movement history (the append-only audit trail, human-readable). Every table exports to
+  CSV via a reusable client component (`src/components/export-csv-button.tsx`), satisfying the RFQ's
+  "exportable to Excel/CSV at any time" non-functional requirement — CSV opens natively in Excel, so one
+  format covers both. Report-building logic lives in `src/lib/services/reports.ts` as pure functions
+  (fetch via repositories, then build), mirroring the inventory engine's shape. Verified: posting a
+  manual receipt (50 units @ R98) immediately showed up correctly in both the stock valuation report
+  (WAC recalculated to R92.65, exact) and the movement history report, with the CSV export button
+  producing no console errors.
+  **Not yet built:** barcode/QR scanning (the other half of RFQ Phase 5), and the remaining ~9 reports
+  the RFQ eventually wants (e.g. dispatch/pick-list reports, supplier performance, BOM explosion).
 
 What exists as the underlying substrate is a **schema-and-engine-first vertical slice**, not a partial
 ERP:
@@ -114,7 +127,8 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 | Purchase order lifecycle (draft/issue/partial-receive) | Real logic and UI — see §1 |
 | Invoicing & billing (VAT, payments, ageing) | Real logic and UI — see §1 |
 | Accounting Integration (Sage/QuickBooks/Xero) | Not started — blocked on §5.5 (which platform) |
-| Reporting, Barcode Scanning | Not started (RFQ Phase 5) |
+| Dashboards & reports (6 of 15+, CSV export) | Real logic and UI — see §1 |
+| Barcode/QR scanning | Not started (RFQ Phase 5) |
 
 ## 5. BUSINESS DECISION REQUIRED — do not resolve these by assumption
 

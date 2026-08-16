@@ -65,7 +65,8 @@ the resulting numbers hand-checked):
 | | Suppliers, Customers | ✅ |
 | Phase 4 — Invoicing, Billing & Accounting | Invoicing & billing (VAT, payments, ageing) | ✅ |
 | | Accounting integration (Sage/QuickBooks/Xero) | ⏳ blocked on §7.5 |
-| Phase 5 — Dashboards, Reporting, Barcode Scanning | — | Not started |
+| Phase 5 — Dashboards, Reporting, Barcode Scanning | Dashboards & reports (6 of 15+, CSV export) | ✅ |
+| | Barcode/QR scanning | Not started |
 | Phase 6 — User Management, Security, Audit Trail | RBAC enforcement, 2FA, immutable audit log | Not started |
 | Authentication | Real Supabase Auth | **Deferred by explicit direction**, not oversight |
 | Core Data | Live Supabase project | **Deferred by explicit direction** — see §4 |
@@ -211,6 +212,9 @@ Server Functions in Next.js are reachable via direct POST requests, not just thr
 - **Dashboard overview** (`/dashboard`) — live KPIs (SKUs tracked, total stock value, below-reorder-point
   count) and the multi-warehouse stock ledger table, plus a generic "record a movement" form that exercises
   the engine directly (the original proof-of-concept before the dedicated workflow pages existed).
+- **Dashboards & reports** (`/dashboard/reports`) — six reports so far (stock valuation, low stock,
+  sales order summary, purchase order summary, invoice ageing, stock movement history), each exportable
+  to CSV. Toward the RFQ's eventual 15+; barcode/QR scanning (the other half of Phase 5) isn't built yet.
 
 Every workflow above was exercised live in the browser during development — not just written and assumed
 correct — with the resulting quantities/costs/VAT amounts hand-verified against the expected math. See
@@ -230,7 +234,8 @@ correct — with the resulting quantities/costs/VAT amounts hand-verified agains
 | RBAC | Schema has `roles`/`permissions`; **not enforced** — any signed-in mock user can do anything a signed-in user can do |
 | Audit trail immutability | Table exists (`audit_log`); DB-level enforcement (revoke UPDATE/DELETE or a blocking trigger) not built — explicitly Security Hardening phase work |
 | Accounting integration (Sage/QuickBooks/Xero) | Not started — blocked on choosing a platform (§7.5) |
-| Reporting (15+ reports), barcode/QR scanning | Not started (RFQ Phase 5) |
+| Dashboards & reports (6 of eventual 15+, CSV export) | Real logic and UI |
+| Barcode/QR scanning | Not started (RFQ Phase 5) |
 
 ---
 
@@ -274,7 +279,11 @@ src/lib/data/
   mock/
     seed.ts                         Seed data: warehouses, products, suppliers, customers, users, roles
     repositories.ts                 The mock implementation of every repository interface
-src/lib/services/inventory-engine.ts   The WAC costing engine — pure functions, no I/O
+src/lib/services/
+  inventory-engine.ts              The WAC costing engine — pure functions, no I/O
+  reports.ts                       Report-building functions (stock valuation, low stock, sales/PO
+                                    summaries, invoice ageing, movement history) — pure, fetch-then-build
+src/components/export-csv-button.tsx   Reusable client-side CSV export, used by every report table
 src/lib/auth.ts                 Mock session/auth — replaced wholesale in the real Authentication phase
 src/lib/demo-credentials.ts     The one demo login (kept separate so a 'use client' component can safely
                                  import it without pulling next/headers into the client bundle)
@@ -295,6 +304,7 @@ src/app/
     sales/                          Sales orders & dispatch
     suppliers/, customers/          List + add pickers
     invoices/                       Invoicing & billing, payments, ageing
+    reports/                        Dashboards & reports (6 of 15+), CSV export per table
 
 docs/ARCHITECTURE.md            The running decision log — phase status, what's real/mocked, open
                                  business decisions, next steps in order. Update it as phases complete.
@@ -311,6 +321,6 @@ CHANGELOG.md                    Version-by-version build history (semver, pre-1.
 3. **Core Data phase:** apply the migrations to that project, replace the mock repositories with real
    Supabase-backed ones behind the same interfaces.
 4. **Accounting integration:** once §9.5 is decided, build the Sage/QuickBooks/Xero sync.
-5. **Phase 5:** Dashboards & Reporting (15+ standard reports), barcode/QR scanning.
+5. **Rest of Phase 5:** the remaining ~9 reports toward 15+, plus barcode/QR scanning.
 6. **Phase 6:** RBAC enforcement, 2FA for privileged users, DB-level immutable audit trail.
 7. **Phase 8:** system testing, UAT, training materials, production cutover.
