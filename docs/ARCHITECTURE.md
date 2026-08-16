@@ -118,7 +118,7 @@ resulting WAC math checked by hand):
   and clips; at 992px the tile is 222px and the value fits exactly). Below that the drawer is genuinely
   correct — there isn't room for both. Two latent bugs were found and fixed here, both needing an
   open-drawer-then-widen sequence to surface: a stale backdrop that dimmed the whole desktop layout (equal
-  specificity between `min-[…]:hidden` and `peer-checked:block`, with Tailwind emitting the latter second
+  specificity between the min-width variant and the peer-checked variant, with Tailwind emitting the latter second
   — fixed by stacking the width bound *onto* the checked variant so above-breakpoint is unreachable rather
   than merely overridden), and a scroll lock that outlived the drawer and left the page unscrollable.
   Verified at 375 / 768 / 960 / 991 / 992 / 1280: no page-level horizontal overflow, no card clipping,

@@ -36,7 +36,7 @@ versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outs
   the three dashboard stat tiles both fit without clipping (measured, not guessed)
 - Fixed two latent bugs in the process, both requiring an open-drawer-then-widen sequence to
   surface: a stale backdrop that dimmed the entire desktop layout (equal-specificity collision
-  between `min-[…]:hidden` and `peer-checked:block` — resolved by stacking the width bound onto
+  between the min-width variant and the peer-checked variant — resolved by stacking the width bound onto
   the checked variant), and a scroll lock that outlived the drawer and left the page unscrollable
 - Verified at 375 / 768 / 960 / 991 / 992 / 1280: no page-level horizontal overflow, no card
   clipping, desktop visually unchanged
