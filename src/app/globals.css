@@ -65,7 +65,17 @@ body {
    Both already carry identical padding, border and font-size, but a <select> sizes its
    content box from intrinsic font metrics and ignores line-height, while an <input> uses
    its line-height (1.5). That left every dropdown 43.00px against 43.12px for inputs
-   sitting beside it on the same row.
+   sitting beside it on the same row in Chromium — and a bigger, engine-dependent gap in
+   browsers whose native select chrome (the built-in OS dropdown widget) carries its own
+   intrinsic sizing that a plain `min-height` can't fully override while `appearance` is
+   left at its default `auto`.
+
+   `appearance: none` opts every select out of that native widget sizing so `min-height`
+   is the only thing deciding its box — the one way to make the match hold across engines,
+   not just the one this was authored in. Removing the native appearance also removes the
+   native dropdown arrow, so a themed one is redrawn here (muted grey, matching
+   `--text-muted`) in the same right-hand spot browsers already used, with `padding-right`
+   widened so option text never sits under it.
 
    `min-height` rather than `height`, so this can only ever grow a select to match — it
    never clamps one that needs to be taller. The 1.5em term is the input's line-height
@@ -74,6 +84,12 @@ body {
    (both counted here because these controls are border-box). */
 select {
   min-height: calc(1.5em + 1.25rem + 2px);
+  appearance: none;
+  padding-right: 2.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23a8a5a0' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 16px 16px;
 }
 
 /* Mobile nav drawer (dashboard/layout.tsx, CSS-only via #mobile-nav-toggle) — lock
