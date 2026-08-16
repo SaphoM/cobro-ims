@@ -68,7 +68,9 @@ the resulting numbers hand-checked):
 | Phase 5 — Dashboards, Reporting, Barcode Scanning | Dashboards & reports (6 of 15+, CSV export) | ✅ |
 | | Barcode/QR scanning (USB scanner: lookup + receiving) | ✅ |
 | | Camera-based scanning, label printing | Not started |
-| Phase 6 — User Management, Security, Audit Trail | RBAC enforcement, 2FA, immutable audit log | Not started |
+| Phase 6 — User Management, Security, Audit Trail | RBAC enforcement (real, 4 demo roles) + audit log | ✅ |
+| | DB-level audit log immutability trigger | ⏳ written, not applied (no live DB) |
+| | 2FA for privileged users | Not started |
 | Authentication | Real Supabase Auth | **Deferred by explicit direction**, not oversight |
 | Core Data | Live Supabase project | **Deferred by explicit direction** — see §4 |
 | Testing, Training, UAT, Production | — | Not started |
@@ -91,12 +93,15 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 (or whatever port `next dev` picks) — you'll land on `/login`. Demo credentials
-are shown on the page itself (also in `src/lib/demo-credentials.ts`):
+Open http://localhost:3000 (or whatever port `next dev` picks) — you'll land on `/login`. Four demo
+accounts, one per RBAC role, are shown on the page itself with one-click autofill (also in
+`src/lib/demo-credentials.ts`) — pick a role to see what it can and can't do:
 
 ```
-Email:    demo@cobroconcrete.co.za
-Password: CobroDemo2026
+Admin          demo@cobroconcrete.co.za         CobroDemo2026
+Warehouse clerk clerk@cobroconcrete.co.za        CobroClerk2026
+Procurement    procurement@cobroconcrete.co.za   CobroProcure2026
+Viewer         viewer@cobroconcrete.co.za        CobroViewer2026
 ```
 
 There is **no real backend**. The entire app runs on an in-memory mock data layer (`src/lib/data/mock`)
@@ -182,6 +187,13 @@ movement and releases the reservation.
 Server Functions in Next.js are reachable via direct POST requests, not just through the rendered UI, so
 "the page was behind a login redirect" is not sufficient authorization on its own.
 
+**RBAC follows the same pattern.** Every mutating Server Action also calls `hasPermission`/
+`requirePermission` (`src/lib/permissions.ts`) right after the session check — a role, not just a login,
+gates every write. Every audited action then writes to an append-only `AuditLogRepository`
+(`/dashboard/audit-log`), the same way stock movements are append-only: no update/delete method exists
+for a caller to call, even if a real database's own immutability trigger is still just written, not
+applied (see `supabase/migrations/20260816100000_audit_log_immutability.sql`).
+
 ---
 
 ## 7. What each module actually does
@@ -199,8 +211,8 @@ Server Functions in Next.js are reachable via direct POST requests, not just thr
   value, it just moves stock at its existing cost.
 - **Write-offs & adjustments** (`/dashboard/adjustments`) — request stays `pending_approval` and never
   touches the ledger; approving posts the movement (the sign of the quantity delta decides `adjustment` vs.
-  `write_off`); rejecting never does. Any signed-in mock user can currently approve — real RBAC (who's
-  allowed to approve what) is an open decision, see §7.2.
+  `write_off`); rejecting never does. Approving/rejecting requires the `approve_adjustments` permission —
+  admin-only in the current placeholder matrix (§9.2).
 - **Sales orders & dispatch** (`/dashboard/sales`) — draft (nothing reserved) → confirm (reserves stock,
   no ledger movement, no WAC change) → dispatch (posts the real outbound movement at the ledger's current
   WAC, releases the reservation) or cancel from draft/confirmed (releases any reservation, posts nothing).
@@ -220,6 +232,9 @@ Server Functions in Next.js are reachable via direct POST requests, not just thr
   across every warehouse; USB scanners work today (they act as keyboard input, submitting a plain form on
   Enter). Also wired into Goods Receiving as a "scan to select product" field. Camera-based scanning and
   label printing aren't built yet.
+- **Audit log** (`/dashboard/audit-log`) — append-only record of every approval, issue, receipt, dispatch,
+  invoice, and catalogue change, with who did it and when. Real DB-level immutability needs a live
+  Postgres project (trigger is written, not applied) — see §6.
 
 Every workflow above was exercised live in the browser during development — not just written and assumed
 correct — with the resulting quantities/costs/VAT amounts hand-verified against the expected math. See
@@ -236,12 +251,13 @@ correct — with the resulting quantities/costs/VAT amounts hand-verified agains
 | Every module in §7 | Real logic and UI, running against the mock data layer |
 | Database schema | Written (`supabase/migrations/`), **not applied anywhere yet** |
 | Auth | Mock — one hardcoded demo user/password, cookie session. **Deferred by direction.** No password hashing, no MFA (RFQ requires 2FA for privileged users), no real Supabase Auth. |
-| RBAC | Schema has `roles`/`permissions`; **not enforced** — any signed-in mock user can do anything a signed-in user can do |
-| Audit trail immutability | Table exists (`audit_log`); DB-level enforcement (revoke UPDATE/DELETE or a blocking trigger) not built — explicitly Security Hardening phase work |
+| RBAC | **Real enforcement** — every mutating Server Action checks a permission via `src/lib/permissions.ts`; 4 demo accounts (one per role) to test with. The matrix itself is still a placeholder pending Cobro sign-off |
+| Audit log | **Real** — every audited action writes an append-only entry, viewable at `/dashboard/audit-log`. DB-level immutability trigger written, not applied (no live project) |
 | Accounting integration (Sage/QuickBooks/Xero) | Not started — blocked on choosing a platform (§7.5) |
 | Dashboards & reports (6 of eventual 15+, CSV export) | Real logic and UI |
 | Barcode/QR scanning (USB scanner: lookup + receiving) | Real logic and UI |
 | Camera-based scanning, label printing | Not started |
+| 2FA for privileged users | Not started — `users.mfa_enrolled` exists in schema, unread by anything |
 
 ---
 
@@ -252,8 +268,9 @@ the RFQ / SoW does not define them. Confirm with Cobro before further engineerin
 
 1. **MVP cut-line for the 8-week/R171,695 window.** What ships by 30/09/2026 vs. what falls into the
    6-month post-delivery support window — the full RFQ scope is a lot for this budget/timeline.
-2. **Permission matrix per role.** Who can approve write-offs, issue POs, edit prices, etc. — not defined
-   anywhere in the RFQ.
+2. **Permission matrix per role.** `src/lib/permissions.ts` now *enforces* a real matrix, but it's a
+   placeholder built from plausible role responsibilities, not one the RFQ defines or Cobro confirmed —
+   e.g. only `admin` can approve/reject adjustments, manage the catalogue, or manage customers today.
 3. **BOM structure.** Currently one-level (parent → component). Does Cobro need nested/multi-level BOM?
 4. **Adjustment reason codes.** Seeded with plausible defaults (`BREAKAGE`, `CYCLE_COUNT`, `THEFT_LOSS`,
    `FOUND_STOCK`) — confirm the real list and which roles approve which reasons.
@@ -277,13 +294,15 @@ supabase/migrations/            Postgres schema, schema-as-code, not yet applied
                                    GRN, transfers, adjustments, stock ledger/movements, roles, audit log
   20260815130000_...sql           Phase 3 sales half: customers, sales_orders, sales_order_lines
   20260815140000_...sql           Phase 4: invoices, invoice_payments
+  20260816100000_...sql           Phase 6: audit_log immutability trigger (rejects UPDATE/DELETE)
 
 src/lib/domain/inventory.ts     TypeScript types mirroring the schema, by hand, kept in sync manually
+src/lib/permissions.ts          RBAC: Permission type, ROLE_PERMISSIONS matrix, hasPermission/requirePermission
 src/lib/data/
   repositories.ts                 Repository INTERFACES — the seam every service/page depends on
   index.ts                        Single entry point; DATA_SOURCE switch (mock today, supabase later)
   mock/
-    seed.ts                         Seed data: warehouses, products, suppliers, customers, users, roles
+    seed.ts                         Seed data: warehouses, products, suppliers, customers, 4 users, roles
     repositories.ts                 The mock implementation of every repository interface
 src/lib/services/
   inventory-engine.ts              The WAC costing engine — pure functions, no I/O
@@ -291,14 +310,14 @@ src/lib/services/
                                     summaries, invoice ageing, movement history) — pure, fetch-then-build
 src/components/export-csv-button.tsx   Reusable client-side CSV export, used by every report table
 src/lib/auth.ts                 Mock session/auth — replaced wholesale in the real Authentication phase
-src/lib/demo-credentials.ts     The one demo login (kept separate so a 'use client' component can safely
+src/lib/demo-credentials.ts     The 4 demo logins (kept separate so a 'use client' component can safely
                                  import it without pulling next/headers into the client bundle)
 src/lib/now.ts                  Tiny wrapper around Date.now() so Server Components can read wall-clock
                                  time without tripping the react-hooks/purity lint rule
 
 src/app/
   page.tsx                        Redirects to /login or /dashboard based on session
-  login/                          Sign-in screen (server action + client form)
+  login/                          Sign-in screen (server action + client form, role picker)
   dashboard/
     layout.tsx                      Sidebar nav + session gate for every /dashboard/* route
     page.tsx                        Overview: KPIs, stock ledger, generic "record a movement" demo
@@ -312,6 +331,7 @@ src/app/
     invoices/                       Invoicing & billing, payments, ageing
     reports/                        Dashboards & reports (6 of 15+), CSV export per table
     scan/                            Barcode/QR lookup (USB scanner-friendly plain GET form)
+    audit-log/                      Append-only audit trail viewer
 
 docs/ARCHITECTURE.md            The running decision log — phase status, what's real/mocked, open
                                  business decisions, next steps in order. Update it as phases complete.
@@ -322,12 +342,12 @@ CHANGELOG.md                    Version-by-version build history (semver, pre-1.
 
 ## 11. Next steps (in order)
 
-1. **Resolve §9.1 (MVP cut-line) with the client** before committing further engineering time — this
-   materially changes phase sequencing.
-2. **Authentication phase:** real Supabase project + Supabase Auth, replacing `src/lib/auth.ts`.
-3. **Core Data phase:** apply the migrations to that project, replace the mock repositories with real
-   Supabase-backed ones behind the same interfaces.
+1. **Resolve §9.1 (MVP cut-line) and §9.2 (permission matrix) with the client** before committing further
+   engineering time — both materially change what's built next.
+2. **Authentication phase:** real Supabase project + Supabase Auth, replacing `src/lib/auth.ts` —
+   including real password hashing and 2FA for privileged users (RFQ requirement, not built yet).
+3. **Core Data phase:** apply all migrations (including the audit-log immutability trigger) to that
+   project, replace the mock repositories with real Supabase-backed ones behind the same interfaces.
 4. **Accounting integration:** once §9.5 is decided, build the Sage/QuickBooks/Xero sync.
 5. **Rest of Phase 5:** the remaining ~9 reports toward 15+, camera-based scanning, label printing.
-6. **Phase 6:** RBAC enforcement, 2FA for privileged users, DB-level immutable audit trail.
-7. **Phase 8:** system testing, UAT, training materials, production cutover.
+6. **Phase 8:** system testing, UAT, training materials, production cutover.

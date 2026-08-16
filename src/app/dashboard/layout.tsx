@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
-import { isUsingMockData } from '@/lib/data';
+import { isUsingMockData, roleRepository } from '@/lib/data';
 import { signOutAction } from '@/app/dashboard/actions';
 import { NavLink } from '@/app/dashboard/nav-link';
 
@@ -18,11 +18,13 @@ const NAV_ITEMS = [
   { href: '/dashboard/invoices', label: 'Invoicing & billing' },
   { href: '/dashboard/reports', label: 'Dashboards & reports' },
   { href: '/dashboard/scan', label: 'Barcode / QR scan' },
+  { href: '/dashboard/audit-log', label: 'Audit log' },
 ];
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect('/login');
+  const role = await roleRepository.getById(session.roleId);
 
   return (
     <div className="flex min-h-screen">
@@ -50,7 +52,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </nav>
 
         <div className="flex flex-col gap-2 border-t border-accent/[0.14] pt-4">
-          <span className="px-1 text-[0.8rem] text-text-muted">{session.fullName}</span>
+          <div className="flex flex-col px-1">
+            <span className="text-[0.8rem] text-text-muted">{session.fullName}</span>
+            <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-accent">
+              {role?.description ?? role?.name ?? 'Unknown role'}
+            </span>
+          </div>
           <form action={signOutAction}>
             <button type="submit" className="px-1 text-left text-[0.8rem] text-text-faint hover:text-accent">
               Sign out

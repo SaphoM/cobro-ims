@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
 import { customerRepository } from '@/lib/data';
+import { hasPermission } from '@/lib/permissions';
 
 export interface CustomerFormState {
   error: string | null;
@@ -15,6 +16,9 @@ export async function createCustomerAction(
 ): Promise<CustomerFormState> {
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
+  if (!(await hasPermission(session, 'manage_customers'))) {
+    return { error: 'Your role does not have permission to manage customers.', success: null };
+  }
 
   const name = String(formData.get('name') ?? '').trim();
   const contactEmail = String(formData.get('contactEmail') ?? '').trim();

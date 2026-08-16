@@ -4,6 +4,27 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.10.0 — 2026-08-16
+
+**RFQ Phase 6 (partial): RBAC enforcement + audit log.**
+- `src/lib/permissions.ts` — real permission matrix (`Permission` type, `ROLE_PERMISSIONS`), enforced in
+  every mutating Server Action across products, receiving, purchase orders, transfers, adjustments, sales
+  orders, invoices, suppliers, customers, and the generic dashboard "record a movement" form
+- Four demo accounts, one per role (admin/warehouse clerk/procurement/viewer) — `src/lib/demo-credentials.ts`,
+  selectable via a role picker on the login page
+- New `RoleRepository` and `AuditLogRepository` (append-only by construction — no update/delete method
+  exists); every audited action writes an entry, viewable at new `/dashboard/audit-log`
+- Real Postgres immutability trigger written (`supabase/migrations/20260816100000_audit_log_immutability.sql`),
+  rejecting UPDATE/DELETE on `audit_log` — not applied anywhere yet, no live database
+- **Caught and fixed during this pass:** the generic dashboard "record a movement" form could post any
+  movement type, including write-offs, with no permission or approval check — a straight RBAC bypass
+  around the dedicated adjustments approval flow. Now gated behind `approve_adjustments`.
+- Sidebar now shows the signed-in user's role
+- Verified end-to-end: Viewer blocked from posting a movement (clear error, ledger unchanged); Admin
+  succeeded (WAC recalculated correctly); requesting + approving an adjustment as Admin produced two
+  correct entries in the audit log (insert, then update) with the right table/user/timestamp
+- Permission matrix itself remains a placeholder pending Cobro confirmation (see `docs/ARCHITECTURE.md` §5.2)
+
 ## v0.9.0 — 2026-08-16
 
 **RFQ Phase 5: barcode/QR scanning (USB scanner).**

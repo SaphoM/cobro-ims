@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
-import { receivingRepository } from '@/lib/data';
+import { auditLogRepository, receivingRepository } from '@/lib/data';
+import { hasPermission } from '@/lib/permissions';
 
 export interface ReceiveFormState {
   error: string | null;
@@ -15,6 +16,9 @@ export async function receiveStockAction(
 ): Promise<ReceiveFormState> {
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
+  if (!(await hasPermission(session, 'manage_receiving'))) {
+    return { error: 'Your role does not have permission to receive stock.', success: null };
+  }
 
   const supplierId = String(formData.get('supplierId') ?? '');
   const warehouseId = String(formData.get('warehouseId') ?? '');
@@ -40,6 +44,13 @@ export async function receiveStockAction(
       quantity,
       unitCost,
       receivedBy: session.id,
+    });
+    await auditLogRepository.write({
+      tableName: 'goods_receipts',
+      recordId: goodsReceipt.id,
+      action: 'insert',
+      changedBy: session.id,
+      after: goodsReceipt,
     });
     revalidatePath('/dashboard/receiving');
     revalidatePath('/dashboard');

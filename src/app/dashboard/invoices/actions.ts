@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
-import { invoiceRepository } from '@/lib/data';
+import { auditLogRepository, invoiceRepository } from '@/lib/data';
+import { hasPermission, requirePermission } from '@/lib/permissions';
 
 async function requireSession() {
   const session = await getSession();
@@ -13,7 +14,15 @@ async function requireSession() {
 export async function generateInvoiceAction(salesOrderId: string) {
   'use server';
   const session = await requireSession();
-  await invoiceRepository.generateFromSalesOrder(salesOrderId, session.id);
+  await requirePermission(session, 'manage_invoices');
+  const invoice = await invoiceRepository.generateFromSalesOrder(salesOrderId, session.id);
+  await auditLogRepository.write({
+    tableName: 'invoices',
+    recordId: invoice.id,
+    action: 'insert',
+    changedBy: session.id,
+    after: invoice,
+  });
   revalidatePath('/dashboard/sales');
   revalidatePath('/dashboard/invoices');
 }
@@ -29,6 +38,9 @@ export async function recordPaymentAction(
 ): Promise<RecordPaymentFormState> {
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
+  if (!(await hasPermission(session, 'manage_invoices'))) {
+    return { error: 'Your role does not have permission to record payments.', success: null };
+  }
 
   const invoiceId = String(formData.get('invoiceId') ?? '');
   const amount = Number(formData.get('amount'));
@@ -38,7 +50,14 @@ export async function recordPaymentAction(
   }
 
   try {
-    const { invoice } = await invoiceRepository.recordPayment(invoiceId, amount, session.id);
+    const { invoice, payment } = await invoiceRepository.recordPayment(invoiceId, amount, session.id);
+    await auditLogRepository.write({
+      tableName: 'invoice_payments',
+      recordId: payment.id,
+      action: 'insert',
+      changedBy: session.id,
+      after: payment,
+    });
     revalidatePath('/dashboard/invoices');
     return {
       error: null,

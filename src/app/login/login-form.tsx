@@ -2,19 +2,22 @@
 
 import { useActionState, useRef, useState } from 'react';
 import { signInAction, type SignInFormState } from '@/app/login/actions';
-import { DEMO_EMAIL, DEMO_PASSWORD } from '@/lib/demo-credentials';
+import { DEMO_ACCOUNTS } from '@/lib/demo-credentials';
 
 const initialState: SignInFormState = { error: null };
 
 export function LoginForm() {
   const [state, formAction, pending] = useActionState(signInAction, initialState);
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState(0);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
-  function autofillDemo() {
-    if (emailRef.current) emailRef.current.value = DEMO_EMAIL;
-    if (passwordRef.current) passwordRef.current.value = DEMO_PASSWORD;
+  function autofillDemo(index: number) {
+    const account = DEMO_ACCOUNTS[index];
+    setSelectedAccount(index);
+    if (emailRef.current) emailRef.current.value = account.email;
+    if (passwordRef.current) passwordRef.current.value = account.password;
     emailRef.current?.focus();
   }
 
@@ -35,29 +38,36 @@ export function LoginForm() {
       </div>
       <p className="mb-6 text-center text-[0.92rem] text-text-muted">Sign in to manage your inventory.</p>
 
-      <div className="mb-5 flex flex-col gap-2 rounded-xl border border-accent/[0.14] bg-surface-2 px-3.5 py-3">
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-text-faint">
-            Demo credentials
-          </span>
-          <button
-            type="button"
-            onClick={autofillDemo}
-            className="font-body text-[0.78rem] font-semibold text-accent hover:text-accent-hover"
-          >
-            Autofill →
-          </button>
+      <div className="mb-5 flex flex-col gap-2.5 rounded-xl border border-accent/[0.14] bg-surface-2 px-3.5 py-3">
+        <span className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-text-faint">
+          Demo accounts — pick a role to test RBAC
+        </span>
+        <div className="flex flex-wrap gap-1.5">
+          {DEMO_ACCOUNTS.map((account, i) => (
+            <button
+              key={account.email}
+              type="button"
+              onClick={() => autofillDemo(i)}
+              className={`rounded-full border px-2.5 py-1 text-[0.74rem] font-semibold transition-colors ${
+                selectedAccount === i
+                  ? 'border-accent bg-accent/15 text-accent'
+                  : 'border-accent/20 text-text-muted hover:border-accent/40 hover:text-text'
+              }`}
+            >
+              {account.roleLabel}
+            </button>
+          ))}
         </div>
         <div className="flex items-baseline justify-between gap-3 text-[0.82rem] text-text-muted">
           <span>Email</span>
           <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono-brand text-[0.76rem] text-text">
-            {DEMO_EMAIL}
+            {DEMO_ACCOUNTS[selectedAccount].email}
           </code>
         </div>
         <div className="flex items-baseline justify-between gap-3 text-[0.82rem] text-text-muted">
           <span>Password</span>
           <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono-brand text-[0.76rem] text-text">
-            {DEMO_PASSWORD}
+            {DEMO_ACCOUNTS[selectedAccount].password}
           </code>
         </div>
       </div>

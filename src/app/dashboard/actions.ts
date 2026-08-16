@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getSession, destroySession } from '@/lib/auth';
 import { stockMovementRepository } from '@/lib/data';
+import { hasPermission } from '@/lib/permissions';
 import type { StockMovementType } from '@/lib/domain/inventory';
 
 export interface RecordMovementFormState {
@@ -22,6 +23,19 @@ export async function recordMovementAction(
   const session = await getSession();
   if (!session) {
     return { error: 'Your session has expired. Please sign in again.', success: null };
+  }
+  // This generic form can post ANY movement type directly — including
+  // write-offs and adjustments with no approval gate, unlike the dedicated
+  // /dashboard/adjustments flow. Gating it behind the same permission as
+  // approving adjustments (the most sensitive capability it overlaps with)
+  // closes what would otherwise be an RBAC bypass for lower-privileged
+  // roles. It stays admin-only rather than being removed, since it's still
+  // useful for quickly proving the engine end-to-end.
+  if (!(await hasPermission(session, 'approve_adjustments'))) {
+    return {
+      error: 'Your role does not have permission to post movements directly. Use the dedicated workflow pages instead.',
+      success: null,
+    };
   }
 
   const productId = String(formData.get('productId') ?? '');

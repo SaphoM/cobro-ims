@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
-import { productRepository } from '@/lib/data';
+import { auditLogRepository, productRepository } from '@/lib/data';
+import { hasPermission } from '@/lib/permissions';
 
 export interface CreateProductFormState {
   error: string | null;
@@ -15,6 +16,9 @@ export async function createProductAction(
 ): Promise<CreateProductFormState> {
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
+  if (!(await hasPermission(session, 'manage_catalogue'))) {
+    return { error: 'Your role does not have permission to manage the product catalogue.', success: null };
+  }
 
   const sku = String(formData.get('sku') ?? '').trim();
   const name = String(formData.get('name') ?? '').trim();
@@ -35,6 +39,13 @@ export async function createProductAction(
       barcode: barcode || null,
       reorderPoint: reorderPointRaw ? Number(reorderPointRaw) : null,
       reorderQuantity: reorderQuantityRaw ? Number(reorderQuantityRaw) : null,
+    });
+    await auditLogRepository.write({
+      tableName: 'products',
+      recordId: product.id,
+      action: 'insert',
+      changedBy: session.id,
+      after: product,
     });
     revalidatePath('/dashboard/products');
     return { error: null, success: `Added ${product.sku} — ${product.name}.` };

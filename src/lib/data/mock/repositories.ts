@@ -13,6 +13,7 @@
 import { randomUUID } from 'crypto';
 import type {
   AdjustmentReasonCode,
+  AuditLogEntry,
   Customer,
   GoodsReceipt,
   InterWarehouseTransfer,
@@ -32,6 +33,7 @@ import type {
 import { VAT_RATE } from '@/lib/domain/inventory';
 import type {
   AdjustmentReasonRepository,
+  AuditLogRepository,
   CreateCustomerInput,
   CreatePurchaseOrderInput,
   CreateProductInput,
@@ -47,6 +49,7 @@ import type {
   ReceivingRepository,
   RecordMovementInput,
   RequestAdjustmentInput,
+  RoleRepository,
   SalesOrderRepository,
   StockAdjustmentRepository,
   StockLedgerRepository,
@@ -55,12 +58,14 @@ import type {
   TransferRepository,
   UserRepository,
   WarehouseRepository,
+  WriteAuditEntryInput,
 } from '@/lib/data/repositories';
 import { applyMovement } from '@/lib/services/inventory-engine';
 import {
   adjustmentReasonCodes,
   customers as seedCustomers,
   products as seedProducts,
+  roles as seedRoles,
   stockLedger as seedLedger,
   suppliers as seedSuppliers,
   users as seedUsers,
@@ -82,6 +87,7 @@ const state = {
   purchaseOrderLines: new Map<string, PurchaseOrderLine>(),
   invoices: [] as Invoice[],
   invoicePayments: [] as InvoicePayment[],
+  auditLog: [] as AuditLogEntry[],
 };
 
 let poCounter = 1000;
@@ -129,6 +135,35 @@ export const mockWarehouseRepository: WarehouseRepository = {
   },
   async getById(id) {
     return seedWarehouses.find((w) => w.id === id) ?? null;
+  },
+};
+
+export const mockRoleRepository: RoleRepository = {
+  async list() {
+    return seedRoles;
+  },
+  async getById(id) {
+    return seedRoles.find((r) => r.id === id) ?? null;
+  },
+};
+
+export const mockAuditLogRepository: AuditLogRepository = {
+  async write(input: WriteAuditEntryInput) {
+    const entry: AuditLogEntry = {
+      id: randomUUID(),
+      tableName: input.tableName,
+      recordId: input.recordId,
+      action: input.action,
+      changedBy: input.changedBy,
+      changedAt: new Date().toISOString(),
+      before: input.before ?? null,
+      after: input.after ?? null,
+    };
+    state.auditLog.push(entry);
+    return entry;
+  },
+  async list(limit = 200) {
+    return [...state.auditLog].sort((a, b) => b.changedAt.localeCompare(a.changedAt)).slice(0, limit);
   },
 };
 

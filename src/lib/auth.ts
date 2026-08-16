@@ -15,7 +15,7 @@
 import { cookies } from 'next/headers';
 import { userRepository } from '@/lib/data';
 import type { User } from '@/lib/domain/inventory';
-import { DEMO_EMAIL, DEMO_PASSWORD } from '@/lib/demo-credentials';
+import { DEMO_ACCOUNTS } from '@/lib/demo-credentials';
 
 const SESSION_COOKIE = 'cobro_ims_session';
 
@@ -45,8 +45,11 @@ export type SignInResult = { ok: true } | { ok: false; error: string };
 
 export async function attemptSignIn(email: string, password: string): Promise<SignInResult> {
   const normalizedEmail = email.trim().toLowerCase();
-  if (normalizedEmail !== DEMO_EMAIL || password !== DEMO_PASSWORD) {
-    return { ok: false, error: 'Incorrect email or password. Try the demo credentials shown below.' };
+  const matchesADemoAccount = DEMO_ACCOUNTS.some(
+    (a) => a.email === normalizedEmail && a.password === password
+  );
+  if (!matchesADemoAccount) {
+    return { ok: false, error: 'Incorrect email or password. Try one of the demo accounts shown below.' };
   }
   const user = await userRepository.findByEmail(normalizedEmail);
   if (!user) {

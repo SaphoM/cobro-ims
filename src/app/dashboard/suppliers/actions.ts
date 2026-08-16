@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
 import { supplierRepository } from '@/lib/data';
+import { hasPermission } from '@/lib/permissions';
 
 export interface SupplierFormState {
   error: string | null;
@@ -15,6 +16,9 @@ export async function createSupplierAction(
 ): Promise<SupplierFormState> {
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
+  if (!(await hasPermission(session, 'manage_suppliers'))) {
+    return { error: 'Your role does not have permission to manage suppliers.', success: null };
+  }
 
   const name = String(formData.get('name') ?? '').trim();
   const contactEmail = String(formData.get('contactEmail') ?? '').trim();

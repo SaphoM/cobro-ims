@@ -16,19 +16,73 @@ import type {
   Warehouse,
 } from '@/lib/domain/inventory';
 
+// Permission keys mirror src/lib/permissions.ts's Permission type — kept as
+// plain strings here (not imported) so seed data has no dependency on
+// business logic. The actual matrix enforced at runtime lives in
+// permissions.ts; what's stored on each role here is descriptive/seed data,
+// matching it by convention. See docs/ARCHITECTURE.md §5.2 — this whole
+// matrix is a placeholder pending Cobro confirmation, not settled policy.
 export const roles: Role[] = [
   { id: 'role-admin', name: 'admin', description: 'Full system access', permissions: { '*': true }, createdAt: '2026-01-01T00:00:00Z' },
-  { id: 'role-warehouse', name: 'warehouse_clerk', description: 'Receiving, dispatch, transfers, stock take', permissions: { stock_movements: true }, createdAt: '2026-01-01T00:00:00Z' },
-  { id: 'role-procurement', name: 'procurement', description: 'Purchase orders & suppliers', permissions: { purchase_orders: true }, createdAt: '2026-01-01T00:00:00Z' },
-  { id: 'role-viewer', name: 'viewer', description: 'Read-only dashboards & reports', permissions: { reports: true }, createdAt: '2026-01-01T00:00:00Z' },
+  {
+    id: 'role-warehouse',
+    name: 'warehouse_clerk',
+    description: 'Receiving, transfers, stock-take requests, sales dispatch',
+    permissions: { manage_receiving: true, manage_transfers: true, request_adjustments: true, manage_sales_orders: true, view_reports: true },
+    createdAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'role-procurement',
+    name: 'procurement',
+    description: 'Purchase orders & suppliers',
+    permissions: { manage_purchase_orders: true, manage_suppliers: true, manage_receiving: true, view_reports: true },
+    createdAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'role-viewer',
+    name: 'viewer',
+    description: 'Read-only dashboards & reports',
+    permissions: { view_reports: true },
+    createdAt: '2026-01-01T00:00:00Z',
+  },
 ];
 
 export const users: User[] = [
   {
     id: 'user-demo',
     email: 'demo@cobroconcrete.co.za',
-    fullName: 'Demo User',
+    fullName: 'Demo Admin',
     roleId: 'role-admin',
+    isActive: true,
+    mfaEnrolled: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'user-clerk',
+    email: 'clerk@cobroconcrete.co.za',
+    fullName: 'Demo Warehouse Clerk',
+    roleId: 'role-warehouse',
+    isActive: true,
+    mfaEnrolled: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'user-procurement',
+    email: 'procurement@cobroconcrete.co.za',
+    fullName: 'Demo Procurement',
+    roleId: 'role-procurement',
+    isActive: true,
+    mfaEnrolled: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'user-viewer',
+    email: 'viewer@cobroconcrete.co.za',
+    fullName: 'Demo Viewer',
+    roleId: 'role-viewer',
     isActive: true,
     mfaEnrolled: false,
     createdAt: '2026-01-01T00:00:00Z',

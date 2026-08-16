@@ -10,11 +10,13 @@
 
 import {
   mockAdjustmentReasonRepository,
+  mockAuditLogRepository,
   mockCustomerRepository,
   mockInvoiceRepository,
   mockProductRepository,
   mockPurchaseOrderRepository,
   mockReceivingRepository,
+  mockRoleRepository,
   mockSalesOrderRepository,
   mockStockAdjustmentRepository,
   mockStockLedgerRepository,
@@ -35,6 +37,8 @@ if (DATA_SOURCE !== 'mock') {
 }
 
 export const warehouseRepository = mockWarehouseRepository;
+export const roleRepository = mockRoleRepository;
+export const auditLogRepository = mockAuditLogRepository;
 export const productRepository = mockProductRepository;
 export const stockLedgerRepository = mockStockLedgerRepository;
 export const stockMovementRepository = mockStockMovementRepository;

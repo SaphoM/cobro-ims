@@ -11,6 +11,7 @@
 import type {
   AdjustmentReasonCode,
   AdjustmentStatus,
+  AuditLogEntry,
   Customer,
   GoodsReceipt,
   InterWarehouseTransfer,
@@ -21,6 +22,7 @@ import type {
   ProductBomLine,
   PurchaseOrder,
   PurchaseOrderLine,
+  Role,
   SalesOrder,
   SalesOrderStatus,
   StockAdjustment,
@@ -36,6 +38,34 @@ import type {
 export interface WarehouseRepository {
   list(): Promise<Warehouse[]>;
   getById(id: string): Promise<Warehouse | null>;
+}
+
+export interface RoleRepository {
+  list(): Promise<Role[]>;
+  getById(id: string): Promise<Role | null>;
+}
+
+export interface WriteAuditEntryInput {
+  tableName: string;
+  recordId: string;
+  action: 'insert' | 'update' | 'delete';
+  changedBy: string | null;
+  before?: unknown;
+  after?: unknown;
+}
+
+/**
+ * Append-only by construction: this interface has no update/delete method,
+ * only `write` and `list`. The real Postgres immutability requirement (RFQ:
+ * "No record in the audit log may be deleted or modified — enforced at the
+ * database level") still needs the DB-level trigger in the migration when a
+ * live project exists — this mock can't enforce anything a caller with
+ * direct state access chooses to ignore, but no caller here is given any
+ * way to mutate or remove an entry once written.
+ */
+export interface AuditLogRepository {
+  write(input: WriteAuditEntryInput): Promise<AuditLogEntry>;
+  list(limit?: number): Promise<AuditLogEntry[]>;
 }
 
 export interface CreateProductInput {

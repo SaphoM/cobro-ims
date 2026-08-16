@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
-import { salesOrderRepository } from '@/lib/data';
+import { auditLogRepository, salesOrderRepository } from '@/lib/data';
+import { hasPermission, requirePermission } from '@/lib/permissions';
 
 export interface SalesOrderFormState {
   error: string | null;
@@ -15,6 +16,9 @@ export async function createSalesOrderAction(
 ): Promise<SalesOrderFormState> {
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
+  if (!(await hasPermission(session, 'manage_sales_orders'))) {
+    return { error: 'Your role does not have permission to create sales orders.', success: null };
+  }
 
   const customerId = String(formData.get('customerId') ?? '');
   const warehouseId = String(formData.get('warehouseId') ?? '');
@@ -56,7 +60,8 @@ async function requireSession() {
 
 export async function confirmSalesOrderAction(orderId: string) {
   'use server';
-  await requireSession();
+  const session = await requireSession();
+  await requirePermission(session, 'manage_sales_orders');
   await salesOrderRepository.confirm(orderId);
   revalidatePath('/dashboard/sales');
   revalidatePath('/dashboard');
@@ -65,14 +70,23 @@ export async function confirmSalesOrderAction(orderId: string) {
 export async function dispatchSalesOrderAction(orderId: string) {
   'use server';
   const session = await requireSession();
-  await salesOrderRepository.dispatch(orderId, session.id);
+  await requirePermission(session, 'manage_sales_orders');
+  const order = await salesOrderRepository.dispatch(orderId, session.id);
+  await auditLogRepository.write({
+    tableName: 'sales_orders',
+    recordId: orderId,
+    action: 'update',
+    changedBy: session.id,
+    after: order,
+  });
   revalidatePath('/dashboard/sales');
   revalidatePath('/dashboard');
 }
 
 export async function cancelSalesOrderAction(orderId: string) {
   'use server';
-  await requireSession();
+  const session = await requireSession();
+  await requirePermission(session, 'manage_sales_orders');
   await salesOrderRepository.cancel(orderId);
   revalidatePath('/dashboard/sales');
   revalidatePath('/dashboard');

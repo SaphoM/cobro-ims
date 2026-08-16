@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
-import { transferRepository } from '@/lib/data';
+import { auditLogRepository, transferRepository } from '@/lib/data';
+import { hasPermission, requirePermission } from '@/lib/permissions';
 
 export interface TransferFormState {
   error: string | null;
@@ -15,6 +16,9 @@ export async function initiateTransferAction(
 ): Promise<TransferFormState> {
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
+  if (!(await hasPermission(session, 'manage_transfers'))) {
+    return { error: 'Your role does not have permission to initiate transfers.', success: null };
+  }
 
   const fromWarehouseId = String(formData.get('fromWarehouseId') ?? '');
   const toWarehouseId = String(formData.get('toWarehouseId') ?? '');
@@ -39,6 +43,13 @@ export async function initiateTransferAction(
       quantity,
       initiatedBy: session.id,
     });
+    await auditLogRepository.write({
+      tableName: 'inter_warehouse_transfers',
+      recordId: transfer.id,
+      action: 'insert',
+      changedBy: session.id,
+      after: transfer,
+    });
     revalidatePath('/dashboard/transfers');
     revalidatePath('/dashboard');
     return { error: null, success: `${transfer.transferNumber} is in transit. Complete it once it arrives.` };
@@ -50,8 +61,16 @@ export async function initiateTransferAction(
 export async function completeTransferAction(transferId: string) {
   'use server';
   const session = await getSession();
-  if (!session) return;
-  await transferRepository.complete(transferId, session.id);
+  if (!session) throw new Error('Session expired.');
+  await requirePermission(session, 'manage_transfers');
+  const transfer = await transferRepository.complete(transferId, session.id);
+  await auditLogRepository.write({
+    tableName: 'inter_warehouse_transfers',
+    recordId: transferId,
+    action: 'update',
+    changedBy: session.id,
+    after: transfer,
+  });
   revalidatePath('/dashboard/transfers');
   revalidatePath('/dashboard');
 }
