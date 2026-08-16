@@ -4,6 +4,19 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.17.1 — 2026-08-16
+
+**UI polish: uniform form-control heights.**
+- Every `<select>` across the app rendered 0.12px shorter than the `<input>`s beside it on the
+  same row — both share identical padding/border/font-size, but `<select>` sizes from intrinsic
+  font metrics and ignores `line-height`, while `<input>` uses the body's `line-height: 1.5`
+- Fixed with one rule in `globals.css`: `select { min-height: calc(1.5em + 1.25rem + 2px) }` —
+  `min-height`, not `height`, so it can only grow a select to match, never clamp one down
+- Verified live across every dashboard page with form rows (Overview, Product catalogue, BOM,
+  Purchase orders, Receiving, Suppliers, Transfers, Adjustments, Sales, Customers, Labels): a
+  single uniform control height (43.12px) everywhere, no distinct values remaining
+- No other change — one file, `src/app/globals.css`, +16 lines
+
 ## v0.17.0 — 2026-08-16
 
 **QR generation, camera scanning at the operational touchpoints, and a full responsive pass

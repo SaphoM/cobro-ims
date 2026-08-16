@@ -60,6 +60,22 @@ body {
   border-color: var(--border);
 }
 
+/* Form control heights — keep <select> the same height as <input>.
+
+   Both already carry identical padding, border and font-size, but a <select> sizes its
+   content box from intrinsic font metrics and ignores line-height, while an <input> uses
+   its line-height (1.5). That left every dropdown 43.00px against 43.12px for inputs
+   sitting beside it on the same row.
+
+   `min-height` rather than `height`, so this can only ever grow a select to match — it
+   never clamps one that needs to be taller. The 1.5em term is the input's line-height
+   resolved against the select's own font-size, so this stays correct if a select is ever
+   given different text sizing; 1.25rem is the shared py-2.5 padding and 2px the border
+   (both counted here because these controls are border-box). */
+select {
+  min-height: calc(1.5em + 1.25rem + 2px);
+}
+
 /* Mobile nav drawer (dashboard/layout.tsx, CSS-only via #mobile-nav-toggle) — lock
    background scroll while it's open, so content behind the dimmed backdrop can't be
    scrolled underneath it on touch devices.
