@@ -284,6 +284,7 @@ export interface Invoice {
   vatAmount: number;
   total: number;
   amountPaid: number;
+  creditedAmount: number; // total of all credit notes issued against this invoice
   status: InvoiceStatus;
   issuedAt: ISODateTime;
   dueAt: ISODateTime; // issuedAt + payment terms (30 days, matching Cobro's own PO terms)
@@ -296,4 +297,20 @@ export interface InvoicePayment {
   amount: number;
   paidAt: ISODateTime;
   recordedBy: UUID;
+}
+
+/**
+ * Reduces what's owed on an invoice without being a payment — for returns,
+ * pricing corrections, or goodwill adjustments. `outstanding` on an invoice
+ * is always `total - amountPaid - creditedAmount`; status flips to 'paid'
+ * once that reaches zero the same way a payment would close it out.
+ */
+export interface CreditNote {
+  id: UUID;
+  creditNoteNumber: string;
+  invoiceId: UUID;
+  amount: number;
+  reason: string;
+  issuedAt: ISODateTime;
+  issuedBy: UUID;
 }

@@ -217,7 +217,7 @@ export function buildInvoiceAgeing(invoices: Invoice[], customers: Customer[], n
   const rows: AgeingRow[] = invoices
     .filter((i) => i.status === 'unpaid' || i.status === 'partially_paid')
     .map((inv) => {
-      const outstanding = Math.round((inv.total - inv.amountPaid) * 100) / 100;
+      const outstanding = Math.round((inv.total - inv.amountPaid - inv.creditedAmount) * 100) / 100;
       const daysPastDue = Math.floor((nowMs - new Date(inv.dueAt).getTime()) / (24 * 60 * 60 * 1000));
       const bucket: AgeingBucket =
         daysPastDue <= 0 ? 'current' : daysPastDue <= 30 ? '1-30' : daysPastDue <= 60 ? '31-60' : daysPastDue <= 90 ? '61-90' : '90+';

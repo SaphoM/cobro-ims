@@ -67,3 +67,48 @@ export async function recordPaymentAction(
     return { error: err instanceof Error ? err.message : 'Could not record the payment.', success: null };
   }
 }
+
+export interface IssueCreditNoteFormState {
+  error: string | null;
+  success: string | null;
+}
+
+export async function issueCreditNoteAction(
+  _prevState: IssueCreditNoteFormState,
+  formData: FormData
+): Promise<IssueCreditNoteFormState> {
+  const session = await getSession();
+  if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
+  if (!(await hasPermission(session, 'manage_invoices'))) {
+    return { error: 'Your role does not have permission to issue credit notes.', success: null };
+  }
+
+  const invoiceId = String(formData.get('invoiceId') ?? '');
+  const amount = Number(formData.get('amount'));
+  const reason = String(formData.get('reason') ?? '').trim();
+  if (!invoiceId) return { error: 'Missing invoice.', success: null };
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { error: 'Credit amount must be a positive number.', success: null };
+  }
+  if (!reason) {
+    return { error: 'A reason is required — e.g. return, pricing correction, goodwill.', success: null };
+  }
+
+  try {
+    const { invoice, creditNote } = await invoiceRepository.issueCreditNote(invoiceId, amount, reason, session.id);
+    await auditLogRepository.write({
+      tableName: 'credit_notes',
+      recordId: creditNote.id,
+      action: 'insert',
+      changedBy: session.id,
+      after: creditNote,
+    });
+    revalidatePath('/dashboard/invoices');
+    return {
+      error: null,
+      success: `${creditNote.creditNoteNumber} issued for R${amount.toFixed(2)} — ${invoice.invoiceNumber} is now ${invoice.status.replace('_', ' ')}.`,
+    };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Could not issue the credit note.', success: null };
+  }
+}

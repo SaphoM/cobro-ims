@@ -65,6 +65,7 @@ the resulting numbers hand-checked):
 | | Full purchase order lifecycle (draft → issue → partial/full receive) | ✅ |
 | | Suppliers, Customers | ✅ |
 | Phase 4 — Invoicing, Billing & Accounting | Invoicing & billing (VAT, payments, ageing) | ✅ |
+| | Credit notes (issue against invoice, nets off outstanding) | ✅ |
 | | Accounting integration (Sage/QuickBooks/Xero) | ⏳ blocked on §7.5 |
 | Phase 5 — Dashboards, Reporting, Barcode Scanning | Dashboards & reports (15 of "15+", CSV export) | ✅ |
 | | Barcode/QR scanning (USB scanner: lookup + receiving) | ✅ |
@@ -226,7 +227,9 @@ applied (see `supabase/migrations/20260816100000_audit_log_immutability.sql`).
 - **Invoicing & billing** (`/dashboard/invoices`) — one VAT-compliant invoice generated per dispatched
   sales order (15% VAT, the current SARS rate; 30-day payment terms matching Cobro's own terms as vendor
   to Productivity SA). Payments — partial or full — move status `unpaid` → `partially_paid` → `paid`;
-  ageing is computed against the due date. A dispatched order can't be invoiced twice.
+  ageing is computed against the due date. A dispatched order can't be invoiced twice. **Credit notes**
+  (reason + amount, against any unpaid/partially-paid invoice) reduce the outstanding balance alongside
+  payments — outstanding is `total - amountPaid - creditedAmount` everywhere it's shown.
 - **Dashboard overview** (`/dashboard`) — live KPIs (SKUs tracked, total stock value, below-reorder-point
   count) and the multi-warehouse stock ledger table, plus a generic "record a movement" form that exercises
   the engine directly (the original proof-of-concept before the dedicated workflow pages existed).
@@ -347,7 +350,7 @@ src/app/
     adjustments/                    Write-offs & adjustments with approval gate
     sales/                          Sales orders & dispatch
     suppliers/, customers/          List + add pickers
-    invoices/                       Invoicing & billing, payments, ageing
+    invoices/                       Invoicing & billing, payments, credit notes, ageing
     reports/                        Dashboards & reports (15 of "15+"), CSV export per table
     scan/                            Barcode/QR lookup (USB scanner-friendly plain GET form)
     labels/                          Print-ready product label sheets (@media print, .no-print convention)

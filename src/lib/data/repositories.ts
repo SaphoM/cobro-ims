@@ -12,6 +12,7 @@ import type {
   AdjustmentReasonCode,
   AdjustmentStatus,
   AuditLogEntry,
+  CreditNote,
   Customer,
   GoodsReceipt,
   InterWarehouseTransfer,
@@ -292,6 +293,13 @@ export interface InvoiceRepository {
   /** Partial payments supported — status becomes 'partially_paid' or 'paid' depending on the running total. */
   recordPayment(invoiceId: string, amount: number, recordedBy: string): Promise<{ invoice: Invoice; payment: InvoicePayment }>;
   listPayments(invoiceId: string): Promise<InvoicePayment[]>;
+  /**
+   * Reduces what's owed without being a payment. Outstanding is always
+   * total - amountPaid - creditedAmount; status flips to 'paid' the same
+   * way a payment closing the balance out would.
+   */
+  issueCreditNote(invoiceId: string, amount: number, reason: string, issuedBy: string): Promise<{ invoice: Invoice; creditNote: CreditNote }>;
+  listCreditNotes(invoiceId: string): Promise<CreditNote[]>;
 }
 
 export interface UserRepository {

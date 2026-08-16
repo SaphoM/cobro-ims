@@ -14,6 +14,7 @@ import { randomUUID } from 'crypto';
 import type {
   AdjustmentReasonCode,
   AuditLogEntry,
+  CreditNote,
   Customer,
   GoodsReceipt,
   InterWarehouseTransfer,
@@ -90,6 +91,7 @@ const state = {
   purchaseOrderLines: new Map<string, PurchaseOrderLine>(),
   invoices: [] as Invoice[],
   invoicePayments: [] as InvoicePayment[],
+  creditNotes: [] as CreditNote[],
   auditLog: [] as AuditLogEntry[],
   bomLines: [] as ProductBomLine[],
 };
@@ -100,6 +102,7 @@ let transferCounter = 1000;
 let adjustmentCounter = 1000;
 let salesOrderCounter = 1000;
 let invoiceCounter = 1000;
+let creditNoteCounter = 1000;
 
 function ledgerKey(productId: string, warehouseId: string) {
   return `${productId}::${warehouseId}`;
@@ -702,6 +705,10 @@ export const mockSalesOrderRepository: SalesOrderRepository = {
 
 const INVOICE_PAYMENT_TERMS_DAYS = 30; // matches Cobro's own PO terms as vendor to Productivity SA
 
+function invoiceOutstanding(invoice: Invoice): number {
+  return Math.round((invoice.total - invoice.amountPaid - invoice.creditedAmount) * 100) / 100;
+}
+
 export const mockInvoiceRepository: InvoiceRepository = {
   async list() {
     return [...state.invoices].sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
@@ -735,6 +742,7 @@ export const mockInvoiceRepository: InvoiceRepository = {
       vatAmount,
       total,
       amountPaid: 0,
+      creditedAmount: 0,
       status: 'unpaid',
       issuedAt: issuedAt.toISOString(),
       dueAt: dueAt.toISOString(),
@@ -750,7 +758,7 @@ export const mockInvoiceRepository: InvoiceRepository = {
       throw new Error(`Invoice is already ${invoice.status}.`);
     }
     if (amount <= 0) throw new Error('Payment amount must be positive.');
-    const outstanding = Math.round((invoice.total - invoice.amountPaid) * 100) / 100;
+    const outstanding = invoiceOutstanding(invoice);
     if (amount > outstanding + 1e-9) {
       throw new Error(`Cannot pay more than the R${outstanding.toFixed(2)} outstanding on this invoice.`);
     }
@@ -765,12 +773,45 @@ export const mockInvoiceRepository: InvoiceRepository = {
     state.invoicePayments.push(payment);
 
     invoice.amountPaid = Math.round((invoice.amountPaid + amount) * 100) / 100;
-    invoice.status = invoice.amountPaid >= invoice.total - 1e-9 ? 'paid' : 'partially_paid';
+    invoice.status = invoiceOutstanding(invoice) <= 1e-9 ? 'paid' : 'partially_paid';
 
     return { invoice, payment };
   },
   async listPayments(invoiceId) {
     return state.invoicePayments.filter((p) => p.invoiceId === invoiceId);
+  },
+  async issueCreditNote(invoiceId, amount, reason, issuedBy) {
+    const invoice = state.invoices.find((i) => i.id === invoiceId);
+    if (!invoice) throw new Error('Invoice not found.');
+    if (invoice.status === 'paid' || invoice.status === 'cancelled') {
+      throw new Error(`Invoice is already ${invoice.status}.`);
+    }
+    if (amount <= 0) throw new Error('Credit note amount must be positive.');
+    if (!reason.trim()) throw new Error('A reason is required.');
+    const outstanding = invoiceOutstanding(invoice);
+    if (amount > outstanding + 1e-9) {
+      throw new Error(`Cannot credit more than the R${outstanding.toFixed(2)} outstanding on this invoice.`);
+    }
+
+    creditNoteCounter += 1;
+    const creditNote: CreditNote = {
+      id: randomUUID(),
+      creditNoteNumber: `CN-${creditNoteCounter}`,
+      invoiceId,
+      amount,
+      reason: reason.trim(),
+      issuedAt: new Date().toISOString(),
+      issuedBy,
+    };
+    state.creditNotes.push(creditNote);
+
+    invoice.creditedAmount = Math.round((invoice.creditedAmount + amount) * 100) / 100;
+    invoice.status = invoiceOutstanding(invoice) <= 1e-9 ? 'paid' : 'partially_paid';
+
+    return { invoice, creditNote };
+  },
+  async listCreditNotes(invoiceId) {
+    return state.creditNotes.filter((c) => c.invoiceId === invoiceId);
   },
 };
 

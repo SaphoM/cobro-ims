@@ -128,6 +128,16 @@ resulting WAC math checked by hand):
   for a concrete block SKU, removed one component and confirmed it reappeared in the "add component"
   picker while disappearing from the BOM table and the explosion calculation; exploded the remaining
   component (0.01 ton/unit) against a 5,000-unit build quantity → exactly 50 tons.
+- **Credit notes** (`/dashboard/invoices`, RFQ Phase 4 gap) — issue a credit note (reason + amount) against
+  any unpaid/partially-paid invoice, gated on `manage_invoices` and audit-logged against `credit_notes`.
+  New `Invoice.creditedAmount` field and `CreditNote` domain type; outstanding balance is now
+  `total - amountPaid - creditedAmount` everywhere it's computed (invoice list totals, per-row outstanding,
+  `buildInvoiceAgeing`). Schema-as-code in
+  `supabase/migrations/20260816110000_credit_notes.sql` (adds `invoices.credited_amount` and a
+  `credit_notes` table). Verified live end-to-end on SO-1001 → INV-1001 (R3,000 subtotal, R450 VAT, R3,450
+  total): issued a R1,000 credit note → outstanding dropped to exactly R2,450.00, Credited column showed
+  R1,000.00, status flipped to "Partially paid"; recorded a R2,450 payment for the remainder → outstanding
+  hit exactly R0.00, status flipped to "Paid".
 
 What exists as the underlying substrate is a **schema-and-engine-first vertical slice**, not a partial
 ERP:
@@ -196,6 +206,7 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 | Barcode/QR scanning (USB scanner, lookup + receiving) | Real logic and UI — see §1 |
 | Product labels (`/dashboard/labels`, print-ready sheets) | Real logic and UI — see §1 |
 | Bill of materials (`/dashboard/bom`, flat BOM + explosion calculator) | Real logic and UI — see §1 |
+| Credit notes (issue against invoice, nets off outstanding) | Real logic and UI — see §1 |
 | Camera-based scanning, rendered barcode symbol graphic (Code 128/QR) | Not built |
 | 2FA for privileged users | **Real gate** on `approve_adjustments` — mock enrollment (`/dashboard/security`), no real authenticator app |
 

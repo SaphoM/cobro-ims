@@ -4,6 +4,23 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.16.0 — 2026-08-16
+
+**Credit notes (RFQ Invoicing & Billing gap closed) — issue, track, and net against invoices.**
+- New `Invoice.creditedAmount` field and `CreditNote` domain type; `InvoiceRepository.issueCreditNote`/
+  `listCreditNotes` added, backed by real mock state with a `CN-1001`-style numbering counter
+- Outstanding balance is now `total - amountPaid - creditedAmount` everywhere it's computed: the invoices
+  list totals, the per-row outstanding figure, and `buildInvoiceAgeing` in the reports engine
+- New "Issue credit note" action on `/dashboard/invoices` (reason + amount, gated on `manage_invoices`,
+  audit-logged against `credit_notes`), alongside the existing "Record payment" action; new "Credited"
+  column in the invoices table
+- Schema-as-code: `supabase/migrations/20260816110000_credit_notes.sql` adds `invoices.credited_amount`
+  and a `credit_notes` table for the eventual real Supabase project
+- Verified live end-to-end on a fresh SO-1001 → INV-1001 (R3,000 subtotal, R450 VAT, R3,450 total): issued
+  a R1,000 credit note ("Partial return - damaged bags") → outstanding dropped to exactly R2,450.00,
+  Credited column showed R1,000.00, status flipped to "Partially paid"; then recorded a R2,450 payment for
+  the remainder → outstanding hit exactly R0.00 and status flipped to "Paid"
+
 ## v0.15.0 — 2026-08-16
 
 **Bill of materials (RFQ Phase 2 gap closed) — flat BOM management + explosion calculator.**

@@ -1,5 +1,6 @@
 import { customerRepository, invoiceRepository, salesOrderRepository } from '@/lib/data';
 import { PaymentLine } from '@/app/dashboard/invoices/payment-line';
+import { CreditNoteLine } from '@/app/dashboard/invoices/credit-note-line';
 import { getNowMs } from '@/lib/now';
 import type { InvoiceStatus } from '@/lib/domain/inventory';
 
@@ -16,7 +17,7 @@ export default async function InvoicesPage() {
 
   const totalOutstanding = invoices
     .filter((i) => i.status === 'unpaid' || i.status === 'partially_paid')
-    .reduce((sum, i) => sum + (i.total - i.amountPaid), 0);
+    .reduce((sum, i) => sum + (i.total - i.amountPaid - i.creditedAmount), 0);
   const overdueCount = invoices.filter(
     (i) => (i.status === 'unpaid' || i.status === 'partially_paid') && new Date(i.dueAt).getTime() < now
   ).length;
@@ -50,7 +51,7 @@ export default async function InvoicesPage() {
           <p className="px-5 py-6 text-[0.85rem] text-text-faint">No invoices generated yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] border-collapse text-[0.86rem]">
+            <table className="w-full min-w-[1080px] border-collapse text-[0.86rem]">
               <thead>
                 <tr className="text-left text-text-faint">
                   <th className="px-5 py-2.5 font-medium">Invoice</th>
@@ -59,6 +60,7 @@ export default async function InvoicesPage() {
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">Subtotal</th>
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">VAT (15%)</th>
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">Total</th>
+                  <th className="px-5 py-2.5 text-right font-medium tabular-nums">Credited</th>
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">Due</th>
                   <th className="px-5 py-2.5 font-medium">Status</th>
                   <th className="px-5 py-2.5 font-medium"></th>
@@ -66,7 +68,7 @@ export default async function InvoicesPage() {
               </thead>
               <tbody>
                 {invoices.map((inv) => {
-                  const outstanding = Math.round((inv.total - inv.amountPaid) * 100) / 100;
+                  const outstanding = Math.round((inv.total - inv.amountPaid - inv.creditedAmount) * 100) / 100;
                   const dueDate = new Date(inv.dueAt);
                   const ageingDays = Math.floor((now - dueDate.getTime()) / (24 * 60 * 60 * 1000));
                   const isOverdue = (inv.status === 'unpaid' || inv.status === 'partially_paid') && ageingDays > 0;
@@ -87,6 +89,11 @@ export default async function InvoicesPage() {
                         R {inv.total.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text-muted">
+                        {inv.creditedAmount > 0
+                          ? `R ${inv.creditedAmount.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : '—'}
+                      </td>
+                      <td className="px-5 py-3 text-right tabular-nums text-text-muted">
                         {dueDate.toLocaleDateString('en-ZA')}
                         {isOverdue && (
                           <span className="ml-2 rounded-full bg-danger/15 px-2 py-0.5 text-[0.68rem] font-semibold text-[#f3a99a]">
@@ -99,7 +106,10 @@ export default async function InvoicesPage() {
                       </td>
                       <td className="px-5 py-3 text-right">
                         {(inv.status === 'unpaid' || inv.status === 'partially_paid') && (
-                          <PaymentLine invoiceId={inv.id} outstanding={outstanding} />
+                          <div className="flex flex-col items-end gap-2">
+                            <PaymentLine invoiceId={inv.id} outstanding={outstanding} />
+                            <CreditNoteLine invoiceId={inv.id} outstanding={outstanding} />
+                          </div>
                         )}
                       </td>
                     </tr>
