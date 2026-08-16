@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import { receiveStockAction, type ReceiveFormState } from '@/app/dashboard/receiving/actions';
 import type { Product, Supplier, Warehouse } from '@/lib/domain/inventory';
 
@@ -20,6 +20,27 @@ export function ReceiveForm({
   products: Product[];
 }) {
   const [state, formAction, pending] = useActionState(receiveStockAction, initialState);
+  const [scanMessage, setScanMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const productSelectRef = useRef<HTMLSelectElement>(null);
+  const quantityRef = useRef<HTMLInputElement>(null);
+
+  function handleBarcodeSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const barcodeInput = e.currentTarget.elements.namedItem('scanBarcode') as HTMLInputElement;
+    const barcode = barcodeInput.value.trim();
+    if (!barcode) return;
+
+    const match = products.find((p) => p.barcode === barcode);
+    if (match && productSelectRef.current) {
+      productSelectRef.current.value = match.id;
+      setScanMessage({ text: `Matched ${match.sku} — ${match.name}.`, ok: true });
+      quantityRef.current?.focus();
+    } else {
+      setScanMessage({ text: `No product with barcode "${barcode}".`, ok: false });
+    }
+    barcodeInput.value = '';
+    barcodeInput.focus();
+  }
 
   return (
     <div className="rounded-2xl border border-accent/[0.14] bg-surface p-5">
@@ -29,6 +50,28 @@ export function ReceiveForm({
         deliberate shortcut while full Purchase Order lifecycle management (RFQ Phase 3) doesn&apos;t exist
         yet. The schema underneath still models PO → GRN properly.
       </p>
+
+      <form onSubmit={handleBarcodeSubmit} className="mb-4 flex items-end gap-2 border-b border-accent/[0.08] pb-4">
+        <label className="flex flex-1 flex-col gap-1.5">
+          <span className="text-[0.75rem] font-semibold text-text-muted">Scan barcode to select product</span>
+          <input
+            name="scanBarcode"
+            type="text"
+            autoComplete="off"
+            placeholder="Scan or type, then Enter"
+            className={`${inputClass} font-mono-brand`}
+          />
+        </label>
+        <button
+          type="submit"
+          className="rounded-lg border border-accent/30 bg-surface-2 px-3 py-2.5 text-[0.82rem] font-semibold text-accent hover:bg-accent/10"
+        >
+          Match
+        </button>
+      </form>
+      {scanMessage && (
+        <p className={`mb-4 text-[0.78rem] ${scanMessage.ok ? 'text-accent' : 'text-danger'}`}>{scanMessage.text}</p>
+      )}
 
       <form action={formAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <label className="flex flex-col gap-1.5 lg:col-span-2">
@@ -55,7 +98,7 @@ export function ReceiveForm({
 
         <label className="flex flex-col gap-1.5 lg:col-span-2">
           <span className="text-[0.75rem] font-semibold text-text-muted">Product</span>
-          <select name="productId" required className={selectClass}>
+          <select name="productId" required ref={productSelectRef} className={selectClass}>
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.sku} — {p.name}
@@ -66,7 +109,16 @@ export function ReceiveForm({
 
         <label className="flex flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">Quantity received</span>
-          <input type="number" name="quantity" min="0.001" step="0.001" required placeholder="0" className={inputClass} />
+          <input
+            ref={quantityRef}
+            type="number"
+            name="quantity"
+            min="0.001"
+            step="0.001"
+            required
+            placeholder="0"
+            className={inputClass}
+          />
         </label>
 
         <label className="flex flex-col gap-1.5">

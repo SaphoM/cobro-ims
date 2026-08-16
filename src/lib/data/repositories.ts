@@ -51,6 +51,8 @@ export interface ProductRepository {
   list(): Promise<Product[]>;
   getById(id: string): Promise<Product | null>;
   getBySku(sku: string): Promise<Product | null>;
+  /** Barcode/QR lookup — RFQ Phase 5. Matches on the exact barcode value scanned. */
+  getByBarcode(barcode: string): Promise<Product | null>;
   create(input: CreateProductInput): Promise<Product>;
   listBom(parentProductId: string): Promise<ProductBomLine[]>;
 }

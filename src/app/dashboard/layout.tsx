@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/customers', label: 'Customers' },
   { href: '/dashboard/invoices', label: 'Invoicing & billing' },
   { href: '/dashboard/reports', label: 'Dashboards & reports' },
+  { href: '/dashboard/scan', label: 'Barcode / QR scan' },
 ];
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {

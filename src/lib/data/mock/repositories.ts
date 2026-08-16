@@ -142,6 +142,9 @@ export const mockProductRepository: ProductRepository = {
   async getBySku(sku) {
     return state.products.find((p) => p.sku === sku) ?? null;
   },
+  async getByBarcode(barcode) {
+    return state.products.find((p) => p.barcode === barcode) ?? null;
+  },
   async create(input: CreateProductInput) {
     if (state.products.some((p) => p.sku.toLowerCase() === input.sku.toLowerCase())) {
       throw new Error(`SKU "${input.sku}" already exists.`);

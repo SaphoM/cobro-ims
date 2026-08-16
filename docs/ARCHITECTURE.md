@@ -62,8 +62,19 @@ resulting WAC math checked by hand):
   manual receipt (50 units @ R98) immediately showed up correctly in both the stock valuation report
   (WAC recalculated to R92.65, exact) and the movement history report, with the CSV export button
   producing no console errors.
-  **Not yet built:** barcode/QR scanning (the other half of RFQ Phase 5), and the remaining ~9 reports
-  the RFQ eventually wants (e.g. dispatch/pick-list reports, supplier performance, BOM explosion).
+  **Not yet built:** the remaining ~9 reports the RFQ eventually wants (e.g. dispatch/pick-list reports,
+  supplier performance, BOM explosion).
+- **Barcode / QR scan** (`/dashboard/scan`, RFQ Phase 5) — a lookup page: scan or type a barcode, see
+  that product's stock across every warehouse. USB scanners work today (they act as keyboard input,
+  submitting a plain GET form on Enter — no client JS needed for the scan itself). Also wired into
+  **Goods receiving**: a barcode field there matches against the loaded product list client-side and
+  auto-selects the product dropdown. Verified: scanning `6001240912345` on the lookup page returned the
+  correct product and per-warehouse ledger; scanning `6001240912346` on the receiving form correctly
+  selected `BLK-STD-140` in the product dropdown; an unknown barcode showed a clear not-found message.
+  **Not built:** camera-based scanning (`getUserMedia` + a barcode-decoding library) — RFQ allows
+  "browser-based camera scanning and/or USB scanner support", so USB-only satisfies the requirement as
+  written, but camera support would need real hardware to test properly. Label printing (also mentioned
+  in the RFQ under barcode scanning) isn't built either.
 
 What exists as the underlying substrate is a **schema-and-engine-first vertical slice**, not a partial
 ERP:
@@ -128,7 +139,8 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 | Invoicing & billing (VAT, payments, ageing) | Real logic and UI — see §1 |
 | Accounting Integration (Sage/QuickBooks/Xero) | Not started — blocked on §5.5 (which platform) |
 | Dashboards & reports (6 of 15+, CSV export) | Real logic and UI — see §1 |
-| Barcode/QR scanning | Not started (RFQ Phase 5) |
+| Barcode/QR scanning (USB scanner, lookup + receiving) | Real logic and UI — see §1 |
+| Camera-based scanning, label printing | Not built |
 
 ## 5. BUSINESS DECISION REQUIRED — do not resolve these by assumption
 

@@ -4,6 +4,22 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.9.0 — 2026-08-16
+
+**RFQ Phase 5: barcode/QR scanning (USB scanner).**
+- `ProductRepository.getByBarcode` — exact-match barcode lookup
+- New `/dashboard/scan` page: scan or type a barcode into a plain GET form (no client JS needed for the
+  scan itself — a USB scanner behaves like a keyboard typing the code then pressing Enter, which submits
+  an ordinary form natively); shows the matched product's stock across every warehouse, with quick links
+  into receive/sell/adjust for that product
+- Goods receiving form gained a "scan to select product" field that matches client-side against the
+  loaded product list and auto-selects the product dropdown
+- Verified: scanning `6001240912345` on the lookup page returned the correct product and ledger rows;
+  scanning `6001240912346` on the receiving form correctly selected `BLK-STD-140`; an unknown barcode
+  showed a clear not-found message
+- Not built: camera-based scanning (`getUserMedia` + decoding — needs real hardware to verify properly)
+  and label printing; RFQ allows "camera and/or USB scanner", so USB-only satisfies it as written
+
 ## v0.8.0 — 2026-08-16
 
 **RFQ Phase 5 (partial): Dashboards & Reports.**
