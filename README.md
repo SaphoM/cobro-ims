@@ -65,7 +65,7 @@ the resulting numbers hand-checked):
 | | Suppliers, Customers | ✅ |
 | Phase 4 — Invoicing, Billing & Accounting | Invoicing & billing (VAT, payments, ageing) | ✅ |
 | | Accounting integration (Sage/QuickBooks/Xero) | ⏳ blocked on §7.5 |
-| Phase 5 — Dashboards, Reporting, Barcode Scanning | Dashboards & reports (10 of 15+, CSV export) | ✅ |
+| Phase 5 — Dashboards, Reporting, Barcode Scanning | Dashboards & reports (15 of "15+", CSV export) | ✅ |
 | | Barcode/QR scanning (USB scanner: lookup + receiving) | ✅ |
 | | Product labels (print-ready sheets) | ✅ |
 | | Camera-based scanning, rendered barcode symbol graphic | Not started |
@@ -226,10 +226,11 @@ applied (see `supabase/migrations/20260816100000_audit_log_immutability.sql`).
 - **Dashboard overview** (`/dashboard`) — live KPIs (SKUs tracked, total stock value, below-reorder-point
   count) and the multi-warehouse stock ledger table, plus a generic "record a movement" form that exercises
   the engine directly (the original proof-of-concept before the dedicated workflow pages existed).
-- **Dashboards & reports** (`/dashboard/reports`) — ten reports so far (stock valuation, low stock, sales
-  order summary, customer summary, purchase order summary, supplier summary, invoice ageing, stock
-  movement history, receiving history, movement type totals), each exportable to CSV. Toward the RFQ's
-  eventual 15+.
+- **Dashboards & reports** (`/dashboard/reports`) — all fifteen: stock valuation, low stock, warehouse
+  summary, dormant stock, sales order summary, customer summary, pick list, purchase order summary,
+  supplier summary, open purchase orders, invoice ageing, stock movement history, receiving history,
+  movement type totals, and adjustment reason summary — each exportable to CSV. The RFQ's "15+" target,
+  reached.
 - **Barcode / QR scan** (`/dashboard/scan`) — scan or type a barcode to look up a product and its stock
   across every warehouse; USB scanners work today (they act as keyboard input, submitting a plain form on
   Enter). Also wired into Goods Receiving as a "scan to select product" field. Camera-based scanning isn't
@@ -264,7 +265,7 @@ correct — with the resulting quantities/costs/VAT amounts hand-verified agains
 | RBAC | **Real enforcement** — every mutating Server Action checks a permission via `src/lib/permissions.ts`; 4 demo accounts (one per role) to test with. The matrix itself is still a placeholder pending Cobro sign-off |
 | Audit log | **Real** — every audited action writes an append-only entry, viewable at `/dashboard/audit-log`. DB-level immutability trigger written, not applied (no live project) |
 | Accounting integration (Sage/QuickBooks/Xero) | Not started — blocked on choosing a platform (§7.5) |
-| Dashboards & reports (10 of eventual 15+, CSV export) | Real logic and UI |
+| Dashboards & reports (15 of "15+", CSV export) | Real logic and UI |
 | Barcode/QR scanning (USB scanner: lookup + receiving) | Real logic and UI |
 | Product labels (print-ready sheets) | Real logic and UI |
 | Camera-based scanning, rendered barcode symbol graphic | Not started |
@@ -340,7 +341,7 @@ src/app/
     sales/                          Sales orders & dispatch
     suppliers/, customers/          List + add pickers
     invoices/                       Invoicing & billing, payments, ageing
-    reports/                        Dashboards & reports (10 of 15+), CSV export per table
+    reports/                        Dashboards & reports (15 of "15+"), CSV export per table
     scan/                            Barcode/QR lookup (USB scanner-friendly plain GET form)
     labels/                          Print-ready product label sheets (@media print, .no-print convention)
     audit-log/                      Append-only audit trail viewer
@@ -363,6 +364,6 @@ CHANGELOG.md                    Version-by-version build history (semver, pre-1.
 3. **Core Data phase:** apply all migrations (including the audit-log immutability trigger) to that
    project, replace the mock repositories with real Supabase-backed ones behind the same interfaces.
 4. **Accounting integration:** once §9.5 is decided, build the Sage/QuickBooks/Xero sync.
-5. **Rest of Phase 5:** the remaining ~5 reports toward 15+, camera-based scanning, a rendered barcode
-   symbol graphic (Code 128/QR) for labels.
+5. **Rest of Phase 5:** camera-based scanning, a rendered barcode symbol graphic (Code 128/QR) for
+   labels — reports are done (15 of "15+").
 6. **Phase 8:** system testing, UAT, training materials, production cutover.

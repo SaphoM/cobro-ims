@@ -1,25 +1,32 @@
 import {
+  adjustmentReasonRepository,
   customerRepository,
   invoiceRepository,
   productRepository,
   purchaseOrderRepository,
   salesOrderRepository,
+  stockAdjustmentRepository,
   stockLedgerRepository,
   stockMovementRepository,
   supplierRepository,
   warehouseRepository,
 } from '@/lib/data';
 import {
+  buildAdjustmentReasonSummary,
   buildCustomerSummary,
+  buildDormantStock,
   buildInvoiceAgeing,
   buildLowStockReport,
   buildMovementHistory,
   buildMovementTypeTotals,
+  buildOpenPurchaseOrders,
+  buildPickList,
   buildPurchaseOrderSummary,
   buildReceivingHistory,
   buildSalesSummary,
   buildStockValuationReport,
   buildSupplierSummary,
+  buildWarehouseSummary,
 } from '@/lib/services/reports';
 import { getNowMs } from '@/lib/now';
 import { ExportCsvButton } from '@/components/export-csv-button';
@@ -35,6 +42,8 @@ export default async function ReportsPage() {
     purchaseOrders,
     invoices,
     movements,
+    adjustments,
+    adjustmentReasons,
   ] = await Promise.all([
     productRepository.list(),
     warehouseRepository.list(),
@@ -45,27 +54,36 @@ export default async function ReportsPage() {
     purchaseOrderRepository.list(),
     invoiceRepository.list(),
     stockMovementRepository.listRecent(200),
+    stockAdjustmentRepository.list(),
+    adjustmentReasonRepository.list(),
   ]);
 
+  const now = getNowMs();
   const valuation = buildStockValuationReport(ledger, products, warehouses);
   const lowStock = buildLowStockReport(ledger, products, warehouses);
   const salesSummary = buildSalesSummary(salesOrders, products, customers);
   const poSummary = buildPurchaseOrderSummary(purchaseOrders, products, suppliers);
-  const ageing = buildInvoiceAgeing(invoices, customers, getNowMs());
+  const ageing = buildInvoiceAgeing(invoices, customers, now);
   const movementHistory = buildMovementHistory(movements, products, warehouses);
   const receivingHistory = buildReceivingHistory(movements, products, warehouses);
   const movementTypeTotals = buildMovementTypeTotals(movements);
   const supplierSummary = buildSupplierSummary(purchaseOrders, suppliers);
   const customerSummary = buildCustomerSummary(salesOrders, customers);
+  const pickList = buildPickList(salesOrders, products, customers, warehouses);
+  const adjustmentReasonSummary = buildAdjustmentReasonSummary(adjustments, adjustmentReasons);
+  const warehouseSummary = buildWarehouseSummary(ledger, products, warehouses);
+  const openPurchaseOrders = buildOpenPurchaseOrders(purchaseOrders, products, suppliers, now);
+  const dormantStock = buildDormantStock(ledger, movements, products, warehouses);
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Dashboards & reports</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Ten of the RFQ&apos;s 15+ standard reports so far — stock valuation, low stock, sales, customers,
-          purchase orders, suppliers, invoice ageing, movement history, receiving history, and movement
-          type totals. Every table exports to CSV (opens in Excel), per the RFQ&apos;s data-export
+          Fifteen of the RFQ&apos;s &quot;15+&quot; standard reports — stock valuation, low stock, sales,
+          customers, purchase orders, suppliers, invoice ageing, movement history, receiving history,
+          movement type totals, pick list, adjustment reasons, warehouse summary, open purchase orders,
+          and dormant stock. Every table exports to CSV (opens in Excel), per the RFQ&apos;s data-export
           requirement.
         </p>
       </div>
@@ -147,6 +165,74 @@ export default async function ReportsPage() {
       </ReportSection>
 
       <ReportSection
+        title="Warehouse summary"
+        subtitle={`${warehouseSummary.length} warehouses`}
+        exportFilename="warehouse-summary"
+        rows={warehouseSummary}
+      >
+        <table className="w-full min-w-[560px] border-collapse text-[0.86rem]">
+          <thead>
+            <tr className="text-left text-text-faint">
+              <th className="px-5 py-2.5 font-medium">Warehouse</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">SKUs</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Below reorder</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Total value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {warehouseSummary.map((r, i) => (
+              <tr key={i} className="border-t border-accent/[0.08]">
+                <td className="px-5 py-3 text-text">{r.warehouseName}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.skuCount}</td>
+                <td className={`px-5 py-3 text-right tabular-nums ${r.lowStockCount > 0 ? 'text-danger' : 'text-text-muted'}`}>
+                  {r.lowStockCount}
+                </td>
+                <td className="px-5 py-3 text-right tabular-nums text-text">
+                  R {r.totalValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </ReportSection>
+
+      <ReportSection
+        title="Dormant stock"
+        subtitle={`${dormantStock.length} product-warehouse combinations with no movement recorded this session`}
+        exportFilename="dormant-stock"
+        rows={dormantStock}
+      >
+        {dormantStock.length === 0 ? (
+          <EmptyState text="Everything on the ledger has moved since this server started." />
+        ) : (
+          <table className="w-full min-w-[560px] border-collapse text-[0.86rem]">
+            <thead>
+              <tr className="text-left text-text-faint">
+                <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                <th className="px-5 py-2.5 font-medium">SKU</th>
+                <th className="px-5 py-2.5 font-medium">Product</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">On hand</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dormantStock.map((r, i) => (
+                <tr key={i} className="border-t border-accent/[0.08]">
+                  <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
+                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
+                  <td className="px-5 py-3 text-text-muted">{r.productName}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOnHand.toLocaleString()}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">
+                    R {r.value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </ReportSection>
+
+      <ReportSection
         title="Sales order summary"
         subtitle={`${salesSummary.length} orders`}
         exportFilename="sales-orders"
@@ -215,6 +301,54 @@ export default async function ReportsPage() {
       </ReportSection>
 
       <ReportSection
+        title="Pick list"
+        subtitle={`${pickList.length} orders reserved or dispatched`}
+        exportFilename="pick-list"
+        rows={pickList}
+      >
+        {pickList.length === 0 ? (
+          <EmptyState text="No orders confirmed or dispatched yet." />
+        ) : (
+          <table className="w-full min-w-[720px] border-collapse text-[0.86rem]">
+            <thead>
+              <tr className="text-left text-text-faint">
+                <th className="px-5 py-2.5 font-medium">Order</th>
+                <th className="px-5 py-2.5 font-medium">Customer</th>
+                <th className="px-5 py-2.5 font-medium">SKU</th>
+                <th className="px-5 py-2.5 font-medium">Product</th>
+                <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Qty</th>
+                <th className="px-5 py-2.5 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pickList.map((r, i) => (
+                <tr key={i} className="border-t border-accent/[0.08]">
+                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.orderNumber}</td>
+                  <td className="px-5 py-3 text-text-muted">{r.customerName}</td>
+                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{r.sku}</td>
+                  <td className="px-5 py-3 text-text-muted">{r.productName}</td>
+                  <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">
+                    {r.quantity.toLocaleString()} {r.unitOfMeasure}
+                  </td>
+                  <td className="px-5 py-3">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${
+                        r.status === 'confirmed' ? 'bg-accent/15 text-accent' : 'bg-white/5 text-text-muted'
+                      }`}
+                    >
+                      {r.status === 'confirmed' ? 'Ready to pick' : 'Dispatched'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </ReportSection>
+
+      <ReportSection
         title="Purchase order summary"
         subtitle={`${poSummary.length} orders`}
         exportFilename="purchase-orders"
@@ -280,6 +414,48 @@ export default async function ReportsPage() {
             ))}
           </tbody>
         </table>
+      </ReportSection>
+
+      <ReportSection
+        title="Open purchase orders"
+        subtitle={`${openPurchaseOrders.length} issued or partially received — exceptions only`}
+        exportFilename="open-purchase-orders"
+        rows={openPurchaseOrders}
+      >
+        {openPurchaseOrders.length === 0 ? (
+          <EmptyState text="Nothing outstanding — every issued PO is fully received." />
+        ) : (
+          <table className="w-full min-w-[720px] border-collapse text-[0.86rem]">
+            <thead>
+              <tr className="text-left text-text-faint">
+                <th className="px-5 py-2.5 font-medium">PO</th>
+                <th className="px-5 py-2.5 font-medium">Supplier</th>
+                <th className="px-5 py-2.5 font-medium">SKU</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Outstanding</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Value</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Days open</th>
+                <th className="px-5 py-2.5 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {openPurchaseOrders.map((r, i) => (
+                <tr key={i} className="border-t border-accent/[0.08]">
+                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.poNumber}</td>
+                  <td className="px-5 py-3 text-text-muted">{r.supplierName}</td>
+                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{r.sku}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOutstanding.toLocaleString()}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">
+                    R {r.outstandingValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className={`px-5 py-3 text-right tabular-nums ${(r.daysOpen ?? 0) > 14 ? 'text-danger' : 'text-text-muted'}`}>
+                    {r.daysOpen ?? '—'}
+                  </td>
+                  <td className="px-5 py-3 text-text-muted capitalize">{r.status.replace('_', ' ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </ReportSection>
 
       <ReportSection
@@ -444,6 +620,43 @@ export default async function ReportsPage() {
                   <td className="px-5 py-3 text-right tabular-nums text-text">
                     R {r.totalValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </ReportSection>
+
+      <ReportSection
+        title="Adjustment reason summary"
+        subtitle="Counts by reason code and status — quantity/value impact isn't tracked at this level yet"
+        exportFilename="adjustment-reasons"
+        rows={adjustmentReasonSummary}
+      >
+        {adjustmentReasonSummary.length === 0 ? (
+          <EmptyState text="No adjustments requested yet." />
+        ) : (
+          <table className="w-full min-w-[560px] border-collapse text-[0.86rem]">
+            <thead>
+              <tr className="text-left text-text-faint">
+                <th className="px-5 py-2.5 font-medium">Reason</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Pending</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Approved</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Rejected</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {adjustmentReasonSummary.map((r, i) => (
+                <tr key={i} className="border-t border-accent/[0.08]">
+                  <td className="px-5 py-3 text-text">
+                    {r.reasonCode}
+                    <div className="text-[0.72rem] text-text-faint">{r.reasonDescription}</div>
+                  </td>
+                  <td className="px-5 py-3 text-right tabular-nums text-accent">{r.pendingCount}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.approvedCount}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.rejectedCount}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">{r.totalCount}</td>
                 </tr>
               ))}
             </tbody>

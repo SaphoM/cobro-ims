@@ -4,6 +4,24 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.14.0 — 2026-08-16
+
+**Final five reports — 15 of the RFQ's "15+" target reached.**
+- `buildPickList` — confirmed/dispatched orders, the RFQ's own "pick lists" phrase under Sales & Dispatch
+- `buildAdjustmentReasonSummary` — counts by reason code and status (quantity/value impact not tracked
+  at this level yet — `StockAdjustmentLine` isn't exposed by the repository)
+- `buildWarehouseSummary` — SKU count, below-reorder count, and total value per location
+- `buildOpenPurchaseOrders` — the exceptions view: only issued/partially-received POs, with days open
+- `buildDormantStock` — on-hand stock with no movement recorded this server session (caveated: mock data
+  has no persistent movement history before that, so this isn't true long-term dormancy)
+- All five wired into `/dashboard/reports` with CSV export
+- Verified across one live scenario touching five reports at once: a 100-unit PO received in two passes
+  (60 then the 40-unit remainder outstanding) produced exactly matching figures on purchase order summary
+  (100/60/40), supplier summary (R9,000 ordered / R5,400 received), and open purchase orders (40
+  outstanding, R3,600); dormant stock correctly dropped the touched SKU from 8 rows to 7 the moment it
+  was received; a confirmed sales order showed correctly on the pick list; a requested (unapproved)
+  adjustment showed as 1 pending on the reason summary
+
 ## v0.13.0 — 2026-08-16
 
 **Product label printing (RFQ Phase 5).**

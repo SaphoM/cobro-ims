@@ -4,19 +4,21 @@
  * given already-fetched domain records, build the rows a report table
  * needs. No I/O here — pages fetch via the repositories, then call these.
  *
- * Ten reports today, not the full 15+ the RFQ eventually wants — see
- * docs/ARCHITECTURE.md for the running list of what's still missing
- * (pick-list reports, BOM explosion, cycle-count variance, etc.).
+ * Fifteen reports — the RFQ's "15+" target reached. See
+ * docs/ARCHITECTURE.md for what's still a plausible addition later
+ * (BOM explosion, per-warehouse reorder thresholds once §5.6 is decided).
  */
 
 import { stockValue } from '@/lib/services/inventory-engine';
 import type {
+  AdjustmentReasonCode,
   Customer,
   Invoice,
   Product,
   PurchaseOrderLine,
   PurchaseOrder,
   SalesOrder,
+  StockAdjustment,
   StockLedgerEntry,
   StockMovementType,
   Supplier,
@@ -403,4 +405,211 @@ export function buildCustomerSummary(orders: SalesOrder[], customers: Customer[]
   }
 
   return [...byCustomer.values()].sort((a, b) => b.totalOrderedValue - a.totalOrderedValue);
+}
+
+// ---------------------------------------------------------------------------
+// Pick list — confirmed (reserved, ready to pick) and dispatched orders,
+// per the RFQ's "pick lists" mention under Sales Orders & Dispatch
+// ---------------------------------------------------------------------------
+
+export interface PickListRow {
+  orderNumber: string;
+  customerName: string;
+  sku: string;
+  productName: string;
+  warehouseCode: string;
+  quantity: number;
+  unitOfMeasure: string;
+  status: string;
+}
+
+export function buildPickList(
+  orders: SalesOrder[],
+  products: Product[],
+  customers: Customer[],
+  warehouses: Warehouse[]
+): PickListRow[] {
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const customerById = new Map(customers.map((c) => [c.id, c]));
+  const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
+
+  return orders
+    .filter((o) => o.status === 'confirmed' || o.status === 'dispatched')
+    .map((o) => {
+      const product = productById.get(o.productId);
+      return {
+        orderNumber: o.orderNumber,
+        customerName: customerById.get(o.customerId)?.name ?? 'Unknown',
+        sku: product?.sku ?? 'Unknown',
+        productName: product?.name ?? 'Unknown',
+        warehouseCode: warehouseById.get(o.warehouseId)?.code ?? 'Unknown',
+        quantity: o.quantityOrdered,
+        unitOfMeasure: product?.unitOfMeasure ?? '',
+        status: o.status,
+      };
+    })
+    .sort((a, b) => (a.status === b.status ? a.orderNumber.localeCompare(b.orderNumber) : a.status === 'confirmed' ? -1 : 1));
+}
+
+// ---------------------------------------------------------------------------
+// Adjustment reason summary — counts by reason code and status. Quantity/
+// value impact isn't included: StockAdjustmentLine (which holds
+// quantityDelta/unitCost) isn't exposed by StockAdjustmentRepository today,
+// only the header record is — see docs/ARCHITECTURE.md for that gap.
+// ---------------------------------------------------------------------------
+
+export interface AdjustmentReasonSummaryRow {
+  reasonCode: string;
+  reasonDescription: string;
+  pendingCount: number;
+  approvedCount: number;
+  rejectedCount: number;
+  totalCount: number;
+}
+
+export function buildAdjustmentReasonSummary(
+  adjustments: StockAdjustment[],
+  reasonCodes: AdjustmentReasonCode[]
+): AdjustmentReasonSummaryRow[] {
+  const reasonById = new Map(reasonCodes.map((r) => [r.id, r]));
+  const byReason = new Map<string, AdjustmentReasonSummaryRow>();
+
+  for (const a of adjustments) {
+    const reason = reasonById.get(a.reasonCodeId);
+    const key = a.reasonCodeId;
+    const row = byReason.get(key) ?? {
+      reasonCode: reason?.code ?? 'Unknown',
+      reasonDescription: reason?.description ?? '',
+      pendingCount: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+      totalCount: 0,
+    };
+    if (a.status === 'pending_approval') row.pendingCount += 1;
+    if (a.status === 'approved') row.approvedCount += 1;
+    if (a.status === 'rejected') row.rejectedCount += 1;
+    row.totalCount += 1;
+    byReason.set(key, row);
+  }
+
+  return [...byReason.values()].sort((a, b) => b.totalCount - a.totalCount);
+}
+
+// ---------------------------------------------------------------------------
+// Warehouse summary — a location-level roll-up, one row per warehouse
+// ---------------------------------------------------------------------------
+
+export interface WarehouseSummaryRow {
+  warehouseCode: string;
+  warehouseName: string;
+  skuCount: number;
+  totalValue: number;
+  lowStockCount: number;
+}
+
+export function buildWarehouseSummary(
+  ledger: StockLedgerEntry[],
+  products: Product[],
+  warehouses: Warehouse[]
+): WarehouseSummaryRow[] {
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const byWarehouse = new Map<string, WarehouseSummaryRow>();
+
+  for (const w of warehouses) {
+    byWarehouse.set(w.id, { warehouseCode: w.code, warehouseName: w.name, skuCount: 0, totalValue: 0, lowStockCount: 0 });
+  }
+
+  for (const entry of ledger) {
+    const row = byWarehouse.get(entry.warehouseId);
+    if (!row) continue;
+    const product = productById.get(entry.productId);
+    row.skuCount += 1;
+    row.totalValue = Math.round((row.totalValue + stockValue(entry)) * 100) / 100;
+    if (product?.reorderPoint != null && entry.quantityOnHand < product.reorderPoint) {
+      row.lowStockCount += 1;
+    }
+  }
+
+  return [...byWarehouse.values()].sort((a, b) => b.totalValue - a.totalValue);
+}
+
+// ---------------------------------------------------------------------------
+// Open purchase orders — the exceptions view: only what's still outstanding
+// ---------------------------------------------------------------------------
+
+export interface OpenPurchaseOrderRow {
+  poNumber: string;
+  supplierName: string;
+  sku: string;
+  quantityOutstanding: number;
+  outstandingValue: number;
+  status: string;
+  orderedAt: string | null;
+  daysOpen: number | null;
+}
+
+export function buildOpenPurchaseOrders(
+  orders: (PurchaseOrder & { line: PurchaseOrderLine })[],
+  products: Product[],
+  suppliers: Supplier[],
+  nowMs: number
+): OpenPurchaseOrderRow[] {
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const supplierById = new Map(suppliers.map((s) => [s.id, s]));
+
+  return orders
+    .filter((po) => po.status === 'issued' || po.status === 'partially_received')
+    .map((po) => {
+      const outstanding = Math.round((po.line.quantityOrdered - po.line.quantityReceived) * 1000) / 1000;
+      const daysOpen = po.orderedAt ? Math.floor((nowMs - new Date(po.orderedAt).getTime()) / (24 * 60 * 60 * 1000)) : null;
+      return {
+        poNumber: po.poNumber,
+        supplierName: supplierById.get(po.supplierId)?.name ?? 'Unknown',
+        sku: productById.get(po.line.productId)?.sku ?? 'Unknown',
+        quantityOutstanding: outstanding,
+        outstandingValue: Math.round(outstanding * po.line.unitCost * 100) / 100,
+        status: po.status,
+        orderedAt: po.orderedAt,
+        daysOpen,
+      };
+    })
+    .sort((a, b) => (b.daysOpen ?? 0) - (a.daysOpen ?? 0));
+}
+
+// ---------------------------------------------------------------------------
+// Dormant stock — stock on hand with no recorded movement. Caveat: mock data
+// has no persistent movement history before this server process started, so
+// "no movement" here means "no movement recorded this session", not
+// necessarily true long-term dormancy — a real database would track actual
+// last-movement timestamps.
+// ---------------------------------------------------------------------------
+
+export interface DormantStockRow {
+  warehouseCode: string;
+  sku: string;
+  productName: string;
+  quantityOnHand: number;
+  value: number;
+}
+
+export function buildDormantStock(
+  ledger: StockLedgerEntry[],
+  movements: { productId: string; warehouseId: string }[],
+  products: Product[],
+  warehouses: Warehouse[]
+): DormantStockRow[] {
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
+  const touched = new Set(movements.map((m) => `${m.productId}::${m.warehouseId}`));
+
+  return ledger
+    .filter((entry) => entry.quantityOnHand > 0 && !touched.has(`${entry.productId}::${entry.warehouseId}`))
+    .map((entry) => ({
+      warehouseCode: warehouseById.get(entry.warehouseId)?.code ?? 'Unknown',
+      sku: productById.get(entry.productId)?.sku ?? 'Unknown',
+      productName: productById.get(entry.productId)?.name ?? 'Unknown',
+      quantityOnHand: entry.quantityOnHand,
+      value: stockValue(entry),
+    }))
+    .sort((a, b) => b.value - a.value);
 }
