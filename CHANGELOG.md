@@ -4,6 +4,21 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.12.0 — 2026-08-16
+
+**2FA for privileged users (RFQ Phase 6) — mock enrollment gating the most sensitive action.**
+- `UserRepository.setMfaEnrolled` + mutable mock user state
+- `src/lib/permissions.ts`: `checkPermission` (non-throwing) now checks role AND, for
+  `PRIVILEGED_PERMISSIONS` (currently just `approve_adjustments`), `user.mfaEnrolled`;
+  `requirePermission` throws using the same check, so every existing call site got the gate for free
+- New `/dashboard/security` — mock enrollment (flag-flip, no real authenticator app), with a clear note
+  that it's standing in for real Supabase Auth MFA
+- Adjustments page shows a banner when the signed-in user's 2FA isn't enabled yet, explaining that
+  requesting doesn't need it but approving does; updated the now-stale "any signed-in user can approve"
+  copy left over from the earlier RBAC pass
+- Verified: Admin without 2FA enabled → blocked from approving with "This action requires two-factor
+  authentication. Enable 2FA under Security first."; enabled 2FA → the same approval then succeeded
+
 ## v0.11.0 — 2026-08-16
 
 **Four more reports — 10 of the RFQ's eventual 15+.**

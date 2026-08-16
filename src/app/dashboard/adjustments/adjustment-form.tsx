@@ -26,9 +26,10 @@ export function AdjustmentForm({
       <h2 className="mb-1 font-display text-[1.05rem] font-medium text-text">Request an adjustment</h2>
       <p className="mb-4 text-[0.83rem] text-text-muted">
         Every adjustment needs approval before it touches the ledger — nothing here posts a movement until
-        someone with authority approves it below. Approver permissions are still a{' '}
-        <span className="text-accent">BUSINESS DECISION REQUIRED</span> item; any signed-in user can
-        approve in this mock.
+        someone with authority approves it below. Approving requires both the right role and 2FA enabled.
+        The exact role assignments are still a{' '}
+        <span className="text-accent">BUSINESS DECISION REQUIRED</span> item — only Admin can approve in
+        this placeholder matrix.
       </p>
 
       <form action={formAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">

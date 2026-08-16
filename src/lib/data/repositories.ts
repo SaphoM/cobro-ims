@@ -283,4 +283,6 @@ export interface UserRepository {
   findByEmail(email: string): Promise<User | null>;
   getById(id: string): Promise<User | null>;
   list(): Promise<User[]>;
+  /** RFQ Phase 6: 2FA enrollment status for privileged users. Mock — no real TOTP/authenticator, just the flag a real flow would set. */
+  setMfaEnrolled(userId: string, enrolled: boolean): Promise<User>;
 }

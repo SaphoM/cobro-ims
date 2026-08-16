@@ -28,6 +28,7 @@ import type {
   StockLedgerEntry,
   StockMovement,
   Supplier,
+  User,
   Warehouse,
 } from '@/lib/domain/inventory';
 import { VAT_RATE } from '@/lib/domain/inventory';
@@ -75,6 +76,7 @@ import {
 // Module-level mutable state, seeded once per server process.
 const state = {
   products: [...seedProducts] as Product[],
+  users: [...seedUsers] as User[],
   suppliers: [...seedSuppliers] as Supplier[],
   customers: [...seedCustomers] as Customer[],
   ledger: new Map<string, StockLedgerEntry>(seedLedger.map((e) => [ledgerKey(e.productId, e.warehouseId), { ...e }])),
@@ -747,12 +749,19 @@ export const mockInvoiceRepository: InvoiceRepository = {
 
 export const mockUserRepository: UserRepository = {
   async findByEmail(email) {
-    return seedUsers.find((u) => u.email.toLowerCase() === email.toLowerCase()) ?? null;
+    return state.users.find((u) => u.email.toLowerCase() === email.toLowerCase()) ?? null;
   },
   async getById(id) {
-    return seedUsers.find((u) => u.id === id) ?? null;
+    return state.users.find((u) => u.id === id) ?? null;
   },
   async list() {
-    return seedUsers;
+    return state.users;
+  },
+  async setMfaEnrolled(userId, enrolled) {
+    const user = state.users.find((u) => u.id === userId);
+    if (!user) throw new Error('User not found.');
+    user.mfaEnrolled = enrolled;
+    user.updatedAt = new Date().toISOString();
+    return user;
   },
 };

@@ -70,7 +70,7 @@ the resulting numbers hand-checked):
 | | Camera-based scanning, label printing | Not started |
 | Phase 6 — User Management, Security, Audit Trail | RBAC enforcement (real, 4 demo roles) + audit log | ✅ |
 | | DB-level audit log immutability trigger | ⏳ written, not applied (no live DB) |
-| | 2FA for privileged users | Not started |
+| | 2FA gate on the most sensitive action (approve/reject adjustments) | ✅ |
 | Authentication | Real Supabase Auth | **Deferred by explicit direction**, not oversight |
 | Core Data | Live Supabase project | **Deferred by explicit direction** — see §4 |
 | Testing, Training, UAT, Production | — | Not started |
@@ -236,6 +236,9 @@ applied (see `supabase/migrations/20260816100000_audit_log_immutability.sql`).
 - **Audit log** (`/dashboard/audit-log`) — append-only record of every approval, issue, receipt, dispatch,
   invoice, and catalogue change, with who did it and when. Real DB-level immutability needs a live
   Postgres project (trigger is written, not applied) — see §6.
+- **Security** (`/dashboard/security`) — mock 2FA enrollment. Approving/rejecting adjustments — the one
+  action that posts a real stock-value change with no second approver — requires it; every other demo
+  account starts unenrolled, so the gate is immediately visible when testing as Admin.
 
 Every workflow above was exercised live in the browser during development — not just written and assumed
 correct — with the resulting quantities/costs/VAT amounts hand-verified against the expected math. See
@@ -251,14 +254,14 @@ correct — with the resulting quantities/costs/VAT amounts hand-verified agains
 | WAC costing math | Real business logic, pure functions, exercised by every workflow |
 | Every module in §7 | Real logic and UI, running against the mock data layer |
 | Database schema | Written (`supabase/migrations/`), **not applied anywhere yet** |
-| Auth | Mock — one hardcoded demo user/password, cookie session. **Deferred by direction.** No password hashing, no MFA (RFQ requires 2FA for privileged users), no real Supabase Auth. |
+| Auth | Mock — 4 hardcoded demo user/password pairs, cookie session. **Deferred by direction.** No password hashing, no real Supabase Auth. |
 | RBAC | **Real enforcement** — every mutating Server Action checks a permission via `src/lib/permissions.ts`; 4 demo accounts (one per role) to test with. The matrix itself is still a placeholder pending Cobro sign-off |
 | Audit log | **Real** — every audited action writes an append-only entry, viewable at `/dashboard/audit-log`. DB-level immutability trigger written, not applied (no live project) |
 | Accounting integration (Sage/QuickBooks/Xero) | Not started — blocked on choosing a platform (§7.5) |
 | Dashboards & reports (10 of eventual 15+, CSV export) | Real logic and UI |
 | Barcode/QR scanning (USB scanner: lookup + receiving) | Real logic and UI |
 | Camera-based scanning, label printing | Not started |
-| 2FA for privileged users | Not started — `users.mfa_enrolled` exists in schema, unread by anything |
+| 2FA for privileged users | **Real gate** on approving/rejecting adjustments (`/dashboard/security`) — mock enrollment, no real authenticator app |
 
 ---
 
@@ -333,6 +336,7 @@ src/app/
     reports/                        Dashboards & reports (10 of 15+), CSV export per table
     scan/                            Barcode/QR lookup (USB scanner-friendly plain GET form)
     audit-log/                      Append-only audit trail viewer
+    security/                       Mock 2FA enrollment, gating the most sensitive action
 
 docs/ARCHITECTURE.md            The running decision log — phase status, what's real/mocked, open
                                  business decisions, next steps in order. Update it as phases complete.
@@ -346,7 +350,8 @@ CHANGELOG.md                    Version-by-version build history (semver, pre-1.
 1. **Resolve §9.1 (MVP cut-line) and §9.2 (permission matrix) with the client** before committing further
    engineering time — both materially change what's built next.
 2. **Authentication phase:** real Supabase project + Supabase Auth, replacing `src/lib/auth.ts` —
-   including real password hashing and 2FA for privileged users (RFQ requirement, not built yet).
+   including real password hashing; the 2FA *gate* already exists (§7), but real Supabase Auth MFA (an
+   actual authenticator app) still needs to replace the mock flag-flip in `/dashboard/security`.
 3. **Core Data phase:** apply all migrations (including the audit-log immutability trigger) to that
    project, replace the mock repositories with real Supabase-backed ones behind the same interfaces.
 4. **Accounting integration:** once §9.5 is decided, build the Sage/QuickBooks/Xero sync.

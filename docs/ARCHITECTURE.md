@@ -9,12 +9,12 @@ phases complete — don't let it drift from the code.
 
 ## 1. Current phase
 
-**Phases 2, 3, and 5 done; Phase 4 half done (invoicing yes, accounting integration no); Phase 6 started
-(RBAC enforcement + append-only audit log, real DB-level immutability trigger written but not applied).**
-Real AUTHENTICATION (Supabase Auth) and CORE DATA (a live Supabase project) are explicitly deferred for
-now — by direction, not oversight — so the mock auth and mock data layer described below are still
-current. Not yet started: accounting integration, camera-based barcode scanning, label printing, 2FA,
-UAT, PRODUCTION.
+**Phases 2, 3, and 5 done; Phase 4 half done (invoicing yes, accounting integration no); Phase 6 well
+underway (RBAC enforcement, 2FA gate on the most sensitive action, append-only audit log — real DB-level
+immutability trigger written but not applied).** Real AUTHENTICATION (Supabase Auth) and CORE DATA (a
+live Supabase project) are explicitly deferred for now — by direction, not oversight — so the mock auth
+and mock data layer described below are still current. Not yet started: accounting integration,
+camera-based barcode scanning, label printing, UAT, PRODUCTION.
 
 Built and browser-verified (not just written — each flow below was exercised end-to-end and the
 resulting WAC math checked by hand):
@@ -95,8 +95,16 @@ resulting WAC math checked by hand):
   ledger unchanged; signed in as Admin, same action → succeeded, WAC recalculated correctly; requested and
   approved an adjustment as Admin → both actions appeared in the audit log with correct table/action/user.
   **The permission matrix itself is a placeholder** (see §5.2) — plausible role assignments, not a
-  policy confirmed with Cobro. **Not built:** 2FA (RFQ requires it for privileged users — `users.mfa_enrolled`
-  exists in the schema but nothing reads it yet).
+  policy confirmed with Cobro.
+- **2FA for privileged users** (`/dashboard/security`, RFQ Phase 6) — a mock enrollment flow (no real
+  authenticator app; just the `users.mfa_enrolled` flag a real Supabase Auth MFA flow would set) that
+  gates `approve_adjustments` — the one action in the app that posts a real WAC-affecting stock movement
+  with no second approver, and so the single most sensitive capability in the matrix. `checkPermission`
+  in `src/lib/permissions.ts` now checks role AND, for that one permission, MFA enrollment; every call
+  site (including the generic dashboard "record a movement" form) goes through it. Verified: signed in
+  as Admin with 2FA not yet enabled, attempted to approve a pending adjustment → blocked with "This
+  action requires two-factor authentication. Enable 2FA under Security first."; enabled 2FA on
+  `/dashboard/security` → the same approval then succeeded.
 
 What exists as the underlying substrate is a **schema-and-engine-first vertical slice**, not a partial
 ERP:
@@ -164,7 +172,7 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 | Dashboards & reports (10 of 15+, CSV export) | Real logic and UI — see §1 |
 | Barcode/QR scanning (USB scanner, lookup + receiving) | Real logic and UI — see §1 |
 | Camera-based scanning, label printing | Not built |
-| 2FA for privileged users | Not built — `users.mfa_enrolled` exists in schema, unread by anything |
+| 2FA for privileged users | **Real gate** on `approve_adjustments` — mock enrollment (`/dashboard/security`), no real authenticator app |
 
 ## 5. BUSINESS DECISION REQUIRED — do not resolve these by assumption
 
@@ -199,7 +207,8 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
    materially changes phase sequencing.
 2. Resolve §5.2 (permission matrix) and §5.5 (accounting platform) with the client.
 3. AUTHENTICATION phase: real Supabase project + Supabase Auth, replacing `src/lib/auth.ts` — including
-   real password hashing and 2FA for privileged users (RFQ requirement, not built yet).
+   real password hashing; the 2FA *gate* exists (§1), but real Supabase Auth MFA (an actual authenticator
+   app enrollment) still needs to replace the mock flag-flip in `/dashboard/security`.
 4. CORE DATA phase: apply all migrations (including the audit-log immutability trigger) to that project,
    replace the mock repositories with real Supabase-backed ones behind the same interfaces.
 5. Accounting integration once §5.5 is decided.

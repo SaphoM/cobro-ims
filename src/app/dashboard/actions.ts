@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getSession, destroySession } from '@/lib/auth';
 import { stockMovementRepository } from '@/lib/data';
-import { hasPermission } from '@/lib/permissions';
+import { checkPermission } from '@/lib/permissions';
 import type { StockMovementType } from '@/lib/domain/inventory';
 
 export interface RecordMovementFormState {
@@ -31,11 +31,9 @@ export async function recordMovementAction(
   // closes what would otherwise be an RBAC bypass for lower-privileged
   // roles. It stays admin-only rather than being removed, since it's still
   // useful for quickly proving the engine end-to-end.
-  if (!(await hasPermission(session, 'approve_adjustments'))) {
-    return {
-      error: 'Your role does not have permission to post movements directly. Use the dedicated workflow pages instead.',
-      success: null,
-    };
+  const permissionCheck = await checkPermission(session, 'approve_adjustments');
+  if (!permissionCheck.allowed) {
+    return { error: permissionCheck.reason, success: null };
   }
 
   const productId = String(formData.get('productId') ?? '');

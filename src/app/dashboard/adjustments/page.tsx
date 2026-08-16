@@ -4,11 +4,13 @@ import {
   stockAdjustmentRepository,
   warehouseRepository,
 } from '@/lib/data';
+import { getSession } from '@/lib/auth';
 import { AdjustmentForm } from '@/app/dashboard/adjustments/adjustment-form';
 import { decideAdjustmentAction } from '@/app/dashboard/adjustments/actions';
 
 export default async function AdjustmentsPage() {
-  const [products, warehouses, reasonCodes, adjustments] = await Promise.all([
+  const [session, products, warehouses, reasonCodes, adjustments] = await Promise.all([
+    getSession(),
     productRepository.list(),
     warehouseRepository.list(),
     adjustmentReasonRepository.list(),
@@ -24,6 +26,16 @@ export default async function AdjustmentsPage() {
         <h1 className="font-display text-[1.3rem] font-medium text-text">Write-offs & adjustments</h1>
         <p className="text-[0.86rem] text-text-muted">Reason-coded, approval-gated stock corrections.</p>
       </div>
+
+      {session && !session.mfaEnrolled && (
+        <div className="rounded-xl border border-accent/30 bg-accent/[0.08] px-4 py-3 text-[0.82rem] text-accent">
+          Approving or rejecting requires 2FA. Enable it under{' '}
+          <a href="/dashboard/security" className="font-semibold underline">
+            Security
+          </a>{' '}
+          first — requesting an adjustment doesn&apos;t need it.
+        </div>
+      )}
 
       <AdjustmentForm products={products} warehouses={warehouses} reasonCodes={reasonCodes} />
 
