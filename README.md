@@ -68,12 +68,14 @@ the resulting numbers hand-checked):
 | | Credit notes (issue against invoice, nets off outstanding) | ✅ |
 | | Accounting integration (Sage/QuickBooks/Xero) | ⏳ blocked on §7.5 |
 | Phase 5 — Dashboards, Reporting, Barcode Scanning | Dashboards & reports (15 of "15+", CSV export) | ✅ |
-| | Barcode/QR scanning (USB scanner: lookup + receiving) | ✅ |
-| | Product labels (print-ready sheets) | ✅ |
-| | Camera-based scanning, rendered barcode symbol graphic | Not started |
+| | Barcode/QR scanning — USB scanner (lookup, receiving, transfers, sales, catalogue) | ✅ |
+| | Barcode/QR scanning — browser camera, same five touchpoints | ✅ |
+| | Product labels (print-ready sheets, with real scannable QR) | ✅ |
+| | Rendered Code 128 linear barcode symbol | Not started — see §7 |
 | Phase 6 — User Management, Security, Audit Trail | RBAC enforcement (real, 4 demo roles) + audit log | ✅ |
 | | DB-level audit log immutability trigger | ⏳ written, not applied (no live DB) |
 | | 2FA gate on the most sensitive action (approve/reject adjustments) | ✅ |
+| Responsive / mobile | Full browser functionality down to a 375px viewport | ✅ |
 | Authentication | Real Supabase Auth | **Deferred by explicit direction**, not oversight |
 | Core Data | Live Supabase project | **Deferred by explicit direction** — see §4 |
 | Testing, Training, UAT, Production | — | Not started |
@@ -239,14 +241,21 @@ applied (see `supabase/migrations/20260816100000_audit_log_immutability.sql`).
   movement type totals, and adjustment reason summary — each exportable to CSV. The RFQ's "15+" target,
   reached.
 - **Barcode / QR scan** (`/dashboard/scan`) — scan or type a barcode to look up a product and its stock
-  across every warehouse; USB scanners work today (they act as keyboard input, submitting a plain form on
-  Enter). Also wired into Goods Receiving as a "scan to select product" field. Camera-based scanning isn't
-  built yet.
-- **Product labels** (`/dashboard/labels`) — pick a product and copy count, get a print-ready sheet (SKU,
-  name, barcode number in large text). Deliberately a human/scanner-readable text code, not a rendered
-  Code 128/QR symbol graphic — a wrong encoding would look legitimate but not scan, and this pass had no
-  way to verify one against a real scanner (full rationale in `docs/ARCHITECTURE.md` §1). Linked from the
-  product catalogue's "Print labels" action.
+  across every warehouse. Two input methods, same lookup: a **USB/Bluetooth scanner** (they act as keyboard
+  input, submitting a plain form on Enter — no client JS needed) and the **browser camera** on phones and
+  tablets.
+- **Scanning at the operational touchpoints** — the same camera-or-USB scan-to-identify pattern is wired
+  into **Goods receiving**, **Transfers**, and **Sales & dispatch** (scan to select the product on the
+  existing form), and into the **Product catalogue** (scan to fill the Barcode field on a new product).
+  A scan only ever *identifies* an item — it posts nothing and bypasses no permission, validation, or stock
+  check. Everything after identification is the existing workflow, unchanged.
+- **Product labels** (`/dashboard/labels`) — pick a product and copy count, get a print-ready sheet with
+  SKU, name, the barcode number in large text, and a **real scannable QR code** per label. The QR comes
+  from the `qrcode` package and was verified by round-trip (encode → decode back to the identical string),
+  not just visually. A rendered **Code 128** linear symbol is still deliberately not built — its
+  checksum/subset rules are easy to get subtly wrong, and a wrong symbol would look legitimate while
+  silently failing to scan (full rationale in `docs/ARCHITECTURE.md` §1). Linked from the product
+  catalogue's "Print labels" action.
 - **Audit log** (`/dashboard/audit-log`) — append-only record of every approval, issue, receipt, dispatch,
   invoice, and catalogue change, with who did it and when. Real DB-level immutability needs a live
   Postgres project (trigger is written, not applied) — see §6.
@@ -273,10 +282,12 @@ correct — with the resulting quantities/costs/VAT amounts hand-verified agains
 | Audit log | **Real** — every audited action writes an append-only entry, viewable at `/dashboard/audit-log`. DB-level immutability trigger written, not applied (no live project) |
 | Accounting integration (Sage/QuickBooks/Xero) | Not started — blocked on choosing a platform (§7.5) |
 | Dashboards & reports (15 of "15+", CSV export) | Real logic and UI |
-| Barcode/QR scanning (USB scanner: lookup + receiving) | Real logic and UI |
+| Barcode/QR scanning — USB scanner + browser camera, at five touchpoints | Real logic and UI |
+| QR code generation on product labels | **Real** — `qrcode` package, verified by encode→decode round-trip |
 | Product labels (print-ready sheets) | Real logic and UI |
 | Bill of materials (flat, + explosion calculator) | Real logic and UI |
-| Camera-based scanning, rendered barcode symbol graphic | Not started |
+| Responsive / mobile (drawer nav below 992px, 375px minimum) | Real — verified at 375/768/960/991/992/1280 |
+| Rendered Code 128 linear barcode symbol | Not started — unsafe to fake without a scanner to verify against |
 | 2FA for privileged users | **Real gate** on approving/rejecting adjustments (`/dashboard/security`) — mock enrollment, no real authenticator app |
 
 ---
@@ -329,7 +340,10 @@ src/lib/services/
   inventory-engine.ts              The WAC costing engine — pure functions, no I/O
   reports.ts                       Report-building functions (stock valuation, low stock, sales/PO
                                     summaries, invoice ageing, movement history) — pure, fetch-then-build
+  qrcode.ts                        Server-side QR symbol generation (PNG data URL) for product labels
 src/components/export-csv-button.tsx   Reusable client-side CSV export, used by every report table
+src/components/scanner/camera-scanner.tsx  Reusable browser-camera QR scanner (jsqr, dynamically
+                                    imported). Identifies a code and hands it back — never posts
 src/lib/auth.ts                 Mock session/auth — replaced wholesale in the real Authentication phase
 src/lib/demo-credentials.ts     The 4 demo logins (kept separate so a 'use client' component can safely
                                  import it without pulling next/headers into the client bundle)
@@ -340,7 +354,8 @@ src/app/
   page.tsx                        Redirects to /login or /dashboard based on session
   login/                          Sign-in screen (server action + client form, role picker)
   dashboard/
-    layout.tsx                      Sidebar nav + session gate for every /dashboard/* route
+    layout.tsx                      Sidebar nav + session gate for every /dashboard/* route.
+                                     Static sidebar from 992px, CSS-only off-canvas drawer below
     page.tsx                        Overview: KPIs, stock ledger, generic "record a movement" demo
     products/                       Product catalogue
     bom/                             Bill of materials (flat) + explosion calculator
@@ -352,8 +367,8 @@ src/app/
     suppliers/, customers/          List + add pickers
     invoices/                       Invoicing & billing, payments, credit notes, ageing
     reports/                        Dashboards & reports (15 of "15+"), CSV export per table
-    scan/                            Barcode/QR lookup (USB scanner-friendly plain GET form)
-    labels/                          Print-ready product label sheets (@media print, .no-print convention)
+    scan/                            Barcode/QR lookup (USB scanner-friendly GET form + camera scan)
+    labels/                          Print-ready label sheets with real QR (@media print, .no-print)
     audit-log/                      Append-only audit trail viewer
     security/                       Mock 2FA enrollment, gating the most sensitive action
 
@@ -374,6 +389,7 @@ CHANGELOG.md                    Version-by-version build history (semver, pre-1.
 3. **Core Data phase:** apply all migrations (including the audit-log immutability trigger) to that
    project, replace the mock repositories with real Supabase-backed ones behind the same interfaces.
 4. **Accounting integration:** once §9.5 is decided, build the Sage/QuickBooks/Xero sync.
-5. **Rest of Phase 5:** camera-based scanning, a rendered barcode symbol graphic (Code 128/QR) for
-   labels — reports are done (15 of "15+").
+5. **Last of Phase 5:** a rendered Code 128 linear barcode symbol for labels — needs a physical scanner
+   on hand to verify the encoder against before it's safe to ship. Reports (15 of "15+"), QR generation,
+   and camera + USB scanning are all done.
 6. **Phase 8:** system testing, UAT, training materials, production cutover.

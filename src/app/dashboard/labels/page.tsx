@@ -1,5 +1,6 @@
 import { productRepository } from '@/lib/data';
 import { PrintButton } from '@/app/dashboard/labels/print-button';
+import { generateQrDataUrl } from '@/lib/services/qrcode';
 
 const MAX_LABELS = 60;
 
@@ -14,15 +15,16 @@ export default async function LabelsPage({
 
   const selected = productId ? products.find((p) => p.id === productId) : null;
   const requestedQty = Math.min(Math.max(Number(qty) || 1, 1), MAX_LABELS);
+  const qrDataUrl = selected?.barcode ? await generateQrDataUrl(selected.barcode) : null;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="no-print">
         <h1 className="font-display text-[1.3rem] font-medium text-text">Product labels</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Generates a print-ready sheet: SKU, product name, and barcode number in large, clear text for
-          each label. This prints a scanner/human-readable code, not a rendered barcode symbol (Code 128 /
-          QR graphic) — see the note at the bottom of this page for why.
+          Generates a print-ready sheet: SKU, product name, barcode number in large clear text, and a real
+          scannable QR code, for each label. A Code 128 barcode symbol graphic still isn&apos;t rendered —
+          see the note at the bottom of this page for why.
         </p>
       </div>
 
@@ -106,15 +108,27 @@ export default async function LabelsPage({
             {Array.from({ length: requestedQty }).map((_, i) => (
               <div
                 key={i}
-                className="flex flex-col justify-between rounded-lg border border-accent/30 bg-white px-3 py-2.5 text-black print:break-inside-avoid"
+                className="flex items-center gap-3 rounded-lg border border-accent/30 bg-white px-3 py-2.5 text-black print:break-inside-avoid"
                 style={{ minHeight: '30mm' }}
               >
-                <div>
-                  <div className="text-[0.95rem] font-bold leading-tight">{selected.sku}</div>
-                  <div className="text-[0.78rem] leading-snug text-gray-700">{selected.name}</div>
-                </div>
-                <div className="mt-2 border-t border-gray-300 pt-1.5 text-center font-mono text-[1.05rem] tracking-[0.15em]">
-                  {selected.barcode}
+                {qrDataUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element -- static data: URL, no next/image optimization to gain
+                  <img
+                    src={qrDataUrl}
+                    alt={`QR code for ${selected.barcode}`}
+                    width={72}
+                    height={72}
+                    className="shrink-0"
+                  />
+                )}
+                <div className="flex min-w-0 flex-1 flex-col justify-between self-stretch">
+                  <div>
+                    <div className="text-[0.95rem] font-bold leading-tight">{selected.sku}</div>
+                    <div className="text-[0.78rem] leading-snug text-gray-700">{selected.name}</div>
+                  </div>
+                  <div className="mt-2 border-t border-gray-300 pt-1.5 text-center font-mono text-[1.05rem] tracking-[0.15em]">
+                    {selected.barcode}
+                  </div>
                 </div>
               </div>
             ))}
@@ -123,11 +137,13 @@ export default async function LabelsPage({
       )}
 
       <p className="no-print text-[0.78rem] text-text-faint">
-        Not built yet: rendering an actual Code 128 / QR barcode symbol graphic. That needs a correct
-        encoding implementation this pass didn&apos;t have a way to verify (a wrong symbol would look
-        legitimate but not scan) — a human/scanner-readable text code was the honest choice over a
-        fabricated barcode image. USB scanners set to type digits will still work fine against the code
-        printed above.
+        QR codes are generated with the <code className="font-mono-brand">qrcode</code> npm package — a
+        widely-used, deterministic encoder, not a hand-rolled implementation — so the symbol is a real,
+        spec-compliant QR that any phone camera or QR-capable scanner can read. Still not built: a rendered
+        Code 128 linear barcode symbol. Code 128 has multiple checksum/subset rules that are easy to get
+        subtly wrong, and this pass had no camera or physical scanner on hand to verify a hand-rolled
+        encoder against — a wrong symbol would look legitimate but silently fail to scan. USB scanners set
+        to type digits will still work fine against the human-readable code printed above.
       </p>
     </div>
   );

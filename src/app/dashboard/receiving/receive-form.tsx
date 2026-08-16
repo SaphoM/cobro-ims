@@ -2,6 +2,7 @@
 
 import { useActionState, useRef, useState } from 'react';
 import { receiveStockAction, type ReceiveFormState } from '@/app/dashboard/receiving/actions';
+import { CameraScanner } from '@/components/scanner/camera-scanner';
 import type { Product, Supplier, Warehouse } from '@/lib/domain/inventory';
 
 const initialState: ReceiveFormState = { error: null, success: null };
@@ -23,6 +24,8 @@ export function ReceiveForm({
   const [scanMessage, setScanMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const productSelectRef = useRef<HTMLSelectElement>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
+  const scanFormRef = useRef<HTMLFormElement>(null);
+  const scanBarcodeRef = useRef<HTMLInputElement>(null);
 
   function handleBarcodeSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -51,10 +54,15 @@ export function ReceiveForm({
         yet. The schema underneath still models PO → GRN properly.
       </p>
 
-      <form onSubmit={handleBarcodeSubmit} className="mb-4 flex items-end gap-2 border-b border-accent/[0.08] pb-4">
+      <form
+        ref={scanFormRef}
+        onSubmit={handleBarcodeSubmit}
+        className="mb-4 flex flex-col items-stretch gap-2 border-b border-accent/[0.08] pb-4 sm:flex-row sm:items-end"
+      >
         <label className="flex flex-1 flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">Scan barcode to select product</span>
           <input
+            ref={scanBarcodeRef}
             name="scanBarcode"
             type="text"
             autoComplete="off"
@@ -62,12 +70,22 @@ export function ReceiveForm({
             className={`${inputClass} font-mono-brand`}
           />
         </label>
-        <button
-          type="submit"
-          className="rounded-lg border border-accent/30 bg-surface-2 px-3 py-2.5 text-[0.82rem] font-semibold text-accent hover:bg-accent/10"
-        >
-          Match
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            className="flex-1 rounded-lg border border-accent/30 bg-surface-2 px-3 py-2.5 text-[0.82rem] font-semibold text-accent hover:bg-accent/10 sm:flex-none"
+          >
+            Match
+          </button>
+          <CameraScanner
+            buttonLabel="Scan with camera"
+            className="flex-1 rounded-lg border border-accent/30 bg-surface-2 px-3 py-2.5 text-[0.82rem] font-semibold text-accent hover:bg-accent/10 sm:flex-none"
+            onScan={(value) => {
+              if (scanBarcodeRef.current) scanBarcodeRef.current.value = value;
+              scanFormRef.current?.requestSubmit();
+            }}
+          />
+        </div>
       </form>
       {scanMessage && (
         <p className={`mb-4 text-[0.78rem] ${scanMessage.ok ? 'text-accent' : 'text-danger'}`}>{scanMessage.text}</p>

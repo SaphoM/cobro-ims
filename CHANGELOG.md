@@ -4,6 +4,49 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.17.0 — 2026-08-16
+
+**QR generation, camera scanning at the operational touchpoints, and a full responsive pass
+(RFQ Phase 5 gaps closed).**
+
+*QR code generation*
+- `src/lib/services/qrcode.ts` renders real, spec-compliant QR symbols via the `qrcode` package
+- Product labels now print a scannable QR alongside the existing human-readable barcode text
+- Verified by round-trip, not just by eye: encoded `6001240912345`, decoded the resulting PNG
+  back with `jsQR`, got the identical string. This is what made QR safe to ship without scanner
+  hardware — unlike Code 128, which is still deliberately **not** rendered (see below)
+
+*Camera scanning (RFQ: "browser-based camera scanning and/or USB scanner support")*
+- New reusable `src/components/scanner/camera-scanner.tsx` — requests the camera, decodes frames
+  with `jsqr`, hands the decoded string to the caller. Handles permission-denied, no-camera, and
+  generic-failure states, always stops the stream on scan/cancel/unmount, and guards against
+  duplicate scan events. `jsqr` is dynamically imported so it only loads when the overlay opens
+- Wired into five existing pages, always as an *additional input method* feeding the existing
+  workflow — never a parallel one: Barcode/QR scan (lookup), Goods receiving, Transfers,
+  Sales & dispatch (all scan-to-select-product), and Product catalogue (scan to fill Barcode)
+- A scan only ever identifies an item. It posts nothing, authorises nothing, and bypasses no
+  permission, validation or stock check — every mutation still goes through the existing Server
+  Actions and the WAC engine untouched
+
+*Responsive (RFQ: full mobile browser functionality, 375px minimum viewport)*
+- Dashboard sidebar becomes an off-canvas drawer below 992px (CSS-only, no client JS), with a
+  dimmed backdrop, a sticky ☰ header, an in-drawer ✕, tap-backdrop-to-close, auto-close on
+  navigation, and background scroll lock
+- Static push-style sidebar from 992px up — chosen as the narrowest width where the sidebar and
+  the three dashboard stat tiles both fit without clipping (measured, not guessed)
+- Fixed two latent bugs in the process, both requiring an open-drawer-then-widen sequence to
+  surface: a stale backdrop that dimmed the entire desktop layout (equal-specificity collision
+  between `min-[…]:hidden` and `peer-checked:block` — resolved by stacking the width bound onto
+  the checked variant), and a scroll lock that outlived the drawer and left the page unscrollable
+- Verified at 375 / 768 / 960 / 991 / 992 / 1280: no page-level horizontal overflow, no card
+  clipping, desktop visually unchanged
+
+*Still not built (unchanged, and deliberate)*
+- A rendered Code 128 linear barcode symbol. Its checksum/subset rules are easy to get subtly
+  wrong and there was no scanner to verify a hand-rolled encoder against — a wrong symbol would
+  look legitimate and silently fail to scan. The human-readable code USB scanners already read
+  remains the honest option
+
 ## v0.16.0 — 2026-08-16
 
 **Credit notes (RFQ Invoicing & Billing gap closed) — issue, track, and net against invoices.**

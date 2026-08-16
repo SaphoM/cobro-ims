@@ -25,9 +25,8 @@ export default async function ScanPage({
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Barcode / QR scan</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Scan (USB scanner — acts as keyboard input, submits on Enter) or type a barcode to look up a
-          product and its stock across every warehouse. Camera-based scanning isn&apos;t built yet — see
-          the note below.
+          Scan with a USB scanner (acts as keyboard input, submits on Enter), scan with a phone/tablet
+          camera, or type a barcode to look up a product and its stock across every warehouse.
         </p>
       </div>
 

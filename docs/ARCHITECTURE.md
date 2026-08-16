@@ -73,25 +73,56 @@ resulting WAC math checked by hand):
   on the pick list as "Ready to pick"; a requested (not yet approved) adjustment showed as 1 pending on
   the reason summary.
 - **Barcode / QR scan** (`/dashboard/scan`, RFQ Phase 5) — a lookup page: scan or type a barcode, see
-  that product's stock across every warehouse. USB scanners work today (they act as keyboard input,
-  submitting a plain GET form on Enter — no client JS needed for the scan itself). Also wired into
-  **Goods receiving**: a barcode field there matches against the loaded product list client-side and
-  auto-selects the product dropdown. Verified: scanning `6001240912345` on the lookup page returned the
-  correct product and per-warehouse ledger; scanning `6001240912346` on the receiving form correctly
-  selected `BLK-STD-140` in the product dropdown; an unknown barcode showed a clear not-found message.
-  **Not built:** camera-based scanning (`getUserMedia` + a barcode-decoding library) — RFQ allows
-  "browser-based camera scanning and/or USB scanner support", so USB-only satisfies the requirement as
-  written, but camera support would need real hardware to test properly.
+  that product's stock across every warehouse. **USB/Bluetooth scanners** work (they act as keyboard
+  input, submitting a plain GET form on Enter — no client JS needed for the scan itself), and so does
+  the **browser camera** on phones and tablets. Verified: scanning `6001240912345` on the lookup page
+  returned the correct product and per-warehouse ledger; scanning `6001240912346` on the receiving form
+  correctly selected `BLK-STD-140`; an unknown barcode showed a clear not-found message.
+- **Camera scanning at the operational touchpoints** (RFQ Phase 5) — `src/components/scanner/camera-scanner.tsx`
+  is one reusable component: it opens an overlay, requests the camera, decodes frames with `jsqr`, and
+  returns the decoded string to whatever called it. It handles permission-denied, no-camera, and generic
+  failure with a manual-entry fallback in each case; always stops the MediaStream on success, cancel, and
+  unmount (nothing keeps running in the background); guards against duplicate scan events via a ref latch;
+  and `jsqr` is dynamically imported so it only enters the bundle when the overlay actually opens.
+  Wired into five existing pages as an *additional input method feeding the existing form* — never a
+  parallel workflow: scan lookup, **Goods receiving**, **Transfers**, **Sales & dispatch** (scan to select
+  the product), and **Product catalogue** (scan to fill the Barcode field).
+  **The security boundary matters here:** a scan only ever produces an identifier. It posts nothing,
+  authorises nothing, and bypasses no permission, validation, reservation, or stock-availability check —
+  every mutation still runs through the existing Server Actions, RBAC checks, and the WAC engine
+  unchanged. There is deliberately no second inventory code path. Verified: USB/manual match still works
+  unchanged on receiving and transfers; the permission-denied state renders correctly and the overlay
+  cancels cleanly; a full transfer (`XFR-1001`, DBN-FAC → PMB-WH, 10 units) completed via
+  scan-identify → existing form → existing action.
 - **Product labels** (`/dashboard/labels`, RFQ Phase 5) — pick a product and a copy count, get a
   print-ready sheet (`@media print` hides the sidebar/nav via a `.no-print` convention, `print:` variant
-  keeps label cards from splitting across a page break). Each label shows SKU, product name, and the
-  barcode number in large, clear monospace text. **Deliberately not** a rendered Code 128/QR barcode
-  symbol graphic — implementing that correctly needs the full standard bar-width lookup table, which this
-  pass had no way to verify against a real scanner, and a wrong symbol would look legitimate on screen
-  while not actually decoding; the honest choice was a human/scanner-readable text code over a fabricated
-  image. Linked from the product catalogue's "Print labels" action per row. Verified: generated a 6-copy
-  sheet for `CEM-42.5-50KG`, correct SKU/name/barcode on every card, page renders cleanly with no console
-  errors.
+  keeps label cards from splitting across a page break). Each label shows SKU, product name, the barcode
+  number in large monospace text, and a **real, scannable QR symbol** generated server-side by
+  `src/lib/services/qrcode.ts` (the `qrcode` package).
+  **Why QR was safe to build but Code 128 still isn't:** QR went through a mature, deterministic encoder
+  *and* was verified by round-trip — encode `6001240912345`, decode the resulting PNG back with `jsQR`,
+  confirm the identical string comes out. That check is what distinguishes it from guessing. A rendered
+  **Code 128** linear symbol remains **deliberately not built**: its checksum and subset-switching rules
+  are easy to get subtly wrong, there was no physical scanner on hand to verify an implementation against,
+  and a wrong symbol would look entirely legitimate on screen while silently failing to decode. Linked
+  from the product catalogue's "Print labels" action per row. Verified: generated sheets for
+  `CEM-42.5-50KG` with a correct QR and correct SKU/name/barcode on every card, no console errors.
+- **Responsive / mobile** (RFQ: full browser functionality on iOS and Android, 375px minimum viewport) —
+  the dashboard sidebar is a static push-style sidebar from **992px** up and a CSS-only off-canvas drawer
+  below it (a hidden checkbox + `peer-checked` variants — no client JS, so `layout.tsx` stays a Server
+  Component). The drawer has a dimmed backdrop, a sticky ☰ header, an in-drawer ✕, tap-backdrop-to-close,
+  auto-close on navigation (the one line of client JS, in `nav-link.tsx`, since the layout doesn't remount
+  between client-side route changes), and a background scroll lock.
+  **992px is measured, not guessed:** it's the narrowest viewport where a 240px sidebar and the three
+  dashboard stat tiles both fit without the currency value clipping (at 768px each tile collapses to 147px
+  and clips; at 992px the tile is 222px and the value fits exactly). Below that the drawer is genuinely
+  correct — there isn't room for both. Two latent bugs were found and fixed here, both needing an
+  open-drawer-then-widen sequence to surface: a stale backdrop that dimmed the whole desktop layout (equal
+  specificity between `min-[…]:hidden` and `peer-checked:block`, with Tailwind emitting the latter second
+  — fixed by stacking the width bound *onto* the checked variant so above-breakpoint is unreachable rather
+  than merely overridden), and a scroll lock that outlived the drawer and left the page unscrollable.
+  Verified at 375 / 768 / 960 / 991 / 992 / 1280: no page-level horizontal overflow, no card clipping,
+  desktop visually unchanged.
 - **RBAC & audit log** (RFQ Phase 6, partial) — a real permission matrix (`src/lib/permissions.ts`,
   `Permission` type + `ROLE_PERMISSIONS`) enforced in every mutating Server Action, checked the same way
   every action already re-checks `getSession()` rather than trusting the page's login redirect. Four demo
@@ -203,11 +234,13 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 | Invoicing & billing (VAT, payments, ageing) | Real logic and UI — see §1 |
 | Accounting Integration (Sage/QuickBooks/Xero) | Not started — blocked on §5.5 (which platform) |
 | Dashboards & reports (15 of "15+", CSV export) | Real logic and UI — see §1 |
-| Barcode/QR scanning (USB scanner, lookup + receiving) | Real logic and UI — see §1 |
+| Barcode/QR scanning — USB scanner + browser camera, at five touchpoints | Real logic and UI — see §1 |
+| QR generation on labels | **Real** — `qrcode` package, verified by encode→decode round-trip — see §1 |
 | Product labels (`/dashboard/labels`, print-ready sheets) | Real logic and UI — see §1 |
+| Responsive / mobile (static sidebar ≥992px, drawer below, 375px min) | Real — verified across six widths — see §1 |
 | Bill of materials (`/dashboard/bom`, flat BOM + explosion calculator) | Real logic and UI — see §1 |
 | Credit notes (issue against invoice, nets off outstanding) | Real logic and UI — see §1 |
-| Camera-based scanning, rendered barcode symbol graphic (Code 128/QR) | Not built |
+| Rendered Code 128 linear barcode symbol | Not built — unsafe to fake without a scanner to verify against — see §1 |
 | 2FA for privileged users | **Real gate** on `approve_adjustments` — mock enrollment (`/dashboard/security`), no real authenticator app |
 
 ## 5. BUSINESS DECISION REQUIRED — do not resolve these by assumption
@@ -249,5 +282,6 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 4. CORE DATA phase: apply all migrations (including the audit-log immutability trigger) to that project,
    replace the mock repositories with real Supabase-backed ones behind the same interfaces.
 5. Accounting integration once §5.5 is decided.
-6. Remainder of Phase 5: camera-based barcode scanning, rendered barcode symbol graphics — reports are done.
+6. Last of Phase 5: a rendered Code 128 linear barcode symbol — blocked on having a physical scanner to
+   verify an encoder against. Reports, QR generation, and camera + USB scanning are done.
 7. Phase 8: system testing, UAT, training materials, production cutover.
