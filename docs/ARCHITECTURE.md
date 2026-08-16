@@ -52,19 +52,22 @@ resulting WAC math checked by hand):
   exactly subtotal R4,000.00 / VAT R600.00 / total R4,600.00 due 30 days out; a R2,000 partial payment
   then the R2,600 remainder moved the invoice through partially-paid to paid exactly, and the sales page
   correctly blocks double-invoicing a dispatched order.
-- **Dashboards & reports** (`/dashboard/reports`, RFQ Phase 5, partial) — six of the RFQ's eventual 15+:
+- **Dashboards & reports** (`/dashboard/reports`, RFQ Phase 5, partial) — ten of the RFQ's eventual 15+:
   stock valuation (by warehouse, with subtotals + grand total), low stock/reorder suggestions, sales
-  order summary, purchase order summary, invoice ageing (standard AR buckets: current/1-30/31-60/61-90/
-  90+), and stock movement history (the append-only audit trail, human-readable). Every table exports to
-  CSV via a reusable client component (`src/components/export-csv-button.tsx`), satisfying the RFQ's
-  "exportable to Excel/CSV at any time" non-functional requirement — CSV opens natively in Excel, so one
-  format covers both. Report-building logic lives in `src/lib/services/reports.ts` as pure functions
-  (fetch via repositories, then build), mirroring the inventory engine's shape. Verified: posting a
-  manual receipt (50 units @ R98) immediately showed up correctly in both the stock valuation report
-  (WAC recalculated to R92.65, exact) and the movement history report, with the CSV export button
-  producing no console errors.
-  **Not yet built:** the remaining ~9 reports the RFQ eventually wants (e.g. dispatch/pick-list reports,
-  supplier performance, BOM explosion).
+  order summary, customer summary (orders/dispatched count + value), purchase order summary, supplier
+  summary (ordered vs. actually received value), invoice ageing (standard AR buckets:
+  current/1-30/31-60/61-90/90+), stock movement history (the append-only audit trail, human-readable),
+  receiving history (every `receipt` movement, covers both quick-receive and PO receipts since both post
+  the same movement type), and movement type totals (count/units/value rolled up by type). Every table
+  exports to CSV via a reusable client component (`src/components/export-csv-button.tsx`), satisfying
+  the RFQ's "exportable to Excel/CSV at any time" non-functional requirement — CSV opens natively in
+  Excel, so one format covers both. Report-building logic lives in `src/lib/services/reports.ts` as pure
+  functions (fetch via repositories, then build), mirroring the inventory engine's shape. Verified: a
+  50-unit PO fully received produced exactly R4,500.00 in both "ordered value" and "received value" on
+  the supplier summary, the same receipt appeared correctly on receiving history and movement type
+  totals, and the stock valuation report's WAC recalculated correctly from the same receipt.
+  **Not yet built:** the remaining ~5 reports the RFQ eventually wants (e.g. pick-list reports, BOM
+  explosion, cycle-count variance).
 - **Barcode / QR scan** (`/dashboard/scan`, RFQ Phase 5) — a lookup page: scan or type a barcode, see
   that product's stock across every warehouse. USB scanners work today (they act as keyboard input,
   submitting a plain GET form on Enter — no client JS needed for the scan itself). Also wired into
@@ -158,7 +161,7 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 | Purchase order lifecycle (draft/issue/partial-receive) | Real logic and UI — see §1 |
 | Invoicing & billing (VAT, payments, ageing) | Real logic and UI — see §1 |
 | Accounting Integration (Sage/QuickBooks/Xero) | Not started — blocked on §5.5 (which platform) |
-| Dashboards & reports (6 of 15+, CSV export) | Real logic and UI — see §1 |
+| Dashboards & reports (10 of 15+, CSV export) | Real logic and UI — see §1 |
 | Barcode/QR scanning (USB scanner, lookup + receiving) | Real logic and UI — see §1 |
 | Camera-based scanning, label printing | Not built |
 | 2FA for privileged users | Not built — `users.mfa_enrolled` exists in schema, unread by anything |

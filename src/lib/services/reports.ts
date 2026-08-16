@@ -4,9 +4,9 @@
  * given already-fetched domain records, build the rows a report table
  * needs. No I/O here — pages fetch via the repositories, then call these.
  *
- * Six reports today, not the full 15+ the RFQ eventually wants — see
+ * Ten reports today, not the full 15+ the RFQ eventually wants — see
  * docs/ARCHITECTURE.md for the running list of what's still missing
- * (dispatch/pick-list reports, supplier performance, BOM explosion, etc.).
+ * (pick-list reports, BOM explosion, cycle-count variance, etc.).
  */
 
 import { stockValue } from '@/lib/services/inventory-engine';
@@ -18,6 +18,7 @@ import type {
   PurchaseOrder,
   SalesOrder,
   StockLedgerEntry,
+  StockMovementType,
   Supplier,
   Warehouse,
 } from '@/lib/domain/inventory';
@@ -267,4 +268,139 @@ export function buildMovementHistory(
       referenceType: m.referenceType,
     }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+// ---------------------------------------------------------------------------
+// Receiving history — every 'receipt' movement, human-readable (covers both
+// quick-receive and PO receipts, since both post through the same movement
+// type)
+// ---------------------------------------------------------------------------
+
+export interface ReceivingHistoryRow {
+  receivedAt: string;
+  sku: string;
+  productName: string;
+  warehouseCode: string;
+  quantity: number;
+  unitCost: number;
+  value: number;
+}
+
+export function buildReceivingHistory(
+  movements: { productId: string; warehouseId: string; movementType: StockMovementType; quantity: number; unitCost: number; createdAt: string }[],
+  products: Product[],
+  warehouses: Warehouse[]
+): ReceivingHistoryRow[] {
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
+
+  return movements
+    .filter((m) => m.movementType === 'receipt')
+    .map((m) => {
+      const product = productById.get(m.productId);
+      return {
+        receivedAt: m.createdAt,
+        sku: product?.sku ?? 'Unknown',
+        productName: product?.name ?? 'Unknown',
+        warehouseCode: warehouseById.get(m.warehouseId)?.code ?? 'Unknown',
+        quantity: m.quantity,
+        unitCost: m.unitCost,
+        value: Math.round(m.quantity * m.unitCost * 100) / 100,
+      };
+    })
+    .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
+}
+
+// ---------------------------------------------------------------------------
+// Movement type totals — a quick roll-up of the audit trail by movement type
+// ---------------------------------------------------------------------------
+
+export interface MovementTypeTotalRow {
+  movementType: string;
+  count: number;
+  totalUnits: number;
+  totalValue: number;
+}
+
+export function buildMovementTypeTotals(
+  movements: { movementType: StockMovementType; quantity: number; unitCost: number }[]
+): MovementTypeTotalRow[] {
+  const byType = new Map<string, MovementTypeTotalRow>();
+  for (const m of movements) {
+    const row = byType.get(m.movementType) ?? { movementType: m.movementType, count: 0, totalUnits: 0, totalValue: 0 };
+    row.count += 1;
+    row.totalUnits = Math.round((row.totalUnits + Math.abs(m.quantity)) * 1000) / 1000;
+    row.totalValue = Math.round((row.totalValue + Math.abs(m.quantity) * m.unitCost) * 100) / 100;
+    byType.set(m.movementType, row);
+  }
+  return [...byType.values()].sort((a, b) => b.totalValue - a.totalValue);
+}
+
+// ---------------------------------------------------------------------------
+// Supplier summary — spend by supplier, ordered vs. actually received
+// ---------------------------------------------------------------------------
+
+export interface SupplierSummaryRow {
+  supplierName: string;
+  orderCount: number;
+  totalOrderedValue: number;
+  totalReceivedValue: number;
+}
+
+export function buildSupplierSummary(
+  orders: (PurchaseOrder & { line: PurchaseOrderLine })[],
+  suppliers: Supplier[]
+): SupplierSummaryRow[] {
+  const supplierById = new Map(suppliers.map((s) => [s.id, s]));
+  const bySupplier = new Map<string, SupplierSummaryRow>();
+
+  for (const po of orders) {
+    const name = supplierById.get(po.supplierId)?.name ?? 'Unknown';
+    const row = bySupplier.get(po.supplierId) ?? { supplierName: name, orderCount: 0, totalOrderedValue: 0, totalReceivedValue: 0 };
+    row.orderCount += 1;
+    row.totalOrderedValue = Math.round((row.totalOrderedValue + po.line.quantityOrdered * po.line.unitCost) * 100) / 100;
+    row.totalReceivedValue = Math.round((row.totalReceivedValue + po.line.quantityReceived * po.line.unitCost) * 100) / 100;
+    bySupplier.set(po.supplierId, row);
+  }
+
+  return [...bySupplier.values()].sort((a, b) => b.totalOrderedValue - a.totalOrderedValue);
+}
+
+// ---------------------------------------------------------------------------
+// Customer summary — order volume and value by customer
+// ---------------------------------------------------------------------------
+
+export interface CustomerSummaryRow {
+  customerName: string;
+  orderCount: number;
+  dispatchedCount: number;
+  totalOrderedValue: number;
+  totalDispatchedValue: number;
+}
+
+export function buildCustomerSummary(orders: SalesOrder[], customers: Customer[]): CustomerSummaryRow[] {
+  const customerById = new Map(customers.map((c) => [c.id, c]));
+  const byCustomer = new Map<string, CustomerSummaryRow>();
+
+  for (const o of orders) {
+    if (o.status === 'cancelled') continue;
+    const name = customerById.get(o.customerId)?.name ?? 'Unknown';
+    const row = byCustomer.get(o.customerId) ?? {
+      customerName: name,
+      orderCount: 0,
+      dispatchedCount: 0,
+      totalOrderedValue: 0,
+      totalDispatchedValue: 0,
+    };
+    const value = Math.round(o.quantityOrdered * o.unitPrice * 100) / 100;
+    row.orderCount += 1;
+    row.totalOrderedValue = Math.round((row.totalOrderedValue + value) * 100) / 100;
+    if (o.status === 'dispatched') {
+      row.dispatchedCount += 1;
+      row.totalDispatchedValue = Math.round((row.totalDispatchedValue + value) * 100) / 100;
+    }
+    byCustomer.set(o.customerId, row);
+  }
+
+  return [...byCustomer.values()].sort((a, b) => b.totalOrderedValue - a.totalOrderedValue);
 }

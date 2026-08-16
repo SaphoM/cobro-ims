@@ -10,12 +10,16 @@ import {
   warehouseRepository,
 } from '@/lib/data';
 import {
+  buildCustomerSummary,
   buildInvoiceAgeing,
   buildLowStockReport,
   buildMovementHistory,
+  buildMovementTypeTotals,
   buildPurchaseOrderSummary,
+  buildReceivingHistory,
   buildSalesSummary,
   buildStockValuationReport,
+  buildSupplierSummary,
 } from '@/lib/services/reports';
 import { getNowMs } from '@/lib/now';
 import { ExportCsvButton } from '@/components/export-csv-button';
@@ -49,15 +53,20 @@ export default async function ReportsPage() {
   const poSummary = buildPurchaseOrderSummary(purchaseOrders, products, suppliers);
   const ageing = buildInvoiceAgeing(invoices, customers, getNowMs());
   const movementHistory = buildMovementHistory(movements, products, warehouses);
+  const receivingHistory = buildReceivingHistory(movements, products, warehouses);
+  const movementTypeTotals = buildMovementTypeTotals(movements);
+  const supplierSummary = buildSupplierSummary(purchaseOrders, suppliers);
+  const customerSummary = buildCustomerSummary(salesOrders, customers);
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Dashboards & reports</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Six of the RFQ&apos;s 15+ standard reports so far — stock valuation, low stock, sales, purchase
-          orders, invoice ageing, and movement history. Every table exports to CSV (opens in Excel), per
-          the RFQ&apos;s data-export requirement.
+          Ten of the RFQ&apos;s 15+ standard reports so far — stock valuation, low stock, sales, customers,
+          purchase orders, suppliers, invoice ageing, movement history, receiving history, and movement
+          type totals. Every table exports to CSV (opens in Excel), per the RFQ&apos;s data-export
+          requirement.
         </p>
       </div>
 
@@ -172,6 +181,40 @@ export default async function ReportsPage() {
       </ReportSection>
 
       <ReportSection
+        title="Customer summary"
+        subtitle={`${customerSummary.length} customers`}
+        exportFilename="customer-summary"
+        rows={customerSummary}
+      >
+        <table className="w-full min-w-[640px] border-collapse text-[0.86rem]">
+          <thead>
+            <tr className="text-left text-text-faint">
+              <th className="px-5 py-2.5 font-medium">Customer</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Orders</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Dispatched</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Ordered value</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Dispatched value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {customerSummary.map((r, i) => (
+              <tr key={i} className="border-t border-accent/[0.08]">
+                <td className="px-5 py-3 text-text">{r.customerName}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.orderCount}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.dispatchedCount}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text">
+                  R {r.totalOrderedValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td className="px-5 py-3 text-right tabular-nums text-text">
+                  R {r.totalDispatchedValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </ReportSection>
+
+      <ReportSection
         title="Purchase order summary"
         subtitle={`${poSummary.length} orders`}
         exportFilename="purchase-orders"
@@ -201,6 +244,38 @@ export default async function ReportsPage() {
                   {r.quantityOutstanding > 0 ? r.quantityOutstanding.toLocaleString() : '—'}
                 </td>
                 <td className="px-5 py-3 text-text-muted capitalize">{r.status.replace('_', ' ')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </ReportSection>
+
+      <ReportSection
+        title="Supplier summary"
+        subtitle={`${supplierSummary.length} suppliers`}
+        exportFilename="supplier-summary"
+        rows={supplierSummary}
+      >
+        <table className="w-full min-w-[640px] border-collapse text-[0.86rem]">
+          <thead>
+            <tr className="text-left text-text-faint">
+              <th className="px-5 py-2.5 font-medium">Supplier</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Orders</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Ordered value</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Received value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {supplierSummary.map((r, i) => (
+              <tr key={i} className="border-t border-accent/[0.08]">
+                <td className="px-5 py-3 text-text">{r.supplierName}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.orderCount}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text">
+                  R {r.totalOrderedValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td className="px-5 py-3 text-right tabular-nums text-text">
+                  R {r.totalReceivedValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -295,6 +370,80 @@ export default async function ReportsPage() {
                   </td>
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">R {r.unitCost.toFixed(2)}</td>
                   <td className="px-5 py-3 text-text-faint">{r.referenceType?.replace(/_/g, ' ') ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </ReportSection>
+
+      <ReportSection
+        title="Receiving history"
+        subtitle={`${receivingHistory.length} receipts — quick-receive and PO receipts alike`}
+        exportFilename="receiving-history"
+        rows={receivingHistory}
+      >
+        {receivingHistory.length === 0 ? (
+          <EmptyState text="No receipts posted yet." />
+        ) : (
+          <table className="w-full min-w-[680px] border-collapse text-[0.86rem]">
+            <thead>
+              <tr className="text-left text-text-faint">
+                <th className="px-5 py-2.5 font-medium">Received</th>
+                <th className="px-5 py-2.5 font-medium">SKU</th>
+                <th className="px-5 py-2.5 font-medium">Product</th>
+                <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Qty</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Unit cost</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {receivingHistory.map((r, i) => (
+                <tr key={i} className="border-t border-accent/[0.08]">
+                  <td className="px-5 py-3 text-text-muted">{new Date(r.receivedAt).toLocaleString('en-ZA')}</td>
+                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
+                  <td className="px-5 py-3 text-text-muted">{r.productName}</td>
+                  <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantity.toLocaleString()}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">R {r.unitCost.toFixed(2)}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">
+                    R {r.value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </ReportSection>
+
+      <ReportSection
+        title="Movement type totals"
+        subtitle="Roll-up of every stock movement by type"
+        exportFilename="movement-type-totals"
+        rows={movementTypeTotals}
+      >
+        {movementTypeTotals.length === 0 ? (
+          <EmptyState text="No stock movements posted yet." />
+        ) : (
+          <table className="w-full min-w-[520px] border-collapse text-[0.86rem]">
+            <thead>
+              <tr className="text-left text-text-faint">
+                <th className="px-5 py-2.5 font-medium">Type</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Count</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Total units</th>
+                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Total value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {movementTypeTotals.map((r, i) => (
+                <tr key={i} className="border-t border-accent/[0.08]">
+                  <td className="px-5 py-3 text-text-muted capitalize">{r.movementType.replace('_', ' ')}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.count}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.totalUnits.toLocaleString()}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">
+                    R {r.totalValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
                 </tr>
               ))}
             </tbody>

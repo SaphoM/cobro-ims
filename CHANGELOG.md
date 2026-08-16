@@ -4,6 +4,19 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.11.0 — 2026-08-16
+
+**Four more reports — 10 of the RFQ's eventual 15+.**
+- `buildSupplierSummary` — orders, ordered value vs. actually received value, per supplier
+- `buildCustomerSummary` — order count, dispatched count, ordered value vs. dispatched value, per customer
+- `buildReceivingHistory` — every `receipt` movement, human-readable (covers quick-receive and PO
+  receipts alike, since both post the same movement type)
+- `buildMovementTypeTotals` — count/total units/total value rolled up by stock movement type
+- All four wired into `/dashboard/reports` with CSV export, same as the existing six
+- Verified: a 50-unit PO fully received produced exactly R4,500.00 in both "ordered value" and "received
+  value" on the supplier summary; the same receipt appeared correctly on receiving history and movement
+  type totals; stock valuation's WAC recalculated correctly from the same receipt
+
 ## v0.10.0 — 2026-08-16
 
 **RFQ Phase 6 (partial): RBAC enforcement + audit log.**
