@@ -4,6 +4,22 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.17.2 — 2026-08-16
+
+**Make the v0.17.1 select/input height fix hold across browser engines.**
+- `select { min-height: calc(...) }` alone matched select and input heights exactly in this
+  environment's Chromium, but a live screenshot showed the mismatch persisting elsewhere — native
+  `<select>` chrome (`appearance: auto`) carries its own engine-specific intrinsic sizing that can
+  override a plain `min-height` in some browsers, even with identical padding/border/font-size
+- Fixed with `appearance: none` on every select, so `min-height` is the only thing deciding its box
+  in every engine. Removing the native appearance also removes the native dropdown arrow, so a
+  themed one (muted grey, matching `--text-muted`) is redrawn in the same spot, with `padding-right`
+  widened so option text never sits under it
+- Verified: every select/input still measures identical (43.12px) on Overview, Receiving, Sales,
+  Transfers, Adjustments, BOM and Labels; no text clipping under the new padding on any page; no
+  page-level horizontal overflow at 375px
+- One file changed: `src/app/globals.css`
+
 ## v0.17.1 — 2026-08-16
 
 **UI polish: uniform form-control heights.**
