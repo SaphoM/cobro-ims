@@ -4,6 +4,21 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.15.0 — 2026-08-16
+
+**Bill of materials (RFQ Phase 2 gap closed) — flat BOM management + explosion calculator.**
+- `ProductRepository.listBom` previously always returned `[]`; now backed by real mock state, plus two
+  new methods `addBomLine`/`removeBomLine`
+- New `/dashboard/bom`: pick a product, add/remove components with a quantity-per-unit, and a "BOM
+  explosion" calculator — given a build quantity, total component requirements
+- Linked from the product catalogue's new "BOM" action per row
+- Flat parent → component only, per the schema's already-committed shape — nested/multi-level BOM
+  remains an explicit open decision (`docs/ARCHITECTURE.md` §5.3), not something this blocks on
+- Verified: built a 2-component BOM (cement + aggregate) for a concrete block SKU; removed one component
+  and confirmed it reappeared in the "add component" picker while disappearing from both the BOM table
+  and the explosion output; exploded the remaining component (0.01 ton/unit) against a 5,000-unit build
+  quantity → exactly 50 tons
+
 ## v0.14.0 — 2026-08-16
 
 **Final five reports — 15 of the RFQ's "15+" target reached.**

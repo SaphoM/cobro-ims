@@ -33,6 +33,7 @@ import type {
 } from '@/lib/domain/inventory';
 import { VAT_RATE } from '@/lib/domain/inventory';
 import type {
+  AddBomLineInput,
   AdjustmentReasonRepository,
   AuditLogRepository,
   CreateCustomerInput,
@@ -90,6 +91,7 @@ const state = {
   invoices: [] as Invoice[],
   invoicePayments: [] as InvoicePayment[],
   auditLog: [] as AuditLogEntry[],
+  bomLines: [] as ProductBomLine[],
 };
 
 let poCounter = 1000;
@@ -204,8 +206,33 @@ export const mockProductRepository: ProductRepository = {
     state.products.push(product);
     return product;
   },
-  async listBom(): Promise<ProductBomLine[]> {
-    return []; // no BOM relationships in the seed data yet
+  async listBom(parentProductId): Promise<ProductBomLine[]> {
+    return state.bomLines.filter((l) => l.parentProductId === parentProductId);
+  },
+  async addBomLine(input: AddBomLineInput) {
+    if (input.parentProductId === input.componentProductId) {
+      throw new Error('A product cannot be a component of itself.');
+    }
+    if (
+      state.bomLines.some(
+        (l) => l.parentProductId === input.parentProductId && l.componentProductId === input.componentProductId
+      )
+    ) {
+      throw new Error('That component is already on this BOM — remove it first to change the quantity.');
+    }
+    const line: ProductBomLine = {
+      id: randomUUID(),
+      parentProductId: input.parentProductId,
+      componentProductId: input.componentProductId,
+      quantity: input.quantity,
+    };
+    state.bomLines.push(line);
+    return line;
+  },
+  async removeBomLine(lineId) {
+    const index = state.bomLines.findIndex((l) => l.id === lineId);
+    if (index === -1) throw new Error('BOM line not found.');
+    state.bomLines.splice(index, 1);
   },
 };
 

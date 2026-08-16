@@ -77,6 +77,12 @@ export interface CreateProductInput {
   reorderQuantity?: number | null;
 }
 
+export interface AddBomLineInput {
+  parentProductId: string;
+  componentProductId: string;
+  quantity: number;
+}
+
 export interface ProductRepository {
   list(): Promise<Product[]>;
   getById(id: string): Promise<Product | null>;
@@ -84,7 +90,16 @@ export interface ProductRepository {
   /** Barcode/QR lookup — RFQ Phase 5. Matches on the exact barcode value scanned. */
   getByBarcode(barcode: string): Promise<Product | null>;
   create(input: CreateProductInput): Promise<Product>;
+  /**
+   * Flat parent -> component BOM only — the schema/migration's committed
+   * shape. Whether Cobro needs nested/multi-level BOM (e.g. a palletised
+   * product built from sub-assemblies) is still a BUSINESS DECISION
+   * REQUIRED item (docs/ARCHITECTURE.md §5.3); this isn't blocked on that
+   * decision, it's the flat model the schema already settled on.
+   */
   listBom(parentProductId: string): Promise<ProductBomLine[]>;
+  addBomLine(input: AddBomLineInput): Promise<ProductBomLine>;
+  removeBomLine(lineId: string): Promise<void>;
 }
 
 export interface StockLedgerRepository {

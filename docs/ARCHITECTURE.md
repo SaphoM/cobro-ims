@@ -118,6 +118,16 @@ resulting WAC math checked by hand):
   as Admin with 2FA not yet enabled, attempted to approve a pending adjustment → blocked with "This
   action requires two-factor authentication. Enable 2FA under Security first."; enabled 2FA on
   `/dashboard/security` → the same approval then succeeded.
+- **Bill of materials** (`/dashboard/bom`, RFQ Phase 2) — flat parent → component BOM management (the
+  schema's committed shape, per `product_bom` in the Foundation migration): add/remove components with a
+  quantity-per-unit, plus a BOM explosion calculator (given a build quantity, total component
+  requirements). `ProductRepository.listBom` previously always returned `[]`; it and two new methods
+  (`addBomLine`, `removeBomLine`) are now backed by real mock state. Linked from the product catalogue's
+  "BOM" action per row. Nested/multi-level BOM remains a **BUSINESS DECISION REQUIRED** item (§5.3) — this
+  is the flat model, not blocked on that decision. Verified: built a 2-component BOM (cement, aggregate)
+  for a concrete block SKU, removed one component and confirmed it reappeared in the "add component"
+  picker while disappearing from the BOM table and the explosion calculation; exploded the remaining
+  component (0.01 ton/unit) against a 5,000-unit build quantity → exactly 50 tons.
 
 What exists as the underlying substrate is a **schema-and-engine-first vertical slice**, not a partial
 ERP:
@@ -185,6 +195,7 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 | Dashboards & reports (15 of "15+", CSV export) | Real logic and UI — see §1 |
 | Barcode/QR scanning (USB scanner, lookup + receiving) | Real logic and UI — see §1 |
 | Product labels (`/dashboard/labels`, print-ready sheets) | Real logic and UI — see §1 |
+| Bill of materials (`/dashboard/bom`, flat BOM + explosion calculator) | Real logic and UI — see §1 |
 | Camera-based scanning, rendered barcode symbol graphic (Code 128/QR) | Not built |
 | 2FA for privileged users | **Real gate** on `approve_adjustments` — mock enrollment (`/dashboard/security`), no real authenticator app |
 
@@ -200,8 +211,9 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
    plausible role responsibilities, not a matrix the RFQ defines or Cobro has confirmed. Notably strict
    today: only `admin` can approve/reject adjustments, manage the product catalogue, or manage customers.
    Confirm real assignments before Production.
-3. **BOM structure.** Schema currently models one-level (parent → component) BOM. Confirm whether Cobro
-   needs nested/multi-level BOM (e.g. a palletised product built from sub-assemblies).
+3. **BOM structure.** Flat one-level (parent → component) BOM is built and working (`/dashboard/bom`).
+   Confirm whether Cobro needs nested/multi-level BOM (e.g. a palletised product built from
+   sub-assemblies) — that would be a schema change, not a UI one.
 4. **Adjustment reason codes.** Seeded with plausible defaults (`BREAKAGE`, `CYCLE_COUNT`, `THEFT_LOSS`,
    `FOUND_STOCK`) and "requires approval" defaulted to true for all — confirm the real list and which
    roles approve which reasons.

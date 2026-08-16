@@ -57,6 +57,7 @@ the resulting numbers hand-checked):
 | --- | --- | --- |
 | Foundation | Schema, WAC inventory engine, mock data layer, login + dashboard shell | ✅ |
 | Phase 2 — Core Inventory Operations | Product catalogue | ✅ |
+| | Bill of materials (flat, + explosion calculator) | ✅ |
 | | Goods receiving (quick-receive, ad-hoc) | ✅ |
 | | Inter-warehouse transfers | ✅ |
 | | Write-offs & adjustments (with approval gate) | ✅ |
@@ -201,6 +202,9 @@ applied (see `supabase/migrations/20260816100000_audit_log_immutability.sql`).
 
 - **Product catalogue** (`/dashboard/products`) — list + add SKUs, unit of measure, barcode, reorder
   point/quantity.
+- **Bill of materials** (`/dashboard/bom`) — flat parent → component BOM management (add/remove
+  components with a quantity-per-unit) plus a BOM explosion calculator: given a build quantity, total
+  component requirements. Nested/multi-level BOM is still an open decision (§9.3); this is the flat model.
 - **Goods receiving** (`/dashboard/receiving`) — "quick receive": creates a PO + PO line + GRN + GRN line
   and posts the stock movement in one step, for genuine ad-hoc receipts with no formal PO raised.
 - **Purchase orders** (`/dashboard/purchase-orders`) — the formal lifecycle: draft → issue → receive one
@@ -268,6 +272,7 @@ correct — with the resulting quantities/costs/VAT amounts hand-verified agains
 | Dashboards & reports (15 of "15+", CSV export) | Real logic and UI |
 | Barcode/QR scanning (USB scanner: lookup + receiving) | Real logic and UI |
 | Product labels (print-ready sheets) | Real logic and UI |
+| Bill of materials (flat, + explosion calculator) | Real logic and UI |
 | Camera-based scanning, rendered barcode symbol graphic | Not started |
 | 2FA for privileged users | **Real gate** on approving/rejecting adjustments (`/dashboard/security`) — mock enrollment, no real authenticator app |
 
@@ -283,7 +288,8 @@ the RFQ / SoW does not define them. Confirm with Cobro before further engineerin
 2. **Permission matrix per role.** `src/lib/permissions.ts` now *enforces* a real matrix, but it's a
    placeholder built from plausible role responsibilities, not one the RFQ defines or Cobro confirmed —
    e.g. only `admin` can approve/reject adjustments, manage the catalogue, or manage customers today.
-3. **BOM structure.** Currently one-level (parent → component). Does Cobro need nested/multi-level BOM?
+3. **BOM structure.** Flat one-level (parent → component) is built and working (`/dashboard/bom`, with a
+   BOM explosion calculator). Does Cobro need nested/multi-level BOM instead — a schema change, not a UI one?
 4. **Adjustment reason codes.** Seeded with plausible defaults (`BREAKAGE`, `CYCLE_COUNT`, `THEFT_LOSS`,
    `FOUND_STOCK`) — confirm the real list and which roles approve which reasons.
 5. **Accounting integration target.** RFQ allows Sage, QuickBooks, or Xero "or equivalent" — not chosen.
@@ -334,6 +340,7 @@ src/app/
     layout.tsx                      Sidebar nav + session gate for every /dashboard/* route
     page.tsx                        Overview: KPIs, stock ledger, generic "record a movement" demo
     products/                       Product catalogue
+    bom/                             Bill of materials (flat) + explosion calculator
     receiving/                      Ad-hoc GRN quick-receive
     purchase-orders/                Full PO lifecycle: draft → issue → receive
     transfers/                      Inter-warehouse transfers

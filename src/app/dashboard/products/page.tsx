@@ -10,9 +10,12 @@ export default async function ProductsPage() {
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Product catalogue</h1>
         <p className="text-[0.86rem] text-text-muted">
-          SKUs, units of measure, barcodes and reorder thresholds. BOM relationships (RFQ: multi-level vs.
-          flat) are still a <span className="text-accent">BUSINESS DECISION REQUIRED</span> item — see
-          docs/ARCHITECTURE.md.
+          SKUs, units of measure, barcodes and reorder thresholds. Flat parent → component{' '}
+          <a href="/dashboard/bom" className="text-accent hover:underline">
+            bills of materials
+          </a>{' '}
+          are built; whether Cobro needs nested/multi-level BOM is still a{' '}
+          <span className="text-accent">BUSINESS DECISION REQUIRED</span> item — see docs/ARCHITECTURE.md.
         </p>
       </div>
 
@@ -45,11 +48,16 @@ export default async function ProductsPage() {
                     {p.reorderPoint?.toLocaleString() ?? '—'}
                   </td>
                   <td className="px-5 py-3 text-right">
-                    {p.barcode && (
-                      <a href={`/dashboard/labels?productId=${p.id}`} className="text-[0.78rem] font-semibold text-accent hover:underline">
-                        Print labels
+                    <div className="flex justify-end gap-3">
+                      <a href={`/dashboard/bom?productId=${p.id}`} className="text-[0.78rem] font-semibold text-accent hover:underline">
+                        BOM
                       </a>
-                    )}
+                      {p.barcode && (
+                        <a href={`/dashboard/labels?productId=${p.id}`} className="text-[0.78rem] font-semibold text-accent hover:underline">
+                          Print labels
+                        </a>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
