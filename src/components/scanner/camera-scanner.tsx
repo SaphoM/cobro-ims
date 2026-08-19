@@ -123,7 +123,7 @@ export function CameraScanner({
         }}
         className={
           className ??
-          'rounded-lg border border-accent/30 bg-surface-2 px-3 py-2.5 text-[0.82rem] font-semibold text-accent hover:bg-accent/10'
+          'h-9 rounded-lg border border-accent/30 bg-surface-2 px-3 py-1.5 text-[0.82rem] font-semibold text-accent hover:bg-accent/10'
         }
       >
         {buttonLabel}

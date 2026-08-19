@@ -17,7 +17,7 @@ export function CreditNoteLine({ invoiceId, outstanding }: { invoiceId: string; 
           name="reason"
           required
           placeholder="Reason (return, correction…)"
-          className="w-40 rounded-lg border border-accent/[0.14] bg-surface-2 px-2.5 py-1.5 text-[0.82rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none"
+          className="h-9 w-40 rounded-lg border border-accent/[0.14] bg-surface-2 px-2.5 py-1.5 text-[0.82rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none"
         />
         <input
           type="number"
@@ -27,12 +27,12 @@ export function CreditNoteLine({ invoiceId, outstanding }: { invoiceId: string; 
           step="0.01"
           required
           placeholder={`up to R${outstanding.toFixed(2)}`}
-          className="w-32 rounded-lg border border-accent/[0.14] bg-surface-2 px-2.5 py-1.5 text-right text-[0.82rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none"
+          className="h-9 w-32 rounded-lg border border-accent/[0.14] bg-surface-2 px-2.5 py-1.5 text-right text-[0.82rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none"
         />
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg border border-accent/30 px-3 py-1.5 text-[0.78rem] font-semibold text-accent transition-colors hover:bg-accent/10 disabled:opacity-90"
+          className="h-9 rounded-lg border border-accent/30 px-3 py-1.5 text-[0.78rem] font-semibold text-accent transition-colors hover:bg-accent/10 disabled:opacity-90"
         >
           {pending ? 'Issuing…' : 'Issue credit note'}
         </button>

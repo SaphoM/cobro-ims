@@ -24,6 +24,18 @@
   --border-strong: rgba(240, 161, 60, 0.4);
   --danger: #e2604a;
   --success: #f0a13c;
+
+  /* Standard height for every single-line form control (input, select) across the
+     app — Tailwind's `h-9` (2.25rem) resolves to this same value, and every control
+     class in src/lib/ui/form-control-classes.ts applies `h-9` directly rather than
+     reading this variable (Tailwind utility classes can't consume a var() without
+     arbitrary-value syntax, which would be harder to grep for than a plain `h-9`).
+     This token exists so the *number* has one documented home — if it ever changes,
+     grep for `h-9` in src/lib/ui and src/components, and update this comment to match.
+     Deliberately not applied to the barcode/QR scan hero input (`/dashboard/scan`) or
+     the login page's email/password fields — see the comment on `select` below and
+     README.md's design-system note for why those stay their own larger size. */
+  --control-height: 36px;
 }
 
 @theme inline {
@@ -60,30 +72,32 @@ body {
   border-color: var(--border);
 }
 
-/* Form control heights — keep <select> the same height as <input>.
+/* Form control height standard — 36px (--control-height) for every single-line input
+   and select across the app, and cross-engine <select> normalization.
 
-   Both already carry identical padding, border and font-size, but a <select> sizes its
-   content box from intrinsic font metrics and ignores line-height, while an <input> uses
-   its line-height (1.5). That left every dropdown 43.00px against 43.12px for inputs
-   sitting beside it on the same row in Chromium — and a bigger, engine-dependent gap in
-   browsers whose native select chrome (the built-in OS dropdown widget) carries its own
-   intrinsic sizing that a plain `min-height` can't fully override while `appearance` is
-   left at its default `auto`.
+   The actual 36px is set per-element via Tailwind's `h-9` in
+   src/lib/ui/form-control-classes.ts (the shared inputClass/selectClass every dashboard
+   form imports) rather than through this rule — `height` on an <input> is respected
+   reliably cross-browser with no native-chrome quirks to work around. `min-height` here
+   is a defensive fallback only, in case a select is ever added without importing the
+   shared class.
 
-   `appearance: none` opts every select out of that native widget sizing so `min-height`
-   is the only thing deciding its box — the one way to make the match hold across engines,
-   not just the one this was authored in. Removing the native appearance also removes the
-   native dropdown arrow, so a themed one is redrawn here (muted grey, matching
-   `--text-muted`) in the same right-hand spot browsers already used, with `padding-right`
-   widened so option text never sits under it.
-
-   `min-height` rather than `height`, so this can only ever grow a select to match — it
-   never clamps one that needs to be taller. The 1.5em term is the input's line-height
-   resolved against the select's own font-size, so this stays correct if a select is ever
-   given different text sizing; 1.25rem is the shared py-2.5 padding and 2px the border
-   (both counted here because these controls are border-box). */
+   A <select> needs more than a height rule, though: its native OS-drawn chrome (the
+   built-in dropdown widget) carries its own intrinsic sizing that plain `height` can't
+   fully override while `appearance` is left at its default `auto`, and it renders its
+   own border/corners underneath ours regardless of height. `appearance: none` opts every
+   select out of that native widget entirely — the only way to make an exact height and
+   this app's rounded-corner container styling hold across engines, not just the one this
+   was authored in. The unprefixed `appearance: none` alone isn't enough: Safari (and
+   older Firefox) only fully strip a <select>'s native chrome via the vendor-prefixed
+   properties, so all three are set (prefixed first, standard last, per convention).
+   Removing the native appearance also removes the native dropdown arrow, so a themed one
+   is redrawn here (muted grey, matching `--text-muted`) in the same right-hand spot
+   browsers already used, with `padding-right` widened so option text never sits under it. */
 select {
-  min-height: calc(1.5em + 1.25rem + 2px);
+  min-height: var(--control-height);
+  -webkit-appearance: none;
+  -moz-appearance: none;
   appearance: none;
   padding-right: 2.5rem;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23a8a5a0' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");

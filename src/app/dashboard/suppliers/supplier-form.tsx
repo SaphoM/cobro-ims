@@ -2,10 +2,9 @@
 
 import { useActionState } from 'react';
 import { createSupplierAction, type SupplierFormState } from '@/app/dashboard/suppliers/actions';
+import { inputClass } from '@/lib/ui/form-control-classes';
 
 const initialState: SupplierFormState = { error: null, success: null };
-const inputClass =
-  'rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none';
 
 export function SupplierForm() {
   const [state, formAction, pending] = useActionState(createSupplierAction, initialState);

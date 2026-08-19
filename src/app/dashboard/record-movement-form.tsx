@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import { recordMovementAction, type RecordMovementFormState } from '@/app/dashboard/actions';
+import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import type { Product, Warehouse } from '@/lib/domain/inventory';
 
 const initialState: RecordMovementFormState = { error: null, success: null };
@@ -33,7 +34,7 @@ export function RecordMovementForm({ products, warehouses }: { products: Product
           <select
             name="productId"
             required
-            className="rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text focus:border-accent focus:outline-none"
+            className={selectClass}
           >
             {products.map((p) => (
               <option key={p.id} value={p.id}>
@@ -48,7 +49,7 @@ export function RecordMovementForm({ products, warehouses }: { products: Product
           <select
             name="warehouseId"
             required
-            className="rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text focus:border-accent focus:outline-none"
+            className={selectClass}
           >
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>
@@ -64,7 +65,7 @@ export function RecordMovementForm({ products, warehouses }: { products: Product
             name="movementType"
             required
             defaultValue="receipt"
-            className="rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text focus:border-accent focus:outline-none"
+            className={selectClass}
           >
             {Object.entries(MOVEMENT_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -83,7 +84,7 @@ export function RecordMovementForm({ products, warehouses }: { products: Product
             step="0.001"
             required
             placeholder="0"
-            className="rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none"
+            className={inputClass}
           />
         </label>
 
@@ -96,7 +97,7 @@ export function RecordMovementForm({ products, warehouses }: { products: Product
             step="0.01"
             required
             placeholder="0.00"
-            className="rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none"
+            className={inputClass}
           />
         </label>
 

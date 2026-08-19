@@ -1,6 +1,7 @@
 import { productRepository } from '@/lib/data';
 import { PrintButton } from '@/app/dashboard/labels/print-button';
 import { generateQrDataUrl } from '@/lib/services/qrcode';
+import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 
 const MAX_LABELS = 60;
 
@@ -39,7 +40,7 @@ export default async function LabelsPage({
             name="productId"
             required
             defaultValue={selected?.id ?? ''}
-            className="rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text focus:border-accent focus:outline-none"
+            className={selectClass}
           >
             <option value="" disabled>
               Choose a product…
@@ -61,13 +62,13 @@ export default async function LabelsPage({
             min="1"
             max={MAX_LABELS}
             defaultValue={requestedQty}
-            className="w-28 rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text focus:border-accent focus:outline-none"
+            className={`${inputClass} w-28`}
           />
         </label>
 
         <button
           type="submit"
-          className="rounded-lg border border-accent/30 bg-surface-2 px-5 py-2.5 text-[0.88rem] font-semibold text-accent hover:bg-accent/10"
+          className="h-9 rounded-lg border border-accent/30 bg-surface-2 px-5 py-1.5 text-[0.88rem] font-semibold text-accent hover:bg-accent/10"
         >
           Generate sheet
         </button>

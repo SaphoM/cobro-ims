@@ -2,13 +2,10 @@
 
 import { useActionState } from 'react';
 import { createPurchaseOrderAction, type PurchaseOrderFormState } from '@/app/dashboard/purchase-orders/actions';
+import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import type { Product, Supplier, Warehouse } from '@/lib/domain/inventory';
 
 const initialState: PurchaseOrderFormState = { error: null, success: null };
-const selectClass =
-  'rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text focus:border-accent focus:outline-none';
-const inputClass =
-  'rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none';
 
 export function PurchaseOrderForm({
   suppliers,

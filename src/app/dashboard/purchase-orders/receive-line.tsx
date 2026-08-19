@@ -20,12 +20,12 @@ export function ReceiveLine({ poId, remaining, unit }: { poId: string; remaining
           step="0.001"
           required
           placeholder={`up to ${remaining}`}
-          className="w-28 rounded-lg border border-accent/[0.14] bg-surface-2 px-2.5 py-1.5 text-right text-[0.82rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none"
+          className="h-9 w-28 rounded-lg border border-accent/[0.14] bg-surface-2 px-2.5 py-1.5 text-right text-[0.82rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none"
         />
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-accent px-3 py-1.5 text-[0.78rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:opacity-90"
+          className="h-9 rounded-lg bg-accent px-3 py-1.5 text-[0.78rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:opacity-90"
         >
           {pending ? 'Posting…' : `Receive (${unit})`}
         </button>

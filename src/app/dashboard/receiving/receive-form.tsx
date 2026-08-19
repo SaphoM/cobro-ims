@@ -3,13 +3,10 @@
 import { useActionState, useRef, useState } from 'react';
 import { receiveStockAction, type ReceiveFormState } from '@/app/dashboard/receiving/actions';
 import { CameraScanner } from '@/components/scanner/camera-scanner';
+import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import type { Product, Supplier, Warehouse } from '@/lib/domain/inventory';
 
 const initialState: ReceiveFormState = { error: null, success: null };
-const selectClass =
-  'rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text focus:border-accent focus:outline-none';
-const inputClass =
-  'rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none';
 
 export function ReceiveForm({
   suppliers,
@@ -73,13 +70,13 @@ export function ReceiveForm({
         <div className="flex gap-2">
           <button
             type="submit"
-            className="flex-1 rounded-lg border border-accent/30 bg-surface-2 px-3 py-2.5 text-[0.82rem] font-semibold text-accent hover:bg-accent/10 sm:flex-none"
+            className="h-9 flex-1 rounded-lg border border-accent/30 bg-surface-2 px-3 py-1.5 text-[0.82rem] font-semibold text-accent hover:bg-accent/10 sm:flex-none"
           >
             Match
           </button>
           <CameraScanner
             buttonLabel="Scan with camera"
-            className="flex-1 rounded-lg border border-accent/30 bg-surface-2 px-3 py-2.5 text-[0.82rem] font-semibold text-accent hover:bg-accent/10 sm:flex-none"
+            className="h-9 flex-1 rounded-lg border border-accent/30 bg-surface-2 px-3 py-1.5 text-[0.82rem] font-semibold text-accent hover:bg-accent/10 sm:flex-none"
             onScan={(value) => {
               if (scanBarcodeRef.current) scanBarcodeRef.current.value = value;
               scanFormRef.current?.requestSubmit();

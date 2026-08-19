@@ -1,6 +1,7 @@
 import { productRepository } from '@/lib/data';
 import { AddComponentForm } from '@/app/dashboard/bom/add-component-form';
 import { removeBomLineAction } from '@/app/dashboard/bom/actions';
+import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 
 export default async function BomPage({
   searchParams,
@@ -45,7 +46,7 @@ export default async function BomPage({
             name="productId"
             required
             defaultValue={selected?.id ?? ''}
-            className="rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text focus:border-accent focus:outline-none"
+            className={selectClass}
           >
             <option value="" disabled>
               Choose a product…
@@ -59,7 +60,7 @@ export default async function BomPage({
         </label>
         <button
           type="submit"
-          className="rounded-lg border border-accent/30 bg-surface-2 px-5 py-2.5 text-[0.88rem] font-semibold text-accent hover:bg-accent/10"
+          className="h-9 rounded-lg border border-accent/30 bg-surface-2 px-5 py-1.5 text-[0.88rem] font-semibold text-accent hover:bg-accent/10"
         >
           View BOM
         </button>
@@ -149,12 +150,12 @@ export default async function BomPage({
                     min="1"
                     step="1"
                     defaultValue={explosionQty}
-                    className="w-32 rounded-lg border border-accent/[0.14] bg-surface-2 px-3 py-2.5 text-[0.88rem] text-text focus:border-accent focus:outline-none"
+                    className={`${inputClass} w-32`}
                   />
                 </label>
                 <button
                   type="submit"
-                  className="rounded-lg border border-accent/30 bg-surface-2 px-4 py-2.5 text-[0.85rem] font-semibold text-accent hover:bg-accent/10"
+                  className="h-9 rounded-lg border border-accent/30 bg-surface-2 px-4 py-1.5 text-[0.85rem] font-semibold text-accent hover:bg-accent/10"
                 >
                   Recalculate
                 </button>
