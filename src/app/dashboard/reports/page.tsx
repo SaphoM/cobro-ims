@@ -1,7 +1,6 @@
 import {
   adjustmentReasonRepository,
   customerRepository,
-  invoiceRepository,
   productRepository,
   purchaseOrderRepository,
   salesOrderRepository,
@@ -15,7 +14,6 @@ import {
   buildAdjustmentReasonSummary,
   buildCustomerSummary,
   buildDormantStock,
-  buildInvoiceAgeing,
   buildLowStockReport,
   buildMovementHistory,
   buildMovementTypeTotals,
@@ -32,38 +30,25 @@ import { getNowMs } from '@/lib/now';
 import { ExportCsvButton } from '@/components/export-csv-button';
 
 export default async function ReportsPage() {
-  const [
-    products,
-    warehouses,
-    ledger,
-    suppliers,
-    customers,
-    salesOrders,
-    purchaseOrders,
-    invoices,
-    movements,
-    adjustments,
-    adjustmentReasons,
-  ] = await Promise.all([
-    productRepository.list(),
-    warehouseRepository.list(),
-    stockLedgerRepository.listAll(),
-    supplierRepository.list(),
-    customerRepository.list(),
-    salesOrderRepository.list(),
-    purchaseOrderRepository.list(),
-    invoiceRepository.list(),
-    stockMovementRepository.listRecent(200),
-    stockAdjustmentRepository.list(),
-    adjustmentReasonRepository.list(),
-  ]);
+  const [products, warehouses, ledger, suppliers, customers, salesOrders, purchaseOrders, movements, adjustments, adjustmentReasons] =
+    await Promise.all([
+      productRepository.list(),
+      warehouseRepository.list(),
+      stockLedgerRepository.listAll(),
+      supplierRepository.list(),
+      customerRepository.list(),
+      salesOrderRepository.list(),
+      purchaseOrderRepository.list(),
+      stockMovementRepository.listRecent(200),
+      stockAdjustmentRepository.list(),
+      adjustmentReasonRepository.list(),
+    ]);
 
   const now = getNowMs();
   const valuation = buildStockValuationReport(ledger, products, warehouses);
   const lowStock = buildLowStockReport(ledger, products, warehouses);
   const salesSummary = buildSalesSummary(salesOrders, products, customers);
   const poSummary = buildPurchaseOrderSummary(purchaseOrders, products, suppliers);
-  const ageing = buildInvoiceAgeing(invoices, customers, now);
   const movementHistory = buildMovementHistory(movements, products, warehouses);
   const receivingHistory = buildReceivingHistory(movements, products, warehouses);
   const movementTypeTotals = buildMovementTypeTotals(movements);
@@ -233,16 +218,16 @@ export default async function ReportsPage() {
       </ReportSection>
 
       <ReportSection
-        title="Sales order summary"
-        subtitle={`${salesSummary.length} orders`}
-        exportFilename="sales-orders"
+        title="Requisition summary"
+        subtitle={`${salesSummary.length} requisitions`}
+        exportFilename="requisitions"
         rows={salesSummary}
       >
         <table className="w-full min-w-[640px] border-collapse text-[0.86rem]">
           <thead>
             <tr className="text-left text-text-faint">
-              <th className="px-5 py-2.5 font-medium">Order</th>
-              <th className="px-5 py-2.5 font-medium">Customer</th>
+              <th className="px-5 py-2.5 font-medium">Requisition</th>
+              <th className="px-5 py-2.5 font-medium">Department</th>
               <th className="px-5 py-2.5 font-medium">SKU</th>
               <th className="px-5 py-2.5 text-right font-medium tabular-nums">Qty</th>
               <th className="px-5 py-2.5 text-right font-medium tabular-nums">Value</th>
@@ -267,19 +252,19 @@ export default async function ReportsPage() {
       </ReportSection>
 
       <ReportSection
-        title="Customer summary"
-        subtitle={`${customerSummary.length} customers`}
-        exportFilename="customer-summary"
+        title="Department summary"
+        subtitle={`${customerSummary.length} departments`}
+        exportFilename="department-summary"
         rows={customerSummary}
       >
         <table className="w-full min-w-[640px] border-collapse text-[0.86rem]">
           <thead>
             <tr className="text-left text-text-faint">
-              <th className="px-5 py-2.5 font-medium">Customer</th>
-              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Orders</th>
-              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Dispatched</th>
-              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Ordered value</th>
-              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Dispatched value</th>
+              <th className="px-5 py-2.5 font-medium">Department</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Requisitions</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Issued</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Requested value</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Issued value</th>
             </tr>
           </thead>
           <tbody>
@@ -302,18 +287,18 @@ export default async function ReportsPage() {
 
       <ReportSection
         title="Pick list"
-        subtitle={`${pickList.length} orders reserved or dispatched`}
+        subtitle={`${pickList.length} requisitions approved or issued`}
         exportFilename="pick-list"
         rows={pickList}
       >
         {pickList.length === 0 ? (
-          <EmptyState text="No orders confirmed or dispatched yet." />
+          <EmptyState text="No requisitions approved or issued yet." />
         ) : (
           <table className="w-full min-w-[720px] border-collapse text-[0.86rem]">
             <thead>
               <tr className="text-left text-text-faint">
-                <th className="px-5 py-2.5 font-medium">Order</th>
-                <th className="px-5 py-2.5 font-medium">Customer</th>
+                <th className="px-5 py-2.5 font-medium">Requisition</th>
+                <th className="px-5 py-2.5 font-medium">Department</th>
                 <th className="px-5 py-2.5 font-medium">SKU</th>
                 <th className="px-5 py-2.5 font-medium">Product</th>
                 <th className="px-5 py-2.5 font-medium">Warehouse</th>
@@ -338,7 +323,7 @@ export default async function ReportsPage() {
                         r.status === 'confirmed' ? 'bg-accent/15 text-accent' : 'bg-white/5 text-text-muted'
                       }`}
                     >
-                      {r.status === 'confirmed' ? 'Ready to pick' : 'Dispatched'}
+                      {r.status === 'confirmed' ? 'Ready to pick' : 'Issued'}
                     </span>
                   </td>
                 </tr>
@@ -451,60 +436,6 @@ export default async function ReportsPage() {
                     {r.daysOpen ?? '—'}
                   </td>
                   <td className="px-5 py-3 text-text-muted capitalize">{r.status.replace('_', ' ')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </ReportSection>
-
-      <ReportSection
-        title="Invoice ageing"
-        subtitle="Outstanding amounts bucketed by days past due"
-        exportFilename="invoice-ageing"
-        rows={ageing.rows}
-      >
-        <div className="grid grid-cols-2 gap-3 border-b border-accent/[0.08] px-5 py-4 sm:grid-cols-5">
-          {(['current', '1-30', '31-60', '61-90', '90+'] as const).map((bucket) => (
-            <div key={bucket}>
-              <div className="text-[0.72rem] font-semibold uppercase tracking-wide text-text-faint">
-                {bucket === 'current' ? 'Current' : `${bucket} days`}
-              </div>
-              <div className={`mt-1 font-display text-[1.1rem] tabular-nums ${bucket !== 'current' && ageing.byBucket[bucket] > 0 ? 'text-danger' : 'text-text'}`}>
-                R {ageing.byBucket[bucket].toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </div>
-          ))}
-        </div>
-        {ageing.rows.length === 0 ? (
-          <EmptyState text="No outstanding invoices." />
-        ) : (
-          <table className="w-full min-w-[640px] border-collapse text-[0.86rem]">
-            <thead>
-              <tr className="text-left text-text-faint">
-                <th className="px-5 py-2.5 font-medium">Invoice</th>
-                <th className="px-5 py-2.5 font-medium">Customer</th>
-                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Outstanding</th>
-                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Due</th>
-                <th className="px-5 py-2.5 font-medium">Bucket</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ageing.rows.map((r, i) => (
-                <tr key={i} className="border-t border-accent/[0.08]">
-                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.invoiceNumber}</td>
-                  <td className="px-5 py-3 text-text-muted">{r.customerName}</td>
-                  <td className="px-5 py-3 text-right tabular-nums text-text">
-                    R {r.outstanding.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">
-                    {new Date(r.dueAt).toLocaleDateString('en-ZA')}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${r.bucket === 'current' ? 'bg-white/5 text-text-muted' : 'bg-danger/15 text-[#f3a99a]'}`}>
-                      {r.bucket === 'current' ? 'Current' : `${r.bucket} days`}
-                    </span>
-                  </td>
                 </tr>
               ))}
             </tbody>

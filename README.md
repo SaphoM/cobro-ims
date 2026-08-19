@@ -38,6 +38,34 @@ credentials) is meant to end up with Cobro, not X Spark. Development is currentl
 data specifically so that a live Supabase project doesn't get provisioned under the wrong account by
 default — see §4.
 
+### 1.1 Scope alignment — internal MRO, not customer sales (client discovery meeting)
+
+A discovery meeting with Cobro confirmed Cobro IMS is an **internal MRO (Maintenance, Repair, Operations)
+inventory system** — Stores purchases → items scanned in → held → a workshop/department requisitions parts
+→ Stores processes the request → items scanned out. **Not** a customer-facing sales platform, CRM, or
+e-commerce system.
+
+The app had already built a real customer/VAT/sales module (`SalesOrder` with `customerId`, linked
+VAT invoices, payments, credit notes) before this was confirmed — none of that applies to an internal
+workshop request (you don't VAT-invoice your own maintenance department). Rather than build a second,
+parallel Requisitions module from scratch, that existing module was **repurposed**:
+
+- **"Sales & dispatch" → "Requisitions"**, **"Customers" → "Departments"** (nav, page copy, status labels:
+  Confirm/Reserved → Approve/Approved, Dispatch/Dispatched → Issue/Issued). Order numbers now read
+  `REQ-1001` instead of `SO-1001`.
+- **VAT invoicing, payments, and credit notes are now dormant** — the only UI path that created an invoice
+  (the "Generate invoice" button on the requisitions list) has been removed. The `/dashboard/invoices`
+  route, its Server Actions, and the underlying repository methods are **untouched and still work** if
+  visited directly; they're just unreachable from navigation and never populated going forward. Nothing
+  was deleted, per the standing "don't delete, mark dormant" principle — see §9 for why this stays
+  reversible rather than ripped out.
+- Internal TypeScript identifiers (`SalesOrder`, `salesOrderRepository`, `Customer`, the `manage_sales_orders`
+  permission string, DB field names) were **deliberately left unrenamed** — this was a terminology and
+  UI-workflow fix, not a schema migration. Renaming those touches the data layer, every report, and the
+  future Supabase migrations for zero user-visible benefit.
+
+See `docs/ARCHITECTURE.md` §1 for the full before/after and the open business decisions this surfaced.
+
 ---
 
 ## 2. Current status
@@ -61,13 +89,13 @@ the resulting numbers hand-checked):
 | | Goods receiving (quick-receive, ad-hoc) | ✅ |
 | | Inter-warehouse transfers | ✅ |
 | | Write-offs & adjustments (with approval gate) | ✅ |
-| Phase 3 — Sales, Procurement & Suppliers | Sales orders & dispatch (reserve → dispatch) | ✅ |
+| Phase 3 — Requisitions, Procurement & Suppliers | Requisitions (draft → approve → issue), internal stock requests | ✅ |
 | | Full purchase order lifecycle (draft → issue → partial/full receive) | ✅ |
-| | Suppliers, Customers | ✅ |
-| Phase 4 — Invoicing, Billing & Accounting | Invoicing & billing (VAT, payments, ageing) | ✅ |
-| | Credit notes (issue against invoice, nets off outstanding) | ✅ |
-| | Accounting integration (Sage/QuickBooks/Xero) | ⏳ blocked on §7.5 |
-| Phase 5 — Dashboards, Reporting, Barcode Scanning | Dashboards & reports (15 of "15+", CSV export) | ✅ |
+| | Suppliers, Departments | ✅ |
+| Phase 4 — Invoicing, Billing & Accounting | **Dormant** — VAT invoicing, payments, ageing (§1.1: not applicable to internal MRO; not deleted) | ⏸ |
+| | Credit notes | ⏸ dormant, same reason |
+| | Accounting integration (Sage/QuickBooks/Xero) | ⏳ explicitly deferred by client decision — see §7.5 |
+| Phase 5 — Dashboards, Reporting, Barcode Scanning | Dashboards & reports (14 of "15+" — Invoice ageing retired with §1.1, CSV export) | ✅ |
 | | Barcode/QR scanning — USB scanner (lookup, receiving, transfers, sales, catalogue) | ✅ |
 | | Barcode/QR scanning — browser camera, same five touchpoints | ✅ |
 | | Product labels (print-ready sheets, with real scannable QR) | ✅ |
@@ -155,6 +183,31 @@ This matches the RFQ's own system map (responsive SPA, RESTful data access, rela
 without needing a separate Node/.NET API tier — Supabase's generated REST/Postgres access plus Edge
 Functions cover that role directly, which matters given the tight budget and timeline (§1, §7.1).
 
+### 5.1 Design system: form control height
+
+Every single-line input and select in the dashboard is **36px** tall (Tailwind's `h-9`), via one shared
+source: `src/lib/ui/form-control-classes.ts` (`inputClass`, `selectClass`). Pages import these instead of
+declaring their own padding/border/height, so the height is enforced from one place, not by convention
+across ~15 files. The number itself is documented as `--control-height` in `src/app/globals.css`.
+
+Selects additionally need `appearance: none` (with `-webkit-`/`-moz-` prefixes) to hold that height in
+every browser engine — a native `<select>`'s OS-drawn chrome carries its own intrinsic sizing and its own
+border/corner rendering that a plain `height` rule can't fully override. See the comment on the `select`
+rule in `globals.css` for the full explanation, including why Safari needs the prefixed property
+specifically.
+
+**Two exceptions, deliberately not on the 36px standard:**
+- The `/dashboard/scan` barcode/QR lookup's hero input and camera button — a single, oversized,
+  intentionally large touch target for warehouse-floor scanning, not one of a dense row of fields.
+- The login page's email/password fields — a single centered auth card, not a dashboard data-entry row.
+
+Shrinking either to match a dense form row would be a visual redesign, not a consistency fix — they were
+never inconsistent with anything, they're deliberately their own size.
+
+Primary submit buttons (Post receipt, Save as draft, Create order, etc.) also stay their own larger size —
+they're standalone full-width actions on their own row, not one of several controls that need to align
+with each other, so there's nothing for them to be inconsistent with.
+
 ---
 
 ## 6. How the app is put together
@@ -221,25 +274,28 @@ applied (see `supabase/migrations/20260816100000_audit_log_immutability.sql`).
   touches the ledger; approving posts the movement (the sign of the quantity delta decides `adjustment` vs.
   `write_off`); rejecting never does. Approving/rejecting requires the `approve_adjustments` permission —
   admin-only in the current placeholder matrix (§9.2).
-- **Sales orders & dispatch** (`/dashboard/sales`) — draft (nothing reserved) → confirm (reserves stock,
-  no ledger movement, no WAC change) → dispatch (posts the real outbound movement at the ledger's current
-  WAC, releases the reservation) or cancel from draft/confirmed (releases any reservation, posts nothing).
-- **Suppliers** (`/dashboard/suppliers`) and **Customers** (`/dashboard/customers`) — list + add, feeding
-  the pickers on receiving/purchase orders and sales orders respectively.
-- **Invoicing & billing** (`/dashboard/invoices`) — one VAT-compliant invoice generated per dispatched
-  sales order (15% VAT, the current SARS rate; 30-day payment terms matching Cobro's own terms as vendor
-  to Productivity SA). Payments — partial or full — move status `unpaid` → `partially_paid` → `paid`;
-  ageing is computed against the due date. A dispatched order can't be invoiced twice. **Credit notes**
-  (reason + amount, against any unpaid/partially-paid invoice) reduce the outstanding balance alongside
-  payments — outstanding is `total - amountPaid - creditedAmount` everywhere it's shown.
+- **Requisitions** (`/dashboard/sales` — route unchanged, page repurposed per §1.1) — an internal stock
+  request from a department/workshop: draft (nothing reserved) → approve (reserves stock, no ledger
+  movement, no WAC change) → issue (posts the real outbound movement at the ledger's current WAC, releases
+  the reservation) or cancel from draft/approved (releases any reservation, posts nothing). Order numbers
+  are `REQ-####`.
+- **Suppliers** (`/dashboard/suppliers`) and **Departments** (`/dashboard/customers` — route unchanged) —
+  list + add, feeding the pickers on receiving/purchase orders and requisitions respectively.
+- **Invoicing & billing** (`/dashboard/invoices`) — **dormant per §1.1.** Still fully functional if visited
+  directly (VAT invoice generation, payments, ageing, credit notes all still work against existing data),
+  but unreachable from navigation and no requisition creates one — internal stock movements aren't VAT
+  sales. Kept rather than deleted in case Cobro's real business (they do sell concrete externally) ever
+  needs a genuine customer-billing module — that would be a new, separate decision, not this one.
 - **Dashboard overview** (`/dashboard`) — live KPIs (SKUs tracked, total stock value, below-reorder-point
   count) and the multi-warehouse stock ledger table, plus a generic "record a movement" form that exercises
   the engine directly (the original proof-of-concept before the dedicated workflow pages existed).
-- **Dashboards & reports** (`/dashboard/reports`) — all fifteen: stock valuation, low stock, warehouse
-  summary, dormant stock, sales order summary, customer summary, pick list, purchase order summary,
-  supplier summary, open purchase orders, invoice ageing, stock movement history, receiving history,
-  movement type totals, and adjustment reason summary — each exportable to CSV. The RFQ's "15+" target,
-  reached.
+- **Dashboards & reports** (`/dashboard/reports`) — fourteen: stock valuation, low stock, warehouse
+  summary, dormant stock, requisition summary, department summary, pick list, purchase order summary,
+  supplier summary, open purchase orders, stock movement history, receiving history, movement type totals,
+  and adjustment reason summary — each exportable to CSV. (Invoice ageing was retired from this list along
+  with the rest of dormant invoicing — §1.1 — dropping the count from 15 to 14 against the RFQ's "15+"
+  target; the function itself still exists in `reports.ts`, unused.) Export formats today are **CSV only**
+  — the RFQ mentions PDF/Excel too; not built yet, see §11.
 - **Barcode / QR scan** (`/dashboard/scan`) — scan or type a barcode to look up a product and its stock
   across every warehouse. Two input methods, same lookup: a **USB/Bluetooth scanner** (they act as keyboard
   input, submitting a plain form on Enter — no client JS needed) and the **browser camera** on phones and
@@ -280,8 +336,10 @@ correct — with the resulting quantities/costs/VAT amounts hand-verified agains
 | Auth | Mock — 4 hardcoded demo user/password pairs, cookie session. **Deferred by direction.** No password hashing, no real Supabase Auth. |
 | RBAC | **Real enforcement** — every mutating Server Action checks a permission via `src/lib/permissions.ts`; 4 demo accounts (one per role) to test with. The matrix itself is still a placeholder pending Cobro sign-off |
 | Audit log | **Real** — every audited action writes an append-only entry, viewable at `/dashboard/audit-log`. DB-level immutability trigger written, not applied (no live project) |
-| Accounting integration (Sage/QuickBooks/Xero) | Not started — blocked on choosing a platform (§7.5) |
-| Dashboards & reports (15 of "15+", CSV export) | Real logic and UI |
+| Accounting integration (Sage/QuickBooks/Xero) | Not started — **explicitly deferred by client decision**, not just unchosen (§7.5) |
+| Requisitions (draft → approve → issue), internal stock requests | Real logic and UI — repurposed from Sales & Dispatch, §1.1 |
+| Invoicing, payments, credit notes | **Dormant** — real code, no longer reachable from navigation, §1.1 |
+| Dashboards & reports (14 of "15+", CSV export; PDF/Excel not built) | Real logic and UI |
 | Barcode/QR scanning — USB scanner + browser camera, at five touchpoints | Real logic and UI |
 | QR code generation on product labels | **Real** — `qrcode` package, verified by encode→decode round-trip |
 | Product labels (print-ready sheets) | Real logic and UI |
@@ -309,10 +367,24 @@ the RFQ / SoW does not define them. Confirm with Cobro before further engineerin
 5. **Accounting integration target.** RFQ allows Sage, QuickBooks, or Xero "or equivalent" — not chosen.
 6. **Reorder point scope.** One global `reorder_point` per product today — does Cobro want per-warehouse
    thresholds instead?
-7. **VAT-exempt sales.** Every invoice is standard-rated (15%) today — do any customers (e.g. exports)
-   need a 0%-rated path?
-8. **Payment terms.** Invoices default to 30 days, mirroring Cobro's own terms as vendor to Productivity
-   SA — confirm this is actually Cobro's customer-facing policy.
+7. **VAT-exempt sales.** Moot while invoicing is dormant (§1.1) — only relevant again if a genuine
+   external customer-billing module is ever built as its own decision.
+8. **Payment terms.** Same — dormant along with invoicing.
+9. **Requisition approval hierarchy.** Today "approve" is a single step gated by the same
+   `manage_sales_orders` permission as creating and issuing — there's no distinct approver role or
+   second-approver check. Does Cobro need a real approval chain (e.g. a supervisor sign-off separate from
+   the person who can issue stock)?
+10. **A distinct "requesting user" / "requester" role.** The current roles (admin, warehouse_clerk,
+    procurement, viewer) don't include a role for workshop staff who should be able to *create* a
+    requisition but not manage receiving, transfers, or the catalogue. Not invented here — see §9.2 of
+    `docs/ARCHITECTURE.md`.
+11. **Partial issues.** Not supported — a requisition is issued in full or not at all, the same all-or-
+    nothing behaviour the underlying dispatch logic already had. Does Cobro need partial fulfilment?
+12. **Who can cancel a requisition.** Currently anyone with `manage_sales_orders` (the same permission that
+    creates/approves/issues) — no separate "who's allowed to cancel someone else's request" rule exists.
+13. **Low-stock notification recipients.** The dashboard tile and the Low Stock report surface the
+    condition; there's no push/email notification to a specific person or role. Who should be notified,
+    and how?
 
 Full detail and rationale for each lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §5.
 
@@ -363,10 +435,10 @@ src/app/
     purchase-orders/                Full PO lifecycle: draft → issue → receive
     transfers/                      Inter-warehouse transfers
     adjustments/                    Write-offs & adjustments with approval gate
-    sales/                          Sales orders & dispatch
-    suppliers/, customers/          List + add pickers
-    invoices/                       Invoicing & billing, payments, credit notes, ageing
-    reports/                        Dashboards & reports (15 of "15+"), CSV export per table
+    sales/                          Requisitions (route unchanged; repurposed from Sales & Dispatch, §1.1)
+    suppliers/, customers/          List + add pickers (customers/ now labeled "Departments" in the UI)
+    invoices/                       Dormant — invoicing, payments, credit notes; still functional, unlinked
+    reports/                        Dashboards & reports (14 of "15+"), CSV export per table
     scan/                            Barcode/QR lookup (USB scanner-friendly GET form + camera scan)
     labels/                          Print-ready label sheets with real QR (@media print, .no-print)
     audit-log/                      Append-only audit trail viewer
@@ -388,8 +460,15 @@ CHANGELOG.md                    Version-by-version build history (semver, pre-1.
    actual authenticator app) still needs to replace the mock flag-flip in `/dashboard/security`.
 3. **Core Data phase:** apply all migrations (including the audit-log immutability trigger) to that
    project, replace the mock repositories with real Supabase-backed ones behind the same interfaces.
-4. **Accounting integration:** once §9.5 is decided, build the Sage/QuickBooks/Xero sync.
+4. **Accounting integration:** explicitly deferred by client decision — do not build ahead of a future,
+   separate go-ahead, once a platform is chosen (§9.5).
 5. **Last of Phase 5:** a rendered Code 128 linear barcode symbol for labels — needs a physical scanner
-   on hand to verify the encoder against before it's safe to ship. Reports (15 of "15+"), QR generation,
+   on hand to verify the encoder against before it's safe to ship. Reports (14 of "15+"), QR generation,
    and camera + USB scanning are all done.
-6. **Phase 8:** system testing, UAT, training materials, production cutover.
+6. **Inventory data import.** Cobro doesn't have a complete digital inventory list yet — X Spark will
+   provide an Excel/CSV template, Cobro populates it, and the app needs a controlled import (validating
+   required fields, SKU uniqueness, UOM, barcode/QR identifiers, numeric quantities, duplicates) before
+   that data can load. **Not built yet** — no import mechanism exists today, and no template has been
+   defined. Demo/dummy data must stay clearly separate from whatever Cobro's real import produces.
+7. **PDF/Excel report export.** Only CSV export exists today; the RFQ mentions PDF and Excel too.
+8. **Phase 8:** system testing, UAT, training materials, production cutover.

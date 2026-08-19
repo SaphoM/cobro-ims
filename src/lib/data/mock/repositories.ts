@@ -630,7 +630,7 @@ export const mockSalesOrderRepository: SalesOrderRepository = {
     salesOrderCounter += 1;
     const order: SalesOrder = {
       id: randomUUID(),
-      orderNumber: `SO-${salesOrderCounter}`,
+      orderNumber: `REQ-${salesOrderCounter}`,
       customerId: input.customerId,
       warehouseId: input.warehouseId,
       productId: input.productId,

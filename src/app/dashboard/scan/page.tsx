@@ -91,7 +91,7 @@ export default async function ScanPage({
               Receive this product →
             </a>
             <a href="/dashboard/sales" className="text-accent hover:underline">
-              Sell this product →
+              Requisition this product →
             </a>
             <a href="/dashboard/adjustments" className="text-accent hover:underline">
               Adjust this product →

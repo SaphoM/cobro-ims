@@ -1,36 +1,28 @@
-import {
-  customerRepository,
-  invoiceRepository,
-  productRepository,
-  salesOrderRepository,
-  warehouseRepository,
-} from '@/lib/data';
+import { customerRepository, productRepository, salesOrderRepository, warehouseRepository } from '@/lib/data';
 import { SalesOrderForm } from '@/app/dashboard/sales/sales-order-form';
 import { cancelSalesOrderAction, confirmSalesOrderAction, dispatchSalesOrderAction } from '@/app/dashboard/sales/actions';
-import { generateInvoiceAction } from '@/app/dashboard/invoices/actions';
 import type { SalesOrderStatus } from '@/lib/domain/inventory';
 
 export default async function SalesPage() {
-  const [customers, warehouses, products, orders, invoices] = await Promise.all([
+  const [customers, warehouses, products, orders] = await Promise.all([
     customerRepository.list(),
     warehouseRepository.list(),
     productRepository.list(),
     salesOrderRepository.list(),
-    invoiceRepository.list(),
   ]);
 
   const customerById = new Map(customers.map((c) => [c.id, c]));
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
   const productById = new Map(products.map((p) => [p.id, p]));
-  const invoicedOrderIds = new Set(invoices.map((i) => i.salesOrderId));
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-display text-[1.3rem] font-medium text-text">Sales orders & dispatch</h1>
+        <h1 className="font-display text-[1.3rem] font-medium text-text">Requisitions</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Draft → confirm (reserves stock) → dispatch (posts the outbound movement, releases the
-          reservation).
+          Internal stock requests from a department or workshop — draft → approve (reserves stock) → issue
+          (posts the outbound movement, releases the reservation). Not customer sales — see
+          docs/ARCHITECTURE.md for why this module was repurposed from Sales &amp; Dispatch.
         </p>
       </div>
 
@@ -38,17 +30,17 @@ export default async function SalesPage() {
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">
-          <h2 className="font-display text-[1.05rem] font-medium text-text">Orders</h2>
+          <h2 className="font-display text-[1.05rem] font-medium text-text">Requisitions</h2>
         </div>
         {orders.length === 0 ? (
-          <p className="px-5 py-6 text-[0.85rem] text-text-faint">No sales orders yet.</p>
+          <p className="px-5 py-6 text-[0.85rem] text-text-faint">No requisitions yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] border-collapse text-[0.86rem]">
               <thead>
                 <tr className="text-left text-text-faint">
-                  <th className="px-5 py-2.5 font-medium">Order</th>
-                  <th className="px-5 py-2.5 font-medium">Customer</th>
+                  <th className="px-5 py-2.5 font-medium">Requisition</th>
+                  <th className="px-5 py-2.5 font-medium">Department</th>
                   <th className="px-5 py-2.5 font-medium">Product</th>
                   <th className="px-5 py-2.5 font-medium">Warehouse</th>
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">Qty</th>
@@ -86,14 +78,14 @@ export default async function SalesPage() {
                           {o.status === 'draft' && (
                             <form action={confirmSalesOrderAction.bind(null, o.id)}>
                               <button type="submit" className="text-[0.8rem] font-semibold text-accent hover:text-accent-hover">
-                                Confirm
+                                Approve
                               </button>
                             </form>
                           )}
                           {o.status === 'confirmed' && (
                             <form action={dispatchSalesOrderAction.bind(null, o.id)}>
                               <button type="submit" className="text-[0.8rem] font-semibold text-accent hover:text-accent-hover">
-                                Dispatch
+                                Issue
                               </button>
                             </form>
                           )}
@@ -103,18 +95,6 @@ export default async function SalesPage() {
                                 Cancel
                               </button>
                             </form>
-                          )}
-                          {o.status === 'dispatched' && !invoicedOrderIds.has(o.id) && (
-                            <form action={generateInvoiceAction.bind(null, o.id)}>
-                              <button type="submit" className="text-[0.8rem] font-semibold text-accent hover:text-accent-hover">
-                                Generate invoice
-                              </button>
-                            </form>
-                          )}
-                          {o.status === 'dispatched' && invoicedOrderIds.has(o.id) && (
-                            <a href="/dashboard/invoices" className="text-[0.8rem] font-semibold text-text-faint hover:text-accent">
-                              Invoiced
-                            </a>
                           )}
                         </div>
                       </td>
@@ -139,8 +119,8 @@ function StatusPill({ status }: { status: SalesOrderStatus }) {
   };
   const labels: Record<SalesOrderStatus, string> = {
     draft: 'Draft',
-    confirmed: 'Reserved',
-    dispatched: 'Dispatched',
+    confirmed: 'Approved',
+    dispatched: 'Issued',
     cancelled: 'Cancelled',
   };
   return <span className={`rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${styles[status]}`}>{labels[status]}</span>;

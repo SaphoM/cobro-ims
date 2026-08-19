@@ -17,7 +17,7 @@ export async function createSalesOrderAction(
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
   if (!(await hasPermission(session, 'manage_sales_orders'))) {
-    return { error: 'Your role does not have permission to create sales orders.', success: null };
+    return { error: 'Your role does not have permission to create requisitions.', success: null };
   }
 
   const customerId = String(formData.get('customerId') ?? '');
@@ -27,13 +27,13 @@ export async function createSalesOrderAction(
   const unitPrice = Number(formData.get('unitPrice'));
 
   if (!customerId || !warehouseId || !productId) {
-    return { error: 'Customer, warehouse and product are required.', success: null };
+    return { error: 'Requesting department, warehouse and product are required.', success: null };
   }
   if (!Number.isFinite(quantity) || quantity <= 0) {
     return { error: 'Quantity must be a positive number.', success: null };
   }
   if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-    return { error: 'Unit price must be zero or a positive number.', success: null };
+    return { error: 'Unit value must be zero or a positive number.', success: null };
   }
 
   try {
@@ -46,9 +46,9 @@ export async function createSalesOrderAction(
       createdBy: session.id,
     });
     revalidatePath('/dashboard/sales');
-    return { error: null, success: `${order.orderNumber} created as a draft. Confirm it to reserve stock.` };
+    return { error: null, success: `${order.orderNumber} created as a draft. Approve it to reserve stock.` };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Could not create the order.', success: null };
+    return { error: err instanceof Error ? err.message : 'Could not create the requisition.', success: null };
   }
 }
 

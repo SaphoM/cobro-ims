@@ -17,7 +17,7 @@ export async function createCustomerAction(
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
   if (!(await hasPermission(session, 'manage_customers'))) {
-    return { error: 'Your role does not have permission to manage customers.', success: null };
+    return { error: 'Your role does not have permission to manage departments.', success: null };
   }
 
   const name = String(formData.get('name') ?? '').trim();
@@ -25,7 +25,7 @@ export async function createCustomerAction(
   const contactPhone = String(formData.get('contactPhone') ?? '').trim();
   const address = String(formData.get('address') ?? '').trim();
 
-  if (!name) return { error: 'Customer name is required.', success: null };
+  if (!name) return { error: 'Department name is required.', success: null };
 
   const customer = await customerRepository.create({
     name,

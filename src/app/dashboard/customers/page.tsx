@@ -8,15 +8,18 @@ export default async function CustomersPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-display text-[1.3rem] font-medium text-text">Customers</h1>
-        <p className="text-[0.86rem] text-text-muted">Feeds the customer picker on the sales orders page.</p>
+        <h1 className="font-display text-[1.3rem] font-medium text-text">Departments</h1>
+        <p className="text-[0.86rem] text-text-muted">
+          Internal workshops and departments — feeds the requesting-department picker on the requisitions
+          page. Not customer records; Cobro IMS is internal MRO stock control, not a sales platform.
+        </p>
       </div>
 
       <CustomerForm />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">
-          <h2 className="font-display text-[1.05rem] font-medium text-text">{sorted.length} customers</h2>
+          <h2 className="font-display text-[1.05rem] font-medium text-text">{sorted.length} departments</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] border-collapse text-[0.86rem]">
