@@ -304,7 +304,7 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 | Invoicing & billing (VAT, payments, ageing) | **Dormant** — real code, unreachable from nav — see §1 |
 | Accounting Integration (Sage/QuickBooks/Xero) | Not started — **explicitly deferred by client decision**, see §5.5 |
 | Dashboards & reports (14 of "15+", CSV export; PDF/Excel not built) | Real logic and UI — see §1 |
-| Inventory data import (Excel/CSV) | **Not built** — no template defined yet, see §6 |
+| Inventory data import (Excel/CSV) | **Templates real and downloadable** from `/dashboard/products`; the actual upload/import screen is not built — see §6 |
 | Barcode/QR scanning — USB scanner + browser camera, at five touchpoints | Real logic and UI — see §1 |
 | QR generation on labels | **Real** — `qrcode` package, verified by encode→decode round-trip — see §1 |
 | Product labels (`/dashboard/labels`, print-ready sheets) | Real logic and UI — see §1 |
@@ -368,10 +368,13 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
    separate future go-ahead, even once §5.5's platform question is answered.
 6. Last of Phase 5: a rendered Code 128 linear barcode symbol — blocked on having a physical scanner to
    verify an encoder against. Reports, QR generation, and camera + USB scanning are done.
-7. Inventory data import: X Spark provides an Excel/CSV template, Cobro populates it, the app needs a
-   controlled import validating required fields/SKU uniqueness/UOM/barcode/quantities/duplicates before
-   loading it. Not built — no template defined yet either. Demo data must stay clearly separate from
-   whatever this produces.
+7. Inventory data import — **templates now exist** (`public/templates/product-import-template.csv`,
+   `opening-stock-import-template.csv`, `README.txt`; downloadable from `/dashboard/products`), matching
+   the real `Product` and `StockLedgerEntry` fields exactly (see §1). **The import mechanism itself is
+   still not built** — a completed file is currently loaded by X Spark manually, not self-service. Still
+   needed: an actual upload-and-import screen with validation (required fields, SKU uniqueness, UOM,
+   barcode, numeric quantities, duplicates, referential integrity between the two files) before this is
+   self-service for Cobro. Demo/dummy data must stay clearly separate from whatever a real import produces.
 8. PDF/Excel report export — only CSV exists today.
 9. Resolve §5.6–§5.8 (approval hierarchy, partial issues, low-stock notification recipients) with the
    client before Production.

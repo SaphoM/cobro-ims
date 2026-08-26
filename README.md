@@ -257,7 +257,9 @@ applied (see `supabase/migrations/20260816100000_audit_log_immutability.sql`).
 ## 7. What each module actually does
 
 - **Product catalogue** (`/dashboard/products`) — list + add SKUs, unit of measure, barcode, reorder
-  point/quantity.
+  point/quantity. Also hosts **bulk data import templates** — downloadable CSVs for product master data and
+  opening stock (§6 below), matching the real domain fields exactly. The upload/import screen itself isn't
+  built yet — see §11.
 - **Bill of materials** (`/dashboard/bom`) — flat parent → component BOM management (add/remove
   components with a quantity-per-unit) plus a BOM explosion calculator: given a build quantity, total
   component requirements. Nested/multi-level BOM is still an open decision (§9.3); this is the flat model.
@@ -429,7 +431,7 @@ src/app/
     layout.tsx                      Sidebar nav + session gate for every /dashboard/* route.
                                      Static sidebar from 992px, CSS-only off-canvas drawer below
     page.tsx                        Overview: KPIs, stock ledger, generic "record a movement" demo
-    products/                       Product catalogue
+    products/                       Product catalogue + bulk data import template downloads
     bom/                             Bill of materials (flat) + explosion calculator
     receiving/                      Ad-hoc GRN quick-receive
     purchase-orders/                Full PO lifecycle: draft → issue → receive
@@ -465,10 +467,13 @@ CHANGELOG.md                    Version-by-version build history (semver, pre-1.
 5. **Last of Phase 5:** a rendered Code 128 linear barcode symbol for labels — needs a physical scanner
    on hand to verify the encoder against before it's safe to ship. Reports (14 of "15+"), QR generation,
    and camera + USB scanning are all done.
-6. **Inventory data import.** Cobro doesn't have a complete digital inventory list yet — X Spark will
-   provide an Excel/CSV template, Cobro populates it, and the app needs a controlled import (validating
-   required fields, SKU uniqueness, UOM, barcode/QR identifiers, numeric quantities, duplicates) before
-   that data can load. **Not built yet** — no import mechanism exists today, and no template has been
-   defined. Demo/dummy data must stay clearly separate from whatever Cobro's real import produces.
+6. **Inventory data import.** Cobro doesn't have a complete digital inventory list yet. **Templates now
+   exist and are downloadable from `/dashboard/products`** — a product master-data CSV and an opening-stock
+   CSV (quantity + cost per warehouse), each matching the real domain fields exactly, plus a plain-language
+   instructions file. **The self-service import mechanism itself is still not built** — a completed file is
+   currently loaded by X Spark manually. Still needed: an upload-and-import screen with controlled
+   validation (required fields, SKU uniqueness, UOM, barcode/QR identifiers, numeric quantities,
+   duplicates, and that every opening-stock SKU exists in the product file) before that data can self-load.
+   Demo/dummy data must stay clearly separate from whatever Cobro's real import produces.
 7. **PDF/Excel report export.** Only CSV export exists today; the RFQ mentions PDF and Excel too.
 8. **Phase 8:** system testing, UAT, training materials, production cutover.

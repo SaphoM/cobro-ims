@@ -8,7 +8,12 @@ import { getSession } from '@/lib/auth';
 import { AdjustmentForm } from '@/app/dashboard/adjustments/adjustment-form';
 import { decideAdjustmentAction } from '@/app/dashboard/adjustments/actions';
 
-export default async function AdjustmentsPage() {
+export default async function AdjustmentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ barcode?: string }>;
+}) {
+  const { barcode } = await searchParams;
   const [session, products, warehouses, reasonCodes, adjustments] = await Promise.all([
     getSession(),
     productRepository.list(),
@@ -37,7 +42,7 @@ export default async function AdjustmentsPage() {
         </div>
       )}
 
-      <AdjustmentForm products={products} warehouses={warehouses} reasonCodes={reasonCodes} />
+      <AdjustmentForm products={products} warehouses={warehouses} reasonCodes={reasonCodes} initialBarcode={barcode} />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">

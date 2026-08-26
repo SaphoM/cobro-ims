@@ -87,13 +87,13 @@ export default async function ScanPage({
             </table>
           </div>
           <div className="flex flex-wrap gap-4 border-t border-accent/[0.08] px-5 py-3 text-[0.82rem]">
-            <a href="/dashboard/receiving" className="text-accent hover:underline">
+            <a href={`/dashboard/receiving?barcode=${encodeURIComponent(product.barcode ?? '')}`} className="text-accent hover:underline">
               Receive this product →
             </a>
-            <a href="/dashboard/sales" className="text-accent hover:underline">
+            <a href={`/dashboard/sales?barcode=${encodeURIComponent(product.barcode ?? '')}`} className="text-accent hover:underline">
               Requisition this product →
             </a>
-            <a href="/dashboard/adjustments" className="text-accent hover:underline">
+            <a href={`/dashboard/adjustments?barcode=${encodeURIComponent(product.barcode ?? '')}`} className="text-accent hover:underline">
               Adjust this product →
             </a>
           </div>

@@ -347,10 +347,17 @@ export const mockReceivingRepository: ReceivingRepository = {
       createdAt: now,
     };
     state.purchaseOrders.push(purchaseOrder);
-    // purchase_order_lines isn't separately exposed yet (no reader needs it),
-    // but keeping the id here documents where it would be created in a real
-    // implementation once the full PO lifecycle (Phase 3) exists.
-    void poLineId;
+    // Store the line so the PO is consistent with every other PO: the list
+    // page derives each order through withLine(), which requires one.
+    const purchaseOrderLine: PurchaseOrderLine = {
+      id: poLineId,
+      purchaseOrderId: poId,
+      productId: input.productId,
+      quantityOrdered: Math.abs(input.quantity),
+      quantityReceived: Math.abs(input.quantity),
+      unitCost: input.unitCost,
+    };
+    state.purchaseOrderLines.set(poId, purchaseOrderLine);
 
     const goodsReceipt: GoodsReceipt = {
       id: randomUUID(),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { createSalesOrderAction, type SalesOrderFormState } from '@/app/dashboard/sales/actions';
 import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
@@ -12,10 +12,12 @@ export function SalesOrderForm({
   customers,
   warehouses,
   products,
+  initialBarcode,
 }: {
   customers: Customer[];
   warehouses: Warehouse[];
   products: Product[];
+  initialBarcode?: string;
 }) {
   const [state, formAction, pending] = useActionState(createSalesOrderAction, initialState);
   const [scanMessage, setScanMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -24,12 +26,7 @@ export function SalesOrderForm({
   const scanFormRef = useRef<HTMLFormElement>(null);
   const scanBarcodeRef = useRef<HTMLInputElement>(null);
 
-  function handleBarcodeSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const barcodeInput = e.currentTarget.elements.namedItem('scanBarcode') as HTMLInputElement;
-    const barcode = barcodeInput.value.trim();
-    if (!barcode) return;
-
+  function matchBarcode(barcode: string) {
     const match = products.find((p) => p.barcode === barcode);
     if (match && productSelectRef.current) {
       productSelectRef.current.value = match.id;
@@ -38,9 +35,25 @@ export function SalesOrderForm({
     } else {
       setScanMessage({ text: `No product with barcode "${barcode}".`, ok: false });
     }
+  }
+
+  function handleBarcodeSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const barcodeInput = e.currentTarget.elements.namedItem('scanBarcode') as HTMLInputElement;
+    const barcode = barcodeInput.value.trim();
+    if (!barcode) return;
+    matchBarcode(barcode);
     barcodeInput.value = '';
     barcodeInput.focus();
   }
+
+  // Coming here via "Requisition this product" from the Barcode / QR scan
+  // page — carry that product straight into the form instead of making the
+  // user scan/search again. Runs the exact same match the manual scan box uses.
+  useEffect(() => {
+    if (initialBarcode) matchBarcode(initialBarcode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialBarcode]);
 
   return (
     <div className="rounded-2xl border border-accent/[0.14] bg-surface p-5">

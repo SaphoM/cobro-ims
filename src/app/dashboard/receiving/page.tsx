@@ -1,7 +1,12 @@
 import { productRepository, receivingRepository, supplierRepository, warehouseRepository } from '@/lib/data';
 import { ReceiveForm } from '@/app/dashboard/receiving/receive-form';
 
-export default async function ReceivingPage() {
+export default async function ReceivingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ barcode?: string }>;
+}) {
+  const { barcode } = await searchParams;
   const [suppliers, warehouses, products, receipts] = await Promise.all([
     supplierRepository.list(),
     warehouseRepository.list(),
@@ -18,7 +23,7 @@ export default async function ReceivingPage() {
         <p className="text-[0.86rem] text-text-muted">PO-linked receipts, posted straight into the stock ledger.</p>
       </div>
 
-      <ReceiveForm suppliers={suppliers} warehouses={warehouses} products={products} />
+      <ReceiveForm suppliers={suppliers} warehouses={warehouses} products={products} initialBarcode={barcode} />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">

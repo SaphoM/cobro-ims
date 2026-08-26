@@ -3,7 +3,12 @@ import { SalesOrderForm } from '@/app/dashboard/sales/sales-order-form';
 import { cancelSalesOrderAction, confirmSalesOrderAction, dispatchSalesOrderAction } from '@/app/dashboard/sales/actions';
 import type { SalesOrderStatus } from '@/lib/domain/inventory';
 
-export default async function SalesPage() {
+export default async function SalesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ barcode?: string }>;
+}) {
+  const { barcode } = await searchParams;
   const [customers, warehouses, products, orders] = await Promise.all([
     customerRepository.list(),
     warehouseRepository.list(),
@@ -26,7 +31,7 @@ export default async function SalesPage() {
         </p>
       </div>
 
-      <SalesOrderForm customers={customers} warehouses={warehouses} products={products} />
+      <SalesOrderForm customers={customers} warehouses={warehouses} products={products} initialBarcode={barcode} />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">

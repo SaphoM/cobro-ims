@@ -19,6 +19,41 @@ export default async function ProductsPage() {
         </p>
       </div>
 
+      <section className="rounded-2xl border border-accent/[0.14] bg-surface p-5">
+        <h2 className="mb-1 font-display text-[1.05rem] font-medium text-text">Bulk data import</h2>
+        <p className="mb-4 text-[0.83rem] text-text-muted">
+          For loading Cobro&apos;s real inventory in one batch rather than adding items one at a time below.
+          Download both templates, fill them in (see the included instructions for exactly what each column
+          means), and send the completed files to X Spark to load. <strong className="text-text-muted">
+          Not yet automatic</strong> — there&apos;s no in-app upload screen yet, so a completed file is
+          currently loaded by X Spark on Cobro&apos;s behalf, not self-service. See{' '}
+          <span className="text-accent">BUSINESS DECISION REQUIRED</span> / next steps in
+          docs/ARCHITECTURE.md.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <a
+            href="/templates/product-import-template.csv"
+            download
+            className="rounded-lg border border-accent/30 bg-surface-2 px-4 py-2.5 text-[0.85rem] font-semibold text-accent hover:bg-accent/10"
+          >
+            Download product template (CSV)
+          </a>
+          <a
+            href="/templates/opening-stock-import-template.csv"
+            download
+            className="rounded-lg border border-accent/30 bg-surface-2 px-4 py-2.5 text-[0.85rem] font-semibold text-accent hover:bg-accent/10"
+          >
+            Download opening stock template (CSV)
+          </a>
+          <a
+            href="/templates/README.txt"
+            className="rounded-lg border border-accent/[0.14] px-4 py-2.5 text-[0.85rem] font-semibold text-text-muted hover:text-accent"
+          >
+            Read the instructions
+          </a>
+        </div>
+      </section>
+
       <NewProductForm />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
