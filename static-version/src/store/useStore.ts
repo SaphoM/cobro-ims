@@ -70,6 +70,7 @@ import type {
   Supplier,
   User,
   Warehouse,
+  WorkshopBomLine,
 } from '@/store/types';
 
 export type ActionResult = { ok: true; message: string } | { ok: false; error: string };
@@ -121,6 +122,13 @@ interface Data {
   creditNotes: CreditNote[];
   auditLog: AuditLogEntry[];
   bomLines: ProductBomLine[];
+  /**
+   * Workshop BOM lines — Engineer-only, per asset. Each line ties a
+   * requisitioned material to a job quantity at the engineer's Workshop/Asset.
+   * Separate from the catalogue-level `bomLines` (which are product→component
+   * relationships); these are planning records driven by requisitions.
+   */
+  workshopBomLines: WorkshopBomLine[];
   poCounter: number;
   grnCounter: number;
   transferCounter: number;
@@ -150,17 +158,59 @@ function freshData(): Data {
     pendingTransferLines: {},
     adjustments: [],
     pendingAdjustmentLines: {},
-    salesOrders: [],
+    /**
+     * Two pre-seeded draft requisitions for the demo engineer (Machine 5).
+     * They demonstrate the "engineer has made a requisition" state on the
+     * Workshop BOM page without requiring any upfront interaction.
+     * Status is `draft` so no stock reservation is needed in the ledger.
+     * The Store can confirm + fulfil them as a full end-to-end demo.
+     */
+    salesOrders: [
+      {
+        id: 'req-seed-001',
+        orderNumber: 'REQ-1001',
+        kind: 'requisition' as const,
+        fromLocationId: STORE_LOCATION_ID,
+        toLocationId: 'asset-machine-5',
+        productId: 'prod-cem-42-5',
+        quantityOrdered: 50,
+        quantityReceived: 0,
+        unitPrice: 92.79,
+        status: 'draft' as const,
+        createdBy: 'user-engineer',
+        createdAt: '2026-08-20T07:00:00Z',
+        confirmedAt: null,
+        dispatchedAt: null,
+      },
+      {
+        id: 'req-seed-002',
+        orderNumber: 'REQ-1002',
+        kind: 'requisition' as const,
+        fromLocationId: STORE_LOCATION_ID,
+        toLocationId: 'asset-machine-5',
+        productId: 'prod-rebar-y12',
+        quantityOrdered: 20,
+        quantityReceived: 0,
+        unitPrice: 118.75,
+        status: 'draft' as const,
+        createdBy: 'user-engineer',
+        createdAt: '2026-08-20T08:00:00Z',
+        confirmedAt: null,
+        dispatchedAt: null,
+      },
+    ],
     invoices: [],
     invoicePayments: [],
     creditNotes: [],
     auditLog: [],
     bomLines: [],
+    workshopBomLines: [],
     poCounter: 1000,
     grnCounter: 1000,
     transferCounter: 1000,
     adjustmentCounter: 1000,
-    salesOrderCounter: 1000,
+    // Counter starts at 1002 — REQ-1001 and REQ-1002 are pre-seeded above.
+    salesOrderCounter: 1002,
     invoiceCounter: 1000,
     creditNoteCounter: 1000,
     currentUserId: null,
@@ -214,6 +264,9 @@ interface Actions {
   cancelSalesOrder: (orderId: string) => ActionResult;
   /** Idle-stock prompt shortcut: return everything of a product to Store. */
   returnStockToStore: (assetId: string, productId: string) => ActionResult;
+  // Workshop BOM — Engineer-only; driven by the engineer's own requisitions.
+  addWorkshopBomLine: (i: { assetId: string; productId: string; quantity: number }) => ActionResult;
+  removeWorkshopBomLine: (lineId: string) => ActionResult;
   // notifications
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
@@ -369,6 +422,7 @@ export const useStore = create<Store>()(
           creditNotes: [...s.creditNotes],
           auditLog: [...s.auditLog],
           bomLines: [...s.bomLines],
+          workshopBomLines: [...s.workshopBomLines],
         };
         let result: ActionResult;
         try {
@@ -1139,6 +1193,50 @@ export const useStore = create<Store>()(
           }),
 
         // ---------------------------------------------------------------
+        // Workshop BOM — Engineer-only, requisition-driven.
+        // The permission gate reuses `manage_sales_orders` (the same
+        // permission engineers use to create requisitions), deliberately:
+        // only the role that can raise a requisition can build a BOM from one.
+        // ---------------------------------------------------------------
+        addWorkshopBomLine: (input) =>
+          tx((d) => {
+            const g = guard('manage_sales_orders');
+            if ('error' in g) return fail(g.error);
+            // Engineers may only build a BOM for their own assigned asset.
+            if (g.user.assetId !== input.assetId) {
+              return fail('You can only build a Workshop BOM for your own asset.');
+            }
+            // Duplicate guard — remove and re-add to change quantity.
+            if (d.workshopBomLines.some((l) => l.assetId === input.assetId && l.productId === input.productId)) {
+              return fail('That material is already on this Workshop BOM — remove it first to change the quantity.');
+            }
+            if (input.quantity <= 0) return fail('Quantity per job unit must be a positive number.');
+            const line: WorkshopBomLine = {
+              id: randomUUID(),
+              assetId: input.assetId,
+              productId: input.productId,
+              quantity: input.quantity,
+            };
+            d.workshopBomLines.push(line);
+            const product = d.products.find((p) => p.id === input.productId);
+            return ok(`Added ${product?.sku ?? 'material'} — ${input.quantity} per job unit.`);
+          }),
+
+        removeWorkshopBomLine: (lineId) =>
+          tx((d) => {
+            const g = guard('manage_sales_orders');
+            if ('error' in g) return fail(g.error);
+            const index = d.workshopBomLines.findIndex((l) => l.id === lineId);
+            if (index === -1) return fail('Workshop BOM line not found.');
+            // Confirm it belongs to the engineer's own asset.
+            if (g.user.assetId !== d.workshopBomLines[index].assetId) {
+              return fail('You can only modify the Workshop BOM for your own asset.');
+            }
+            d.workshopBomLines.splice(index, 1);
+            return ok('Material removed from Workshop BOM.');
+          }),
+
+        // ---------------------------------------------------------------
         // Notifications & idle-stock detection
         // ---------------------------------------------------------------
         markNotificationRead: (id) =>
@@ -1331,7 +1429,17 @@ export const useStore = create<Store>()(
     },
     {
       name: 'cobro-ims-static-demo',
-      version: 1,
+      // Version 2: adds WorkshopBomLine and pre-seeded draft requisitions.
+      // `migrate` returning undefined signals "discard old data, start fresh"
+      // which is what we want here — existing localStorage has no seeded
+      // orders and no workshopBomLines field.
+      version: 2,
+      migrate: (_persistedState, fromVersion) => {
+        // Any stored state from before version 2 is incompatible with the new
+        // seed data shape. Return undefined to discard it and use freshData().
+        if (fromVersion < 2) return undefined;
+        return _persistedState as Data;
+      },
     }
   )
 );

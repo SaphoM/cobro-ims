@@ -16,7 +16,7 @@ import { NotificationBell } from '@/ui/NotificationBell';
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Overview' },
   { href: '/dashboard/products', label: 'Product catalogue' },
-  { href: '/dashboard/bom', label: 'Warehouse bill of materials' },
+  { href: '/dashboard/bom', label: 'Workshop bill of materials' },
   { href: '/dashboard/purchase-orders', label: 'Purchase orders' },
   { href: '/dashboard/receiving', label: 'Goods receiving' },
   { href: '/dashboard/suppliers', label: 'Suppliers' },
@@ -80,7 +80,11 @@ export function DashboardLayout() {
         </div>
 
         <nav className="flex flex-1 flex-col gap-0.5">
-          {NAV_ITEMS.map((item) => (
+          {NAV_ITEMS.filter((item) => {
+            // Workshop BOM is Engineer-only — Admin and Store don't construct BOMs.
+            if (item.href === '/dashboard/bom') return role?.name === 'engineer';
+            return true;
+          }).map((item) => (
             <NavLink key={item.href} href={item.href}>
               {item.label}
             </NavLink>

@@ -90,6 +90,24 @@ export interface ProductBomLine {
   quantity: number;
 }
 
+/**
+ * Workshop Bill of Materials line — Engineer-only, scoped to one asset.
+ *
+ * Unlike the catalogue-level ProductBomLine (which links product→component),
+ * this is job-scoped: it records which materials (from the engineer's own
+ * requisitions) are needed per job unit at a specific Workshop/Asset.
+ * Persisted in the store so the engineer's BOM survives a page refresh.
+ */
+export interface WorkshopBomLine {
+  id: UUID;
+  /** The Workshop/Asset this BOM belongs to. */
+  assetId: UUID;
+  /** The requisitioned material being planned. */
+  productId: UUID;
+  /** Quantity required per job unit. */
+  quantity: number;
+}
+
 export interface Supplier {
   id: UUID;
   name: string;
