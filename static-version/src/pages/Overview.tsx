@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { stockValue } from '@/store/engine';
-import { warehouses } from '@/store/seed';
-import { useStore, type ActionResult } from '@/store/useStore';
+
+import { useCurrentUser, useStore, scopeFor, type ActionResult } from '@/store/useStore';
+import { roles } from '@/store/seed';
+import { HelpPopup } from '@/ui/HelpPopup';
 import { inputClass, selectClass } from '@/ui/form-control-classes';
 import { Feedback } from '@/ui/Feedback';
 import type { StockLedgerView, StockMovementType } from '@/store/types';
@@ -18,8 +20,14 @@ const MOVEMENT_LABELS: Record<string, string> = {
 
 export function OverviewPage() {
   const products = useStore((s) => s.products);
+  // Locations come from the store now (assets are user-managed).
+  const warehouses = useStore((s) => s.locations);
   const ledger = useStore((s) => s.ledger);
   const recordMovement = useStore((s) => s.recordMovement);
+  const session = useCurrentUser();
+  const roleName = session ? roles.find((r) => r.id === session.roleId)?.name ?? '' : '';
+  // Engineers focus on their own asset; Store on the Store; Admin sees all.
+  const { focusLocationId } = scopeFor(session, roleName);
   const [result, setResult] = useState<ActionResult | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -42,8 +50,10 @@ export function OverviewPage() {
     .filter((v): v is StockLedgerView => v !== null)
     .sort((a, b) => a.product.name.localeCompare(b.product.name));
 
-  const totalStockValue = ledgerView.reduce((sum, row) => sum + row.stockValue, 0);
-  const lowStockCount = ledgerView.filter((row) => row.isBelowReorderPoint).length;
+  const scopedView = focusLocationId ? ledgerView.filter((r) => r.warehouseId === focusLocationId) : ledgerView;
+  const focusName = focusLocationId ? warehouseById.get(focusLocationId)?.name ?? '' : '';
+  const totalStockValue = scopedView.reduce((sum, row) => sum + row.stockValue, 0);
+  const lowStockCount = scopedView.filter((row) => row.isBelowReorderPoint).length;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -63,6 +73,20 @@ export function OverviewPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <HelpPopup sectionKey="overview" />
+
+      {/*
+        Scope note. Engineers get detail for their own asset but still see
+        every location's quantities in the ledger below — they need to know
+        whether a part is already on site elsewhere before requesting one.
+      */}
+      {focusLocationId && (
+        <div className="rounded-xl border border-accent/30 bg-accent/[0.08] px-4 py-3 text-[0.82rem] text-accent">
+          Showing totals for <strong>{focusName}</strong>. The ledger below lists every location, so you can
+          still see what other assets are holding.
+        </div>
+      )}
+
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatTile label="SKUs tracked" value={products.length.toLocaleString()} />
         <StatTile
@@ -93,7 +117,7 @@ export function OverviewPage() {
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[0.75rem] font-semibold text-text-muted">Warehouse</span>
+            <span className="text-[0.75rem] font-semibold text-text-muted">Location</span>
             <select name="warehouseId" required className={selectClass}>
               {warehouses.map((w) => (
                 <option key={w.id} value={w.id}>
@@ -140,15 +164,15 @@ export function OverviewPage() {
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">
-          <h2 className="font-display text-[1.05rem] font-medium text-text">Multi-warehouse stock ledger</h2>
-          <p className="text-[0.83rem] text-text-muted">Weighted-average cost, live across every location.</p>
+          <h2 className="font-display text-[1.05rem] font-medium text-text">Stock by location</h2>
+          <p className="text-[0.83rem] text-text-muted">Weighted-average cost, live across the Store and every asset.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] border-collapse text-[0.86rem]">
             <thead>
               <tr className="text-left text-text-faint">
                 <th className="px-5 py-2.5 font-medium">Product</th>
-                <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                <th className="px-5 py-2.5 font-medium">Location</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">On hand</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Reserved</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">WAC</th>
@@ -162,7 +186,7 @@ export function OverviewPage() {
                     <div className="text-text">{row.product.name}</div>
                     <div className="font-mono-brand text-[0.72rem] text-text-faint">{row.product.sku}</div>
                   </td>
-                  <td className="px-5 py-3 text-text-muted">{row.warehouse.code}</td>
+                  <td className="px-5 py-3 text-text-muted">{row.warehouse.name}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
                     {row.quantityOnHand.toLocaleString()} {row.product.unitOfMeasure}
                     {row.isBelowReorderPoint && (

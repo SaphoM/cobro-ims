@@ -38,13 +38,19 @@ import { DEMO_ACCOUNTS } from '@/store/demo-credentials';
 import {
   adjustmentReasonCodes,
   customers as seedCustomers,
+  IDLE_STOCK_DAYS,
   products as seedProducts,
   stockLedger as seedLedger,
+  STORE_LOCATION_ID,
   suppliers as seedSuppliers,
   users as seedUsers,
+  warehouses as seedWarehouses,
 } from '@/store/seed';
 import { VAT_RATE } from '@/store/types';
 import type {
+  AppNotification,
+  MovementKind,
+  NotificationAudience,
   AuditLogEntry,
   CreditNote,
   Customer,
@@ -63,6 +69,7 @@ import type {
   StockMovementType,
   Supplier,
   User,
+  Warehouse,
 } from '@/store/types';
 
 export type ActionResult = { ok: true; message: string } | { ok: false; error: string };
@@ -85,6 +92,20 @@ interface Data {
   users: User[];
   suppliers: Supplier[];
   customers: Customer[];
+  /**
+   * Every stock location — the one Store plus every asset. Mutable (assets
+   * are managed on the Assets page), so it lives in the store rather than
+   * being read straight from the seed.
+   */
+  locations: Warehouse[];
+  notifications: AppNotification[];
+  /**
+   * Per-user "don't show again" for the contextual help popups, keyed
+   * `userId::sectionKey`. Persisted with the rest of the store.
+   */
+  helpDismissed: Record<string, boolean>;
+  /** Assets already flagged idle, so the same prompt isn't raised twice. */
+  idleFlagged: Record<string, boolean>;
   ledger: Record<string, StockLedgerEntry>;
   movements: StockMovement[];
   purchaseOrders: PurchaseOrder[];
@@ -116,6 +137,10 @@ function freshData(): Data {
     users: seedUsers.map((u) => ({ ...u })),
     suppliers: seedSuppliers.map((s) => ({ ...s })),
     customers: seedCustomers.map((c) => ({ ...c })),
+    locations: seedWarehouses.map((w) => ({ ...w })),
+    notifications: [],
+    helpDismissed: {},
+    idleFlagged: {},
     ledger: Object.fromEntries(seedLedger.map((e) => [ledgerKey(e.productId, e.warehouseId), { ...e }])),
     movements: [],
     purchaseOrders: [],
@@ -167,11 +192,35 @@ interface Actions {
   // adjustments
   requestAdjustment: (i: { warehouseId: string; productId: string; reasonCodeId: string; quantityDelta: number; unitCost: number }) => ActionResult;
   decideAdjustment: (adjustmentId: string, decision: 'approved' | 'rejected') => ActionResult;
-  // requisitions
-  createSalesOrder: (i: { customerId: string; warehouseId: string; productId: string; quantity: number; unitPrice: number }) => ActionResult;
+  // assets
+  createAsset: (i: { name: string; description?: string }) => ActionResult;
+  updateAsset: (id: string, i: { name: string; description?: string }) => ActionResult;
+  // requisitions & transfers (one unified record set, two business kinds)
+  createSalesOrder: (i: {
+    kind: MovementKind;
+    fromLocationId: string;
+    toLocationId: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+  }) => ActionResult;
   confirmSalesOrder: (orderId: string) => ActionResult;
-  dispatchSalesOrder: (orderId: string) => ActionResult;
+  /**
+   * Fulfil a request. `receivedQuantity` is the ACTUAL amount handed over —
+   * scanned one at a time, scanned in bulk, or typed. Short fulfilment does
+   * not close the record; it reserves the shortfall at the source instead.
+   */
+  fulfilSalesOrder: (orderId: string, receivedQuantity: number) => ActionResult;
   cancelSalesOrder: (orderId: string) => ActionResult;
+  /** Idle-stock prompt shortcut: return everything of a product to Store. */
+  returnStockToStore: (assetId: string, productId: string) => ActionResult;
+  // notifications
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
+  /** Scans assets for stock past IDLE_STOCK_DAYS and raises prompts. */
+  detectIdleStock: () => void;
+  // help popups
+  dismissHelp: (sectionKey: string) => void;
   // invoicing (dormant — unreachable from nav, per the original)
   generateInvoice: (salesOrderId: string) => ActionResult;
   recordPayment: (invoiceId: string, amount: number) => ActionResult;
@@ -202,6 +251,38 @@ export const useStore = create<Store>()(
         const check = checkPermission(user, permission);
         if (!check.allowed) return { error: check.reason ?? 'Permission denied.' };
         return { user };
+      }
+
+      /** Raise a notification. Audience + optional asset scope decide who sees it. */
+      function notify(
+        d: Data,
+        n: {
+          audience: NotificationAudience[];
+          assetId?: string | null;
+          title: string;
+          body: string;
+          href?: string | null;
+          kind?: 'general' | 'idle_stock';
+          productId?: string | null;
+        }
+      ) {
+        d.notifications.push({
+          id: randomUUID(),
+          audience: n.audience,
+          assetId: n.assetId ?? null,
+          title: n.title,
+          body: n.body,
+          href: n.href ?? null,
+          kind: n.kind ?? 'general',
+          productId: n.productId ?? null,
+          createdAt: new Date().toISOString(),
+          readBy: [],
+        });
+      }
+
+      /** Location name for notification/message text. */
+      function locName(d: Data, id: string) {
+        return d.locations.find((l) => l.id === id)?.name ?? 'Unknown location';
       }
 
       function audit(
@@ -240,7 +321,10 @@ export const useStore = create<Store>()(
           quantity: input.quantity,
           unitCost: input.unitCost,
         });
-        d.ledger[key] = ledger;
+        // Stamp arrival time on inbound so stock ageing can be measured from
+        // it. Outbound movements leave the existing timestamp alone — taking
+        // stock out doesn't make what's left "newer".
+        d.ledger[key] = input.quantity > 0 ? { ...ledger, lastInboundAt: new Date().toISOString() } : ledger;
 
         d.movements.push({
           id: randomUUID(),
@@ -769,22 +853,87 @@ export const useStore = create<Store>()(
             audit(d, { tableName: 'stock_adjustments', recordId: adjustment.id, action: 'update', changedBy: g.user.id, after: { status: decision } });
             return ok(`${adjustment.adjustmentNumber} ${decision}.`);
           }),
+        // ---------------------------------------------------------------
+        // Assets — stock-bearing locations (machines, workshops)
+        // ---------------------------------------------------------------
+        createAsset: (input) =>
+          tx((d) => {
+            const g = guard('manage_customers');
+            if ('error' in g) return fail(g.error);
+            const name = input.name.trim();
+            if (!name) return fail('An asset name is required.');
+            if (d.locations.some((l) => l.name.toLowerCase() === name.toLowerCase())) {
+              return fail(`An asset named "${name}" already exists.`);
+            }
+            const asset: Warehouse = {
+              id: randomUUID(),
+              // Short code derived from the name, for tables and pickers.
+              code: name.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 12) || 'ASSET',
+              name,
+              description: input.description?.trim() || null,
+              kind: 'asset',
+              address: null,
+              isActive: true,
+              createdAt: new Date().toISOString(),
+            };
+            d.locations.push(asset);
+            audit(d, { tableName: 'assets', recordId: asset.id, action: 'insert', changedBy: g.user.id, after: asset });
+            return ok(`Added asset ${asset.name}.`);
+          }),
+
+        updateAsset: (id, input) =>
+          tx((d) => {
+            const g = guard('manage_customers');
+            if ('error' in g) return fail(g.error);
+            const index = d.locations.findIndex((l) => l.id === id);
+            if (index === -1) return fail('Asset not found.');
+            if (d.locations[index].kind !== 'asset') return fail('The Store cannot be edited as an asset.');
+            const name = input.name.trim();
+            if (!name) return fail('An asset name is required.');
+            const before = d.locations[index];
+            d.locations[index] = { ...before, name, description: input.description?.trim() || null };
+            audit(d, { tableName: 'assets', recordId: id, action: 'update', changedBy: g.user.id, before, after: d.locations[index] });
+            return ok(`Updated ${name}.`);
+          }),
 
         // ---------------------------------------------------------------
-        // Requisitions (route/permission names unchanged from Sales & Dispatch)
+        // Requisitions & transfers — one record set, two business kinds.
+        // A requisition is an ASK (Store -> Asset, can sit outstanding and
+        // reserve a shortfall). A transfer is a MOVE (Asset -> Asset, or
+        // Asset -> Store as a return).
         // ---------------------------------------------------------------
         createSalesOrder: (input) =>
           tx((d) => {
-            const g = guard('manage_sales_orders');
+            // Requisitions and transfers are gated on different permissions,
+            // which is what keeps Admin out of both (see permissions.ts).
+            const g = guard(input.kind === 'requisition' ? 'manage_sales_orders' : 'manage_transfers');
             if ('error' in g) return fail(g.error);
+            if (input.fromLocationId === input.toLocationId) {
+              return fail('Source and destination must be different locations.');
+            }
+            if (input.quantity <= 0) return fail('Quantity must be a positive number.');
+
+            // Can't move what isn't there. Checked at creation so the user
+            // finds out immediately rather than at fulfilment.
+            const source = d.ledger[ledgerKey(input.productId, input.fromLocationId)];
+            const available = (source?.quantityOnHand ?? 0) - (source?.quantityReserved ?? 0);
+            if (available < input.quantity) {
+              return fail(
+                `Only ${Math.max(available, 0).toLocaleString()} available (unreserved) at ${locName(d, input.fromLocationId)}.`
+              );
+            }
+
             d.salesOrderCounter += 1;
+            const prefix = input.kind === 'requisition' ? 'REQ' : 'TRF';
             const order: SalesOrder = {
               id: randomUUID(),
-              orderNumber: `REQ-${d.salesOrderCounter}`,
-              customerId: input.customerId,
-              warehouseId: input.warehouseId,
+              orderNumber: `${prefix}-${d.salesOrderCounter}`,
+              kind: input.kind,
+              fromLocationId: input.fromLocationId,
+              toLocationId: input.toLocationId,
               productId: input.productId,
               quantityOrdered: input.quantity,
+              quantityReceived: 0,
               unitPrice: input.unitPrice,
               status: 'draft',
               createdBy: g.user.id,
@@ -793,71 +942,282 @@ export const useStore = create<Store>()(
               dispatchedAt: null,
             };
             d.salesOrders.push(order);
+
+            const product = d.products.find((p) => p.id === input.productId);
+            const route = `${locName(d, input.fromLocationId)} → ${locName(d, input.toLocationId)}`;
+            if (input.kind === 'requisition') {
+              // Store needs to know there's something to pick; Admin oversees.
+              notify(d, {
+                audience: ['store', 'admin'],
+                title: `New requisition ${order.orderNumber}`,
+                body: `${locName(d, input.toLocationId)} requested ${input.quantity.toLocaleString()} × ${product?.sku ?? 'item'} from the Store.`,
+                href: '/dashboard/requisitions',
+              });
+            } else {
+              notify(d, {
+                audience: ['admin', 'store'],
+                assetId: input.fromLocationId,
+                title: `Transfer raised ${order.orderNumber}`,
+                body: `${route} — ${input.quantity.toLocaleString()} × ${product?.sku ?? 'item'}.`,
+                href: '/dashboard/requisitions',
+              });
+            }
+
             audit(d, { tableName: 'sales_orders', recordId: order.id, action: 'insert', changedBy: g.user.id, after: order });
             return ok(`${order.orderNumber} created as a draft — nothing is reserved yet.`);
           }),
 
         confirmSalesOrder: (orderId) =>
           tx((d) => {
-            const g = guard('manage_sales_orders');
-            if ('error' in g) return fail(g.error);
             const order = d.salesOrders.find((o) => o.id === orderId);
-            if (!order) return fail('Requisition not found.');
-            if (order.status !== 'draft') return fail(`Order is already ${order.status}.`);
-            // Reserving is a ledger-state change only — no movement, no WAC impact.
-            adjustReserved(d, order.productId, order.warehouseId, order.quantityOrdered);
+            if (!order) return fail('Record not found.');
+            const g = guard(order.kind === 'requisition' ? 'manage_sales_orders' : 'manage_transfers');
+            if ('error' in g) return fail(g.error);
+            if (order.status !== 'draft') return fail(`Already ${order.status.replace('_', ' ')}.`);
+            // Approving reserves at the SOURCE — a ledger-state change only.
+            // No movement is posted and WAC is untouched until fulfilment.
+            adjustReserved(d, order.productId, order.fromLocationId, order.quantityOrdered);
             order.status = 'confirmed';
             order.confirmedAt = new Date().toISOString();
             audit(d, { tableName: 'sales_orders', recordId: order.id, action: 'update', changedBy: g.user.id, after: { status: 'confirmed' } });
-            return ok(`${order.orderNumber} approved — ${order.quantityOrdered.toLocaleString()} reserved.`);
+            return ok(`${order.orderNumber} approved — ${order.quantityOrdered.toLocaleString()} reserved at ${locName(d, order.fromLocationId)}.`);
           }),
 
-        dispatchSalesOrder: (orderId) =>
+        /**
+         * PARTIAL FULFILMENT. `receivedQuantity` is the actual amount handed
+         * over and is the single source of truth, whether it was scanned one
+         * at a time, scanned in bulk, or typed.
+         *
+         * Short fulfilment does NOT close the record: what moved is posted,
+         * what didn't stays outstanding, and the shortfall stays reserved at
+         * the source so it can't be promised to anyone else.
+         */
+        fulfilSalesOrder: (orderId, receivedQuantity) =>
           tx((d) => {
-            const g = guard('manage_sales_orders');
-            if ('error' in g) return fail(g.error);
             const order = d.salesOrders.find((o) => o.id === orderId);
-            if (!order) return fail('Requisition not found.');
-            if (order.status !== 'confirmed') return fail('Only approved requisitions can be issued.');
-            const ledger = d.ledger[ledgerKey(order.productId, order.warehouseId)];
-            if (!ledger) return fail('No stock ledger entry for this product/warehouse.');
+            if (!order) return fail('Record not found.');
+            const g = guard(order.kind === 'requisition' ? 'manage_sales_orders' : 'manage_transfers');
+            if ('error' in g) return fail(g.error);
+            if (order.status !== 'confirmed' && order.status !== 'partially_fulfilled') {
+              return fail('Only approved records can be fulfilled.');
+            }
 
-            // Outbound movement is valued at the ledger's current WAC — the
-            // requisition's unit price is not cost.
+            const outstandingBefore = Math.round((order.quantityOrdered - order.quantityReceived) * 1000) / 1000;
+            if (receivedQuantity <= 0) return fail('Received quantity must be a positive number.');
+            if (receivedQuantity > outstandingBefore + 1e-9) {
+              return fail(`Cannot fulfil more than the ${outstandingBefore.toLocaleString()} still outstanding.`);
+            }
+
+            const sourceLedger = d.ledger[ledgerKey(order.productId, order.fromLocationId)];
+            if (!sourceLedger) return fail(`No stock at ${locName(d, order.fromLocationId)} for this product.`);
+
+            // Release only what actually moves, then post out at source and
+            // in at destination — carrying the source's WAC, so a movement
+            // never fabricates value.
+            const unitCost = sourceLedger.weightedAverageCost;
+            adjustReserved(d, order.productId, order.fromLocationId, -receivedQuantity);
             postMovement(d, {
               productId: order.productId,
-              warehouseId: order.warehouseId,
-              movementType: 'dispatch',
-              quantity: -Math.abs(order.quantityOrdered),
-              unitCost: ledger.weightedAverageCost,
-              referenceType: 'sales_order',
+              warehouseId: order.fromLocationId,
+              movementType: 'transfer_out',
+              quantity: -Math.abs(receivedQuantity),
+              unitCost,
+              referenceType: order.kind === 'requisition' ? 'requisition' : 'transfer',
               referenceId: order.id,
               createdBy: g.user.id,
             });
-            // Release the reservation now that the stock has actually left.
-            adjustReserved(d, order.productId, order.warehouseId, -order.quantityOrdered);
+            postMovement(d, {
+              productId: order.productId,
+              warehouseId: order.toLocationId,
+              movementType: 'transfer_in',
+              quantity: Math.abs(receivedQuantity),
+              unitCost,
+              referenceType: order.kind === 'requisition' ? 'requisition' : 'transfer',
+              referenceId: order.id,
+              createdBy: g.user.id,
+            });
 
-            order.status = 'dispatched';
-            order.dispatchedAt = new Date().toISOString();
-            audit(d, { tableName: 'sales_orders', recordId: order.id, action: 'update', changedBy: g.user.id, after: { status: 'dispatched' } });
-            return ok(`${order.orderNumber} issued — stock has left the ledger.`);
+            order.quantityReceived = Math.round((order.quantityReceived + receivedQuantity) * 1000) / 1000;
+            const outstanding = Math.round((order.quantityOrdered - order.quantityReceived) * 1000) / 1000;
+
+            // Arriving stock is no longer idle at its destination.
+            delete d.idleFlagged[`${order.toLocationId}::${order.productId}`];
+
+            const product = d.products.find((p) => p.id === order.productId);
+            if (outstanding <= 1e-9) {
+              order.status = 'dispatched';
+              order.dispatchedAt = new Date().toISOString();
+              notify(d, {
+                audience: ['engineer', 'admin'],
+                assetId: order.toLocationId,
+                title: `${order.orderNumber} fulfilled`,
+                body: `${order.quantityOrdered.toLocaleString()} × ${product?.sku ?? 'item'} received at ${locName(d, order.toLocationId)}.`,
+                href: '/dashboard/requisitions',
+              });
+              audit(d, { tableName: 'sales_orders', recordId: order.id, action: 'update', changedBy: g.user.id, after: { status: 'dispatched' } });
+              return ok(`${order.orderNumber} fulfilled in full — ${receivedQuantity.toLocaleString()} moved.`);
+            }
+
+            order.status = 'partially_fulfilled';
+            // The shortfall stays reserved at source, so it remains promised
+            // to this record and can't be handed to another.
+            notify(d, {
+              audience: ['engineer', 'store', 'admin'],
+              assetId: order.toLocationId,
+              title: `${order.orderNumber} partially fulfilled`,
+              body: `Requested ${order.quantityOrdered.toLocaleString()}, received ${order.quantityReceived.toLocaleString()}, ${outstanding.toLocaleString()} still outstanding and reserved.`,
+              href: '/dashboard/requisitions',
+            });
+            audit(d, { tableName: 'sales_orders', recordId: order.id, action: 'update', changedBy: g.user.id, after: { status: 'partially_fulfilled', received: order.quantityReceived } });
+            return ok(
+              `${receivedQuantity.toLocaleString()} received. ${outstanding.toLocaleString()} still outstanding — kept reserved at ${locName(d, order.fromLocationId)}.`
+            );
           }),
 
         cancelSalesOrder: (orderId) =>
           tx((d) => {
-            const g = guard('manage_sales_orders');
-            if ('error' in g) return fail(g.error);
             const order = d.salesOrders.find((o) => o.id === orderId);
-            if (!order) return fail('Requisition not found.');
+            if (!order) return fail('Record not found.');
+            const g = guard(order.kind === 'requisition' ? 'manage_sales_orders' : 'manage_transfers');
+            if ('error' in g) return fail(g.error);
             if (order.status === 'dispatched' || order.status === 'cancelled') {
-              return fail(`Order is already ${order.status}.`);
+              return fail(`Already ${order.status}.`);
             }
-            if (order.status === 'confirmed') {
-              adjustReserved(d, order.productId, order.warehouseId, -order.quantityOrdered);
+            // Release whatever is still reserved but never moved.
+            if (order.status === 'confirmed' || order.status === 'partially_fulfilled') {
+              const stillReserved = Math.round((order.quantityOrdered - order.quantityReceived) * 1000) / 1000;
+              if (stillReserved > 0) adjustReserved(d, order.productId, order.fromLocationId, -stillReserved);
             }
             order.status = 'cancelled';
             audit(d, { tableName: 'sales_orders', recordId: order.id, action: 'update', changedBy: g.user.id, after: { status: 'cancelled' } });
             return ok(`${order.orderNumber} cancelled.`);
+          }),
+
+        /**
+         * The action offered on an idle-stock prompt: raise an Asset → Store
+         * return for everything of that product currently at the asset. It
+         * creates a normal transfer record rather than silently moving
+         * stock, so the return is auditable like any other movement.
+         */
+        returnStockToStore: (assetId, productId) =>
+          tx((d) => {
+            const g = guard('manage_transfers');
+            if ('error' in g) return fail(g.error);
+            const entry = d.ledger[ledgerKey(productId, assetId)];
+            const available = (entry?.quantityOnHand ?? 0) - (entry?.quantityReserved ?? 0);
+            if (available <= 0) return fail('No unreserved stock at this asset to return.');
+
+            d.salesOrderCounter += 1;
+            const order: SalesOrder = {
+              id: randomUUID(),
+              orderNumber: `TRF-${d.salesOrderCounter}`,
+              kind: 'transfer',
+              fromLocationId: assetId,
+              toLocationId: STORE_LOCATION_ID,
+              productId,
+              quantityOrdered: available,
+              quantityReceived: 0,
+              unitPrice: entry?.weightedAverageCost ?? 0,
+              status: 'draft',
+              createdBy: g.user.id,
+              createdAt: new Date().toISOString(),
+              confirmedAt: null,
+              dispatchedAt: null,
+            };
+            d.salesOrders.push(order);
+            delete d.idleFlagged[`${assetId}::${productId}`];
+
+            const product = d.products.find((p) => p.id === productId);
+            notify(d, {
+              audience: ['store', 'admin'],
+              title: `Return raised ${order.orderNumber}`,
+              body: `${locName(d, assetId)} is returning ${available.toLocaleString()} × ${product?.sku ?? 'item'} to the Store.`,
+              href: '/dashboard/requisitions',
+            });
+            audit(d, { tableName: 'sales_orders', recordId: order.id, action: 'insert', changedBy: g.user.id, after: order });
+            return ok(`${order.orderNumber} raised — approve and fulfil it to complete the return.`);
+          }),
+
+        // ---------------------------------------------------------------
+        // Notifications & idle-stock detection
+        // ---------------------------------------------------------------
+        markNotificationRead: (id) =>
+          set((s) => {
+            const userId = s.currentUserId;
+            if (!userId) return {};
+            return {
+              notifications: s.notifications.map((n) =>
+                n.id === id && !n.readBy.includes(userId) ? { ...n, readBy: [...n.readBy, userId] } : n
+              ),
+            };
+          }),
+
+        markAllNotificationsRead: () =>
+          set((s) => {
+            const userId = s.currentUserId;
+            if (!userId) return {};
+            return {
+              notifications: s.notifications.map((n) =>
+                n.readBy.includes(userId) ? n : { ...n, readBy: [...n.readBy, userId] }
+              ),
+            };
+          }),
+
+        /**
+         * Automated idle-stock detection. Runs on app load (see App shell) so
+         * no one has to remember to check. Any asset holding stock whose last
+         * inbound is older than IDLE_STOCK_DAYS raises a prompt addressed to
+         * that asset's engineers, offering a return to Store.
+         *
+         * `idleFlagged` keeps it idempotent — the same stock won't re-prompt
+         * on every page load. It clears when the stock moves.
+         */
+        detectIdleStock: () => {
+          const s = get();
+          const cutoff = Date.now() - IDLE_STOCK_DAYS * 24 * 60 * 60 * 1000;
+          const assetIds = new Set(s.locations.filter((l) => l.kind === 'asset').map((l) => l.id));
+          const fresh: AppNotification[] = [];
+          const flagged: Record<string, boolean> = {};
+
+          for (const entry of Object.values(s.ledger)) {
+            if (!assetIds.has(entry.warehouseId) || entry.quantityOnHand <= 0) continue;
+            const since = entry.lastInboundAt ? new Date(entry.lastInboundAt).getTime() : null;
+            if (since === null || since > cutoff) continue;
+            const key = `${entry.warehouseId}::${entry.productId}`;
+            if (s.idleFlagged[key]) continue;
+
+            const product = s.products.find((p) => p.id === entry.productId);
+            const asset = s.locations.find((l) => l.id === entry.warehouseId);
+            const days = Math.floor((Date.now() - since) / (24 * 60 * 60 * 1000));
+            flagged[key] = true;
+            fresh.push({
+              id: randomUUID(),
+              audience: ['engineer', 'admin'],
+              assetId: entry.warehouseId,
+              title: `Idle stock at ${asset?.name ?? 'asset'}`,
+              body: `${entry.quantityOnHand.toLocaleString()} × ${product?.sku ?? 'item'} has sat unused for ${days} days. Return it to the Store?`,
+              href: '/dashboard/requisitions',
+              kind: 'idle_stock',
+              productId: entry.productId,
+              createdAt: new Date().toISOString(),
+              readBy: [],
+            });
+          }
+
+          if (fresh.length === 0) return;
+          set({
+            notifications: [...s.notifications, ...fresh],
+            idleFlagged: { ...s.idleFlagged, ...flagged },
+          });
+        },
+
+        // ---------------------------------------------------------------
+        // Contextual help popups — per-user "don't show again"
+        // ---------------------------------------------------------------
+        dismissHelp: (sectionKey) =>
+          set((s) => {
+            if (!s.currentUserId) return {};
+            return { helpDismissed: { ...s.helpDismissed, [`${s.currentUserId}::${sectionKey}`]: true } };
           }),
 
         // ---------------------------------------------------------------
@@ -885,7 +1245,9 @@ export const useStore = create<Store>()(
               id: randomUUID(),
               invoiceNumber: `INV-${d.invoiceCounter}`,
               salesOrderId,
-              customerId: order.customerId,
+              // Dormant module: the old customer reference now points at the
+              // destination location. Nothing populates invoices any more.
+              customerId: order.toLocationId,
               subtotal,
               vatAmount,
               total,
@@ -978,5 +1340,45 @@ export const useStore = create<Store>()(
 export function useCurrentUser(): User | null {
   return useStore((s) => (s.currentUserId ? s.users.find((u) => u.id === s.currentUserId) ?? null : null));
 }
+
+/**
+ * Which notifications reach a given user. One rule, used by both the badge
+ * count and the list:
+ *
+ *  1. The user's role must be in the notification's audience.
+ *  2. If the notification is scoped to an asset, engineers only see it when
+ *     it's THEIR asset. Admin and Store hold organisation-wide roles, so an
+ *     asset scope doesn't hide anything from them.
+ */
+export function visibleNotifications(
+  notifications: AppNotification[],
+  roleName: string,
+  userAssetId: string | null
+): AppNotification[] {
+  const audience = roleName as NotificationAudience;
+  return notifications.filter((n) => {
+    if (!n.audience.includes(audience)) return false;
+    if (n.assetId && roleName === 'engineer') return n.assetId === userAssetId;
+    return true;
+  });
+}
+
+/**
+ * The locations a user should see detail for, and the one their dashboard
+ * centres on.
+ *
+ *  - Engineer  -> their own asset (they still see other assets' quantities,
+ *                 just without the same operational detail).
+ *  - Store     -> the Store.
+ *  - Admin     -> everything; no single focus.
+ */
+export function scopeFor(user: User | null, roleName: string): { focusLocationId: string | null } {
+  if (!user) return { focusLocationId: null };
+  if (roleName === 'engineer') return { focusLocationId: user.assetId };
+  if (roleName === 'store') return { focusLocationId: STORE_LOCATION_ID };
+  return { focusLocationId: null };
+}
+
+export { STORE_LOCATION_ID };
 
 export { adjustmentReasonCodes };

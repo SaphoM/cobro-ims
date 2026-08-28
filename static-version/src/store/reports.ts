@@ -138,14 +138,14 @@ export interface SalesSummaryRow {
   status: string;
 }
 
-export function buildSalesSummary(orders: SalesOrder[], products: Product[], customers: Customer[]): SalesSummaryRow[] {
+export function buildSalesSummary(orders: SalesOrder[], products: Product[], locations: Warehouse[]): SalesSummaryRow[] {
   const productById = new Map(products.map((p) => [p.id, p]));
-  const customerById = new Map(customers.map((c) => [c.id, c]));
+  const locationById = new Map(locations.map((l) => [l.id, l]));
 
   return orders
     .map((o) => ({
       orderNumber: o.orderNumber,
-      customerName: customerById.get(o.customerId)?.name ?? 'Unknown',
+      customerName: locationById.get(o.toLocationId)?.name ?? 'Unknown',
       sku: productById.get(o.productId)?.sku ?? 'Unknown',
       quantity: o.quantityOrdered,
       value: Math.round(o.quantityOrdered * o.unitPrice * 100) / 100,
@@ -380,14 +380,14 @@ export interface CustomerSummaryRow {
   totalDispatchedValue: number;
 }
 
-export function buildCustomerSummary(orders: SalesOrder[], customers: Customer[]): CustomerSummaryRow[] {
-  const customerById = new Map(customers.map((c) => [c.id, c]));
+export function buildCustomerSummary(orders: SalesOrder[], locations: Warehouse[]): CustomerSummaryRow[] {
+  const locationById = new Map(locations.map((l) => [l.id, l]));
   const byCustomer = new Map<string, CustomerSummaryRow>();
 
   for (const o of orders) {
     if (o.status === 'cancelled') continue;
-    const name = customerById.get(o.customerId)?.name ?? 'Unknown';
-    const row = byCustomer.get(o.customerId) ?? {
+    const name = locationById.get(o.toLocationId)?.name ?? 'Unknown';
+    const row = byCustomer.get(o.toLocationId) ?? {
       customerName: name,
       orderCount: 0,
       dispatchedCount: 0,
@@ -401,7 +401,7 @@ export function buildCustomerSummary(orders: SalesOrder[], customers: Customer[]
       row.dispatchedCount += 1;
       row.totalDispatchedValue = Math.round((row.totalDispatchedValue + value) * 100) / 100;
     }
-    byCustomer.set(o.customerId, row);
+    byCustomer.set(o.toLocationId, row);
   }
 
   return [...byCustomer.values()].sort((a, b) => b.totalOrderedValue - a.totalOrderedValue);
@@ -426,23 +426,21 @@ export interface PickListRow {
 export function buildPickList(
   orders: SalesOrder[],
   products: Product[],
-  customers: Customer[],
-  warehouses: Warehouse[]
+  locations: Warehouse[]
 ): PickListRow[] {
   const productById = new Map(products.map((p) => [p.id, p]));
-  const customerById = new Map(customers.map((c) => [c.id, c]));
-  const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
+  const locationById = new Map(locations.map((l) => [l.id, l]));
 
   return orders
-    .filter((o) => o.status === 'confirmed' || o.status === 'dispatched')
+    .filter((o) => o.status === 'confirmed' || o.status === 'partially_fulfilled' || o.status === 'dispatched')
     .map((o) => {
       const product = productById.get(o.productId);
       return {
         orderNumber: o.orderNumber,
-        customerName: customerById.get(o.customerId)?.name ?? 'Unknown',
+        customerName: locationById.get(o.toLocationId)?.name ?? 'Unknown',
         sku: product?.sku ?? 'Unknown',
         productName: product?.name ?? 'Unknown',
-        warehouseCode: warehouseById.get(o.warehouseId)?.code ?? 'Unknown',
+        warehouseCode: locationById.get(o.fromLocationId)?.code ?? 'Unknown',
         quantity: o.quantityOrdered,
         unitOfMeasure: product?.unitOfMeasure ?? '',
         status: o.status,

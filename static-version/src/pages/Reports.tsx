@@ -1,4 +1,4 @@
-import { adjustmentReasonCodes, warehouses } from '@/store/seed';
+import {adjustmentReasonCodes} from '@/store/seed';
 import { useStore } from '@/store/useStore';
 import { ExportCsvButton } from '@/ui/ExportCsvButton';
 import {
@@ -27,9 +27,10 @@ import type { PurchaseOrder, PurchaseOrderLine } from '@/store/types';
  */
 export function ReportsPage() {
   const products = useStore((s) => s.products);
+  // Locations come from the store now (assets are user-managed).
+  const warehouses = useStore((s) => s.locations);
   const ledgerMap = useStore((s) => s.ledger);
   const suppliers = useStore((s) => s.suppliers);
-  const customers = useStore((s) => s.customers);
   const salesOrders = useStore((s) => s.salesOrders);
   const purchaseOrders = useStore((s) => s.purchaseOrders);
   const purchaseOrderLines = useStore((s) => s.purchaseOrderLines);
@@ -47,14 +48,14 @@ export function ReportsPage() {
   const now = Date.now();
   const valuation = buildStockValuationReport(ledger, products, warehouses);
   const lowStock = buildLowStockReport(ledger, products, warehouses);
-  const salesSummary = buildSalesSummary(salesOrders, products, customers);
+  const salesSummary = buildSalesSummary(salesOrders, products, warehouses);
   const poSummary = buildPurchaseOrderSummary(posWithLines, products, suppliers);
   const movementHistory = buildMovementHistory(movements, products, warehouses);
   const receivingHistory = buildReceivingHistory(movements, products, warehouses);
   const movementTypeTotals = buildMovementTypeTotals(movements);
   const supplierSummary = buildSupplierSummary(posWithLines, suppliers);
-  const customerSummary = buildCustomerSummary(salesOrders, customers);
-  const pickList = buildPickList(salesOrders, products, customers, warehouses);
+  const customerSummary = buildCustomerSummary(salesOrders, warehouses);
+  const pickList = buildPickList(salesOrders, products, warehouses);
   const adjustmentReasonSummary = buildAdjustmentReasonSummary(adjustments, adjustmentReasonCodes);
   const warehouseSummary = buildWarehouseSummary(ledger, products, warehouses);
   const openPurchaseOrders = buildOpenPurchaseOrders(posWithLines, products, suppliers, now);
@@ -68,7 +69,7 @@ export function ReportsPage() {
         <h1 className="font-display text-[1.3rem] font-medium text-text">Dashboards &amp; reports</h1>
         <p className="text-[0.86rem] text-text-muted">
           Fourteen reports — stock valuation, low stock, warehouse summary, dormant stock, requisitions,
-          departments, pick list, purchase orders, suppliers, open POs, movement history, receiving history,
+          assets, pick list, purchase orders, suppliers, open POs, movement history, receiving history,
           movement type totals, and adjustment reasons. Every table exports to CSV (opens in Excel), per the
           RFQ&apos;s data-export requirement.
         </p>
@@ -211,7 +212,7 @@ export function ReportsPage() {
             <thead>
               <tr className="text-left text-text-faint">
                 <th className="px-5 py-2.5 font-medium">Requisition</th>
-                <th className="px-5 py-2.5 font-medium">Department</th>
+                <th className="px-5 py-2.5 font-medium">Asset</th>
                 <th className="px-5 py-2.5 font-medium">SKU</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Qty</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Value</th>
@@ -234,14 +235,14 @@ export function ReportsPage() {
         )}
       </ReportSection>
 
-      <ReportSection title="Department summary" subtitle={`${customerSummary.length} departments`} exportFilename="department-summary" rows={customerSummary}>
+      <ReportSection title="Asset summary" subtitle={`${customerSummary.length} assets`} exportFilename="asset-summary" rows={customerSummary}>
         {customerSummary.length === 0 ? (
           <EmptyState text="No requisitions yet." />
         ) : (
           <table className="w-full min-w-[640px] border-collapse text-[0.86rem]">
             <thead>
               <tr className="text-left text-text-faint">
-                <th className="px-5 py-2.5 font-medium">Department</th>
+                <th className="px-5 py-2.5 font-medium">Asset</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Requisitions</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Issued</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Requested value</th>
@@ -271,7 +272,7 @@ export function ReportsPage() {
             <thead>
               <tr className="text-left text-text-faint">
                 <th className="px-5 py-2.5 font-medium">Requisition</th>
-                <th className="px-5 py-2.5 font-medium">Department</th>
+                <th className="px-5 py-2.5 font-medium">Asset</th>
                 <th className="px-5 py-2.5 font-medium">SKU</th>
                 <th className="px-5 py-2.5 font-medium">Product</th>
                 <th className="px-5 py-2.5 font-medium">Warehouse</th>

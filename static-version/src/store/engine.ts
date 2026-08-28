@@ -52,6 +52,9 @@ export function applyMovement(
     quantityOnHand: 0,
     quantityReserved: 0,
     weightedAverageCost: 0,
+    // Stock-ageing field, carried on the ledger entry. Callers set it on
+    // inbound movements; the costing math below never reads it.
+    lastInboundAt: null,
     updatedAt: new Date().toISOString(),
   };
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { warehouses } from '@/store/seed';
+
 import { useStore, type ActionResult } from '@/store/useStore';
 import { inputClass, selectClass } from '@/ui/form-control-classes';
 import { Feedback } from '@/ui/Feedback';
@@ -12,6 +12,8 @@ export function ReceivingPage() {
   const barcode = searchParams.get('barcode');
 
   const products = useStore((s) => s.products);
+  // Locations come from the store now (assets are user-managed).
+  const warehouses = useStore((s) => s.locations);
   const suppliers = useStore((s) => s.suppliers);
   const receipts = useStore((s) => s.goodsReceipts);
   const quickReceive = useStore((s) => s.quickReceive);
@@ -71,7 +73,7 @@ export function ReceivingPage() {
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[0.75rem] font-semibold text-text-muted">Warehouse</span>
+            <span className="text-[0.75rem] font-semibold text-text-muted">Location</span>
             <select name="warehouseId" required className={selectClass}>
               {warehouses.map((w) => (
                 <option key={w.id} value={w.id}>
@@ -128,7 +130,7 @@ export function ReceivingPage() {
               <thead>
                 <tr className="text-left text-text-faint">
                   <th className="px-5 py-2.5 font-medium">GRN</th>
-                  <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                  <th className="px-5 py-2.5 font-medium">Location</th>
                   <th className="px-5 py-2.5 font-medium">Status</th>
                   <th className="px-5 py-2.5 font-medium">Received</th>
                 </tr>

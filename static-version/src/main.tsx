@@ -12,10 +12,9 @@ import { BomPage } from '@/pages/Bom';
 import { PurchaseOrdersPage } from '@/pages/PurchaseOrders';
 import { ReceivingPage } from '@/pages/Receiving';
 import { SuppliersPage } from '@/pages/Suppliers';
-import { TransfersPage } from '@/pages/Transfers';
 import { AdjustmentsPage } from '@/pages/Adjustments';
-import { RequisitionsPage } from '@/pages/Requisitions';
-import { DepartmentsPage } from '@/pages/Departments';
+import { RequisitionsTransfersPage } from '@/pages/RequisitionsTransfers';
+import { AssetsPage } from '@/pages/Assets';
 import { ReportsPage } from '@/pages/Reports';
 import { ScanPage } from '@/pages/Scan';
 import { LabelsPage } from '@/pages/Labels';
@@ -50,10 +49,13 @@ const router = createHashRouter([
       { path: 'purchase-orders', element: <PurchaseOrdersPage /> },
       { path: 'receiving', element: <ReceivingPage /> },
       { path: 'suppliers', element: <SuppliersPage /> },
-      { path: 'transfers', element: <TransfersPage /> },
       { path: 'adjustments', element: <AdjustmentsPage /> },
-      { path: 'sales', element: <RequisitionsPage /> },
-      { path: 'customers', element: <DepartmentsPage /> },
+      { path: 'requisitions', element: <RequisitionsTransfersPage /> },
+      // Old routes kept as redirects so existing links/bookmarks still land.
+      { path: 'sales', element: <Navigate to="/dashboard/requisitions" replace /> },
+      { path: 'transfers', element: <Navigate to="/dashboard/requisitions" replace /> },
+      { path: 'assets', element: <AssetsPage /> },
+      { path: 'customers', element: <Navigate to="/dashboard/assets" replace /> },
       { path: 'reports', element: <ReportsPage /> },
       { path: 'scan', element: <ScanPage /> },
       { path: 'labels', element: <LabelsPage /> },

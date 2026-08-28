@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { warehouses } from '@/store/seed';
+
 import { useStore, type ActionResult } from '@/store/useStore';
 import { inputClass, selectClass } from '@/ui/form-control-classes';
 import { Feedback } from '@/ui/Feedback';
@@ -13,6 +13,8 @@ import type { PoStatus } from '@/store/types';
  */
 export function PurchaseOrdersPage() {
   const products = useStore((s) => s.products);
+  // Locations come from the store now (assets are user-managed).
+  const warehouses = useStore((s) => s.locations);
   const suppliers = useStore((s) => s.suppliers);
   const purchaseOrders = useStore((s) => s.purchaseOrders);
   const purchaseOrderLines = useStore((s) => s.purchaseOrderLines);
@@ -86,7 +88,7 @@ export function PurchaseOrdersPage() {
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[0.75rem] font-semibold text-text-muted">Warehouse</span>
+            <span className="text-[0.75rem] font-semibold text-text-muted">Location</span>
             <select name="warehouseId" required className={selectClass}>
               {warehouses.map((w) => (
                 <option key={w.id} value={w.id}>
@@ -146,7 +148,7 @@ export function PurchaseOrdersPage() {
                   <th className="px-5 py-2.5 font-medium">PO</th>
                   <th className="px-5 py-2.5 font-medium">Supplier</th>
                   <th className="px-5 py-2.5 font-medium">Product</th>
-                  <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                  <th className="px-5 py-2.5 font-medium">Location</th>
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">Ordered</th>
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">Received</th>
                   <th className="px-5 py-2.5 font-medium">Status</th>

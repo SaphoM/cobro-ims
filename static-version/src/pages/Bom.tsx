@@ -66,7 +66,7 @@ export function BomPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-display text-[1.3rem] font-medium text-text">Bill of materials</h1>
+        <h1 className="font-display text-[1.3rem] font-medium text-text">Warehouse bill of materials</h1>
         <p className="text-[0.86rem] text-text-muted">
           Flat parent → component structure — the schema&apos;s committed shape. Whether Cobro needs
           nested/multi-level BOM is still a <span className="text-accent">BUSINESS DECISION REQUIRED</span>{' '}

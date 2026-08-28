@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { adjustmentReasonCodes, warehouses } from '@/store/seed';
+import {adjustmentReasonCodes} from '@/store/seed';
 import { useCurrentUser, useStore, type ActionResult } from '@/store/useStore';
 import { inputClass, selectClass } from '@/ui/form-control-classes';
 import { Feedback } from '@/ui/Feedback';
@@ -13,6 +13,8 @@ export function AdjustmentsPage() {
 
   const session = useCurrentUser();
   const products = useStore((s) => s.products);
+  // Locations come from the store now (assets are user-managed).
+  const warehouses = useStore((s) => s.locations);
   const adjustments = useStore((s) => s.adjustments);
   const requestAdjustment = useStore((s) => s.requestAdjustment);
   const decideAdjustment = useStore((s) => s.decideAdjustment);
@@ -77,7 +79,7 @@ export function AdjustmentsPage() {
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[0.75rem] font-semibold text-text-muted">Warehouse</span>
+            <span className="text-[0.75rem] font-semibold text-text-muted">Location</span>
             <select name="warehouseId" required className={selectClass}>
               {warehouses.map((w) => (
                 <option key={w.id} value={w.id}>
@@ -154,7 +156,7 @@ export function AdjustmentsPage() {
               <thead>
                 <tr className="text-left text-text-faint">
                   <th className="px-5 py-2.5 font-medium">Adjustment</th>
-                  <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                  <th className="px-5 py-2.5 font-medium">Location</th>
                   <th className="px-5 py-2.5 font-medium">Reason</th>
                   <th className="px-5 py-2.5 font-medium">Status</th>
                   <th className="px-5 py-2.5 font-medium"></th>

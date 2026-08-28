@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { NavLink } from '@/layout/NavLink';
 import { roles } from '@/store/seed';
 import { useCurrentUser, useStore } from '@/store/useStore';
+import { NotificationBell } from '@/ui/NotificationBell';
 
 /**
  * PORTED from src/app/dashboard/layout.tsx. The sidebar, nav list, and the
@@ -14,14 +16,13 @@ import { useCurrentUser, useStore } from '@/store/useStore';
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Overview' },
   { href: '/dashboard/products', label: 'Product catalogue' },
-  { href: '/dashboard/bom', label: 'Bill of materials' },
+  { href: '/dashboard/bom', label: 'Warehouse bill of materials' },
   { href: '/dashboard/purchase-orders', label: 'Purchase orders' },
   { href: '/dashboard/receiving', label: 'Goods receiving' },
   { href: '/dashboard/suppliers', label: 'Suppliers' },
-  { href: '/dashboard/transfers', label: 'Transfers' },
   { href: '/dashboard/adjustments', label: 'Write-offs & adjustments' },
-  { href: '/dashboard/sales', label: 'Requisitions' },
-  { href: '/dashboard/customers', label: 'Departments' },
+  { href: '/dashboard/requisitions', label: 'Requisitions & transfers' },
+  { href: '/dashboard/assets', label: 'Assets' },
   { href: '/dashboard/reports', label: 'Dashboards & reports' },
   { href: '/dashboard/scan', label: 'Barcode / QR scan' },
   { href: '/dashboard/labels', label: 'Product labels' },
@@ -33,7 +34,15 @@ export function DashboardLayout() {
   const session = useCurrentUser();
   const signOut = useStore((s) => s.signOut);
   const resetDemoData = useStore((s) => s.resetDemoData);
+  const detectIdleStock = useStore((s) => s.detectIdleStock);
   const navigate = useNavigate();
+
+  // Automated idle-stock detection — runs on load so nobody has to remember
+  // to check. It is idempotent (see `idleFlagged` in the store).
+  useEffect(() => {
+    detectIdleStock();
+  }, [detectIdleStock]);
+
   const role = session ? roles.find((r) => r.id === session.roleId) : null;
 
   return (
@@ -153,9 +162,16 @@ export function DashboardLayout() {
           </span>
         </header>
 
-        {/* The original's "Running on mock data" banner, restated for this build. */}
-        <div className="no-print border-b border-accent/30 bg-accent/[0.08] px-4 py-2 text-center text-[0.8rem] text-accent sm:px-6">
-          Static demo — everything runs in your browser and saves to this device only. No server, no database.
+        {/*
+          Notification bar. The bell lives here so it's reachable at every
+          width — the mobile header above collapses below 992px, but this row
+          persists, so Admin/Store/Engineer all keep access to notifications.
+        */}
+        <div className="no-print flex items-center gap-3 border-b border-accent/30 bg-accent/[0.08] px-4 py-2 sm:px-6">
+          <p className="min-w-0 flex-1 text-center text-[0.8rem] text-accent">
+            Static demo — everything runs in your browser and saves to this device only. No server, no database.
+          </p>
+          <NotificationBell />
         </div>
 
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">

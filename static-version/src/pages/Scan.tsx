@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { stockValue } from '@/store/engine';
-import { warehouses } from '@/store/seed';
+
 import { useStore } from '@/store/useStore';
 import { CameraScanner } from '@/ui/CameraScanner';
 
@@ -23,6 +23,8 @@ export function ScanPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const barcode = searchParams.get('barcode')?.trim() ?? '';
   const products = useStore((s) => s.products);
+  // Locations come from the store now (assets are user-managed).
+  const warehouses = useStore((s) => s.locations);
   const ledger = useStore((s) => s.ledger);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -96,7 +98,7 @@ export function ScanPage() {
             <table className="w-full min-w-[520px] border-collapse text-[0.86rem]">
               <thead>
                 <tr className="text-left text-text-faint">
-                  <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                  <th className="px-5 py-2.5 font-medium">Location</th>
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">On hand</th>
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">Reserved</th>
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">WAC</th>

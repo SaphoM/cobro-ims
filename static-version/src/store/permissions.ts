@@ -30,11 +30,40 @@ export type Permission =
   | 'manage_customers'
   | 'view_reports';
 
+/**
+ * ADMIN IS DELIBERATELY NOT '*'.
+ *
+ * Admin is an oversight role: it must see everything and initiate nothing.
+ * `manage_sales_orders` (requisitions) and `manage_transfers` are therefore
+ * withheld from admin on purpose — not an oversight. Admin keeps the
+ * catalogue/approval/oversight permissions it needs to administer the system
+ * and still reads every page, because reads are not permission-gated.
+ *
+ * Engineers work at an asset: they requisition from Store, transfer between
+ * assets, and return stock. Store fulfils those requests and runs the
+ * inbound side (receiving, purchase orders, suppliers).
+ */
 const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
-  admin: '*',
-  warehouse_clerk: ['manage_receiving', 'manage_transfers', 'request_adjustments', 'manage_sales_orders', 'view_reports'],
-  procurement: ['manage_purchase_orders', 'manage_suppliers', 'manage_receiving', 'view_reports'],
-  viewer: ['view_reports'],
+  admin: [
+    'manage_catalogue',
+    'manage_suppliers',
+    'manage_customers',
+    'approve_adjustments',
+    'request_adjustments',
+    'manage_invoices',
+    'view_reports',
+    // NO manage_sales_orders, NO manage_transfers — oversight only.
+  ],
+  engineer: ['manage_sales_orders', 'manage_transfers', 'request_adjustments', 'view_reports'],
+  store: [
+    'manage_receiving',
+    'manage_purchase_orders',
+    'manage_suppliers',
+    'manage_sales_orders',
+    'manage_transfers',
+    'request_adjustments',
+    'view_reports',
+  ],
 };
 
 // Approving an adjustment is the one action in the whole app that posts a
