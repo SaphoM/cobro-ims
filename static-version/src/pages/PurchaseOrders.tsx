@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useStore, type ActionResult } from '@/store/useStore';
 import { inputClass, selectClass } from '@/ui/form-control-classes';
 import { Feedback } from '@/ui/Feedback';
+import { ScanToCount } from '@/ui/ScanToCount';
 import type { PoStatus } from '@/store/types';
 
 /**
@@ -191,6 +192,7 @@ export function PurchaseOrdersPage() {
                             poId={po.id}
                             remaining={remaining}
                             unit={product?.unitOfMeasure ?? 'ea'}
+                            expectedBarcode={product?.barcode ?? null}
                             onResult={setRowResult}
                           />
                         )}
@@ -207,55 +209,44 @@ export function PurchaseOrdersPage() {
   );
 }
 
-/** PORTED from receive-line.tsx — the inline partial-receive control. */
+/**
+ * PORTED from receive-line.tsx — the inline partial-receive control, now
+ * offering the same two ways to reach a quantity as requisition fulfilment:
+ * scan it in (one increment per scan, USB or camera) or type it.
+ */
 function ReceiveLine({
   poId,
   remaining,
   unit,
+  expectedBarcode,
   onResult,
 }: {
   poId: string;
   remaining: number;
   unit: string;
+  expectedBarcode: string | null;
   onResult: (r: ActionResult) => void;
 }) {
   const receivePurchaseOrder = useStore((s) => s.receivePurchaseOrder);
   const [pending, setPending] = useState(false);
   const [local, setLocal] = useState<ActionResult | null>(null);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const quantity = Number(new FormData(form).get('quantity'));
-    setPending(true);
-    const result = receivePurchaseOrder(poId, quantity);
-    setPending(false);
-    setLocal(result);
-    onResult(result);
-    if (result.ok) form.reset();
-  }
-
   return (
     <div className="flex flex-col items-end gap-1.5">
-      <form onSubmit={handleSubmit} className="flex items-center gap-2">
-        <input
-          type="number"
-          name="quantity"
-          min="0.001"
-          max={remaining}
-          step="0.001"
-          required
-          placeholder={`up to ${remaining}`}
-          className="h-9 w-28 rounded-lg border border-accent/[0.14] bg-surface-2 px-2.5 py-1.5 text-right text-[0.82rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none"
-        />
-        <button
-          type="submit"
-          disabled={pending}
-          className="h-9 rounded-lg bg-accent px-3 py-1.5 text-[0.78rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:opacity-90"
-        >
-          {pending ? 'Posting…' : `Receive (${unit})`}
-        </button>
-      </form>
+      <ScanToCount
+        expectedBarcode={expectedBarcode}
+        max={remaining}
+        unit={unit}
+        pending={pending}
+        submitLabel="Receive"
+        onSubmit={(qty) => {
+          setPending(true);
+          const result = receivePurchaseOrder(poId, qty);
+          setPending(false);
+          setLocal(result);
+          onResult(result);
+        }}
+      />
       {local && !local.ok && <p className="text-[0.72rem] text-[#f3a99a]">{local.error}</p>}
       {local && local.ok && <p className="text-[0.72rem] text-accent">{local.message}</p>}
     </div>

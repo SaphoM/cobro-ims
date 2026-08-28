@@ -7,6 +7,7 @@ import { useCurrentUser, useStore, scopeFor, STORE_LOCATION_ID, type ActionResul
 import { inputClass, selectClass } from '@/ui/form-control-classes';
 import { Feedback } from '@/ui/Feedback';
 import { ScanRow, useScanRow } from '@/ui/ScanRow';
+import { ScanToCount } from '@/ui/ScanToCount';
 import { HelpPopup } from '@/ui/HelpPopup';
 import type { SalesOrderStatus } from '@/store/types';
 
@@ -292,6 +293,7 @@ export function RequisitionsTransfersPage() {
                                 orderId={o.id}
                                 outstanding={outstanding}
                                 unit={product?.unitOfMeasure ?? 'ea'}
+                                expectedBarcode={product?.barcode ?? null}
                                 onResult={setRowResult}
                                 onCancel={() => setRowResult(cancelSalesOrder(o.id))}
                                 fulfil={fulfilSalesOrder}
@@ -313,14 +315,17 @@ export function RequisitionsTransfersPage() {
 }
 
 /**
- * Partial-fulfilment control. The number entered is the ACTUAL quantity
- * handed over — scanned one at a time, scanned in bulk, or typed. It is
- * capped at the outstanding amount, and a short entry leaves the record open.
+ * Partial-fulfilment control. The quantity is the ACTUAL amount handed over
+ * and can be produced two ways — scanned (one increment per scan, USB or
+ * camera) or typed — with the number itself always editable and always the
+ * figure that gets posted. It's capped at the outstanding amount, and a
+ * short entry leaves the record open with the shortfall still reserved.
  */
 function FulfilLine({
   orderId,
   outstanding,
   unit,
+  expectedBarcode,
   onResult,
   onCancel,
   fulfil,
@@ -328,44 +333,27 @@ function FulfilLine({
   orderId: string;
   outstanding: number;
   unit: string;
+  expectedBarcode: string | null;
   onResult: (r: ActionResult) => void;
   onCancel: () => void;
   fulfil: (id: string, qty: number) => ActionResult;
 }) {
   const [pending, setPending] = useState(false);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const qty = Number(new FormData(form).get('receivedQuantity'));
-    setPending(true);
-    const r = fulfil(orderId, qty);
-    setPending(false);
-    onResult(r);
-    if (r.ok) form.reset();
-  }
-
   return (
     <div className="flex flex-col items-end gap-1.5">
-      <form onSubmit={handleSubmit} className="flex items-center gap-2">
-        <input
-          type="number"
-          name="receivedQuantity"
-          min="0.001"
-          max={outstanding}
-          step="0.001"
-          required
-          placeholder={`up to ${outstanding}`}
-          className="h-9 w-28 rounded-lg border border-accent/[0.14] bg-surface-2 px-2.5 py-1.5 text-right text-[0.82rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none"
-        />
-        <button
-          type="submit"
-          disabled={pending}
-          className="h-9 rounded-lg bg-accent px-3 py-1.5 text-[0.78rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:opacity-90"
-        >
-          {pending ? 'Posting…' : `Fulfil (${unit})`}
-        </button>
-      </form>
+      <ScanToCount
+        expectedBarcode={expectedBarcode}
+        max={outstanding}
+        unit={unit}
+        pending={pending}
+        submitLabel="Fulfil"
+        onSubmit={(qty) => {
+          setPending(true);
+          onResult(fulfil(orderId, qty));
+          setPending(false);
+        }}
+      />
       <button type="button" onClick={onCancel} className="text-[0.76rem] font-semibold text-text-faint hover:text-danger">
         Cancel
       </button>
