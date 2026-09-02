@@ -65,7 +65,7 @@ export default async function ReportsPage() {
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Dashboards & reports</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Fifteen of the RFQ&apos;s &quot;15+&quot; standard reports — stock valuation, low stock, sales,
+          Fifteen of the RFQ&apos;s &quot;15+&quot; standard reports - stock valuation, low stock, sales,
           customers, purchase orders, suppliers, invoice ageing, movement history, receiving history,
           movement type totals, pick list, adjustment reasons, warehouse summary, open purchase orders,
           and dormant stock. Every table exports to CSV (opens in Excel), per the RFQ&apos;s data-export
@@ -75,14 +75,14 @@ export default async function ReportsPage() {
 
       <ReportSection
         title="Stock valuation"
-        subtitle={`Grand total: R ${valuation.grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} across ${valuation.byWarehouse.length} warehouses`}
+        subtitle={`Grand total: R ${valuation.grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} across ${valuation.byWarehouse.length} stores`}
         exportFilename="stock-valuation"
         rows={valuation.rows}
       >
         <table className="w-full min-w-[720px] border-collapse text-[0.86rem]">
           <thead>
             <tr className="text-left text-text-faint">
-              <th className="px-5 py-2.5 font-medium">Warehouse</th>
+              <th className="px-5 py-2.5 font-medium">Store</th>
               <th className="px-5 py-2.5 font-medium">SKU</th>
               <th className="px-5 py-2.5 font-medium">Product</th>
               <th className="px-5 py-2.5 text-right font-medium tabular-nums">On hand</th>
@@ -121,7 +121,7 @@ export default async function ReportsPage() {
           <table className="w-full min-w-[720px] border-collapse text-[0.86rem]">
             <thead>
               <tr className="text-left text-text-faint">
-                <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                <th className="px-5 py-2.5 font-medium">Store</th>
                 <th className="px-5 py-2.5 font-medium">SKU</th>
                 <th className="px-5 py-2.5 font-medium">Product</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">On hand</th>
@@ -140,7 +140,7 @@ export default async function ReportsPage() {
                   </td>
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.reorderPoint.toLocaleString()}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
-                    {r.suggestedReorderQuantity?.toLocaleString() ?? '—'}
+                    {r.suggestedReorderQuantity?.toLocaleString() ?? '-'}
                   </td>
                 </tr>
               ))}
@@ -150,7 +150,7 @@ export default async function ReportsPage() {
       </ReportSection>
 
       <ReportSection
-        title="Warehouse summary"
+        title="Store summary"
         subtitle={`${warehouseSummary.length} warehouses`}
         exportFilename="warehouse-summary"
         rows={warehouseSummary}
@@ -158,7 +158,7 @@ export default async function ReportsPage() {
         <table className="w-full min-w-[560px] border-collapse text-[0.86rem]">
           <thead>
             <tr className="text-left text-text-faint">
-              <th className="px-5 py-2.5 font-medium">Warehouse</th>
+              <th className="px-5 py-2.5 font-medium">Store</th>
               <th className="px-5 py-2.5 text-right font-medium tabular-nums">SKUs</th>
               <th className="px-5 py-2.5 text-right font-medium tabular-nums">Below reorder</th>
               <th className="px-5 py-2.5 text-right font-medium tabular-nums">Total value</th>
@@ -193,7 +193,7 @@ export default async function ReportsPage() {
           <table className="w-full min-w-[560px] border-collapse text-[0.86rem]">
             <thead>
               <tr className="text-left text-text-faint">
-                <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                <th className="px-5 py-2.5 font-medium">Store</th>
                 <th className="px-5 py-2.5 font-medium">SKU</th>
                 <th className="px-5 py-2.5 font-medium">Product</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">On hand</th>
@@ -301,7 +301,7 @@ export default async function ReportsPage() {
                 <th className="px-5 py-2.5 font-medium">Department</th>
                 <th className="px-5 py-2.5 font-medium">SKU</th>
                 <th className="px-5 py-2.5 font-medium">Product</th>
-                <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                <th className="px-5 py-2.5 font-medium">Store</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Qty</th>
                 <th className="px-5 py-2.5 font-medium">Status</th>
               </tr>
@@ -320,7 +320,7 @@ export default async function ReportsPage() {
                   <td className="px-5 py-3">
                     <span
                       className={`rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${
-                        r.status === 'confirmed' ? 'bg-accent/15 text-accent' : 'bg-white/5 text-text-muted'
+                        r.status === 'confirmed' ? 'bg-accent/15 text-accent-strong' : 'bg-neutral-soft text-text-muted'
                       }`}
                     >
                       {r.status === 'confirmed' ? 'Ready to pick' : 'Issued'}
@@ -360,7 +360,7 @@ export default async function ReportsPage() {
                 <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOrdered.toLocaleString()}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.quantityReceived.toLocaleString()}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
-                  {r.quantityOutstanding > 0 ? r.quantityOutstanding.toLocaleString() : '—'}
+                  {r.quantityOutstanding > 0 ? r.quantityOutstanding.toLocaleString() : '-'}
                 </td>
                 <td className="px-5 py-3 text-text-muted capitalize">{r.status.replace('_', ' ')}</td>
               </tr>
@@ -403,12 +403,12 @@ export default async function ReportsPage() {
 
       <ReportSection
         title="Open purchase orders"
-        subtitle={`${openPurchaseOrders.length} issued or partially received — exceptions only`}
+        subtitle={`${openPurchaseOrders.length} issued or partially received - exceptions only`}
         exportFilename="open-purchase-orders"
         rows={openPurchaseOrders}
       >
         {openPurchaseOrders.length === 0 ? (
-          <EmptyState text="Nothing outstanding — every issued PO is fully received." />
+          <EmptyState text="Nothing outstanding - every issued PO is fully received." />
         ) : (
           <table className="w-full min-w-[720px] border-collapse text-[0.86rem]">
             <thead>
@@ -433,7 +433,7 @@ export default async function ReportsPage() {
                     R {r.outstandingValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className={`px-5 py-3 text-right tabular-nums ${(r.daysOpen ?? 0) > 14 ? 'text-danger' : 'text-text-muted'}`}>
-                    {r.daysOpen ?? '—'}
+                    {r.daysOpen ?? '-'}
                   </td>
                   <td className="px-5 py-3 text-text-muted capitalize">{r.status.replace('_', ' ')}</td>
                 </tr>
@@ -445,7 +445,7 @@ export default async function ReportsPage() {
 
       <ReportSection
         title="Stock movement history"
-        subtitle={`Last ${movementHistory.length} movements — the append-only audit trail`}
+        subtitle={`Last ${movementHistory.length} movements - the append-only audit trail`}
         exportFilename="stock-movements"
         rows={movementHistory}
       >
@@ -457,10 +457,11 @@ export default async function ReportsPage() {
               <tr className="text-left text-text-faint">
                 <th className="px-5 py-2.5 font-medium">When</th>
                 <th className="px-5 py-2.5 font-medium">SKU</th>
-                <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                <th className="px-5 py-2.5 font-medium">Store</th>
                 <th className="px-5 py-2.5 font-medium">Type</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Qty</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Unit cost</th>
+                <th className="px-5 py-2.5 font-medium">Batch</th>
                 <th className="px-5 py-2.5 font-medium">Reference</th>
               </tr>
             </thead>
@@ -476,7 +477,8 @@ export default async function ReportsPage() {
                     {r.quantity.toLocaleString()}
                   </td>
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">R {r.unitCost.toFixed(2)}</td>
-                  <td className="px-5 py-3 text-text-faint">{r.referenceType?.replace(/_/g, ' ') ?? '—'}</td>
+                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{r.batchRef ?? '-'}</td>
+                  <td className="px-5 py-3 text-text-faint">{r.referenceType?.replace(/_/g, ' ') ?? '-'}</td>
                 </tr>
               ))}
             </tbody>
@@ -486,7 +488,7 @@ export default async function ReportsPage() {
 
       <ReportSection
         title="Receiving history"
-        subtitle={`${receivingHistory.length} receipts — quick-receive and PO receipts alike`}
+        subtitle={`${receivingHistory.length} receipts - quick-receive and PO receipts alike`}
         exportFilename="receiving-history"
         rows={receivingHistory}
       >
@@ -499,7 +501,7 @@ export default async function ReportsPage() {
                 <th className="px-5 py-2.5 font-medium">Received</th>
                 <th className="px-5 py-2.5 font-medium">SKU</th>
                 <th className="px-5 py-2.5 font-medium">Product</th>
-                <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                <th className="px-5 py-2.5 font-medium">Store</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Qty</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Unit cost</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Value</th>
@@ -560,7 +562,7 @@ export default async function ReportsPage() {
 
       <ReportSection
         title="Adjustment reason summary"
-        subtitle="Counts by reason code and status — quantity/value impact isn't tracked at this level yet"
+        subtitle="Counts by reason code and status - quantity/value impact isn't tracked at this level yet"
         exportFilename="adjustment-reasons"
         rows={adjustmentReasonSummary}
       >
@@ -584,7 +586,7 @@ export default async function ReportsPage() {
                     {r.reasonCode}
                     <div className="text-[0.72rem] text-text-faint">{r.reasonDescription}</div>
                   </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-accent">{r.pendingCount}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-accent-strong">{r.pendingCount}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.approvedCount}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.rejectedCount}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">{r.totalCount}</td>

@@ -30,16 +30,7 @@ export function NewProductForm() {
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">Barcode</span>
-          <div className="flex gap-2">
-            <input ref={barcodeRef} name="barcode" placeholder="Optional" className={`${inputClass} flex-1`} />
-            <CameraScanner
-              buttonLabel="Scan"
-              className="h-9 rounded-lg border border-accent/30 bg-surface-2 px-3 py-1.5 text-[0.82rem] font-semibold text-accent hover:bg-accent/10"
-              onScan={(value) => {
-                if (barcodeRef.current) barcodeRef.current.value = value;
-              }}
-            />
-          </div>
+          <input ref={barcodeRef} name="barcode" placeholder="Optional" className={inputClass} />
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">Reorder point</span>
@@ -50,7 +41,12 @@ export function NewProductForm() {
           <input type="number" name="reorderQuantity" min="0" step="1" placeholder="Optional" className={inputClass} />
         </label>
 
-        <div className="flex items-end lg:col-span-6">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[0.75rem] font-semibold text-text-muted">Price (R)</span>
+          <input type="number" name="unitPrice" min="0" step="0.01" placeholder="Optional" className={inputClass} />
+        </label>
+
+        <div className="flex items-end gap-2 lg:col-span-6">
           <button
             type="submit"
             disabled={pending}
@@ -58,16 +54,23 @@ export function NewProductForm() {
           >
             {pending ? 'Adding…' : 'Add product'}
           </button>
+          <CameraScanner
+            buttonLabel="Scan"
+            className="rounded-lg border border-accent/30 bg-surface-2 px-5 py-2.5 text-[0.82rem] font-semibold text-accent-strong hover:bg-accent/10"
+            onScan={(value) => {
+              if (barcodeRef.current) barcodeRef.current.value = value;
+            }}
+          />
         </div>
       </form>
 
       {state.error && (
-        <p role="alert" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.82rem] text-[#f3a99a]">
+        <p role="alert" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.82rem] text-danger-text">
           {state.error}
         </p>
       )}
       {state.success && (
-        <p role="status" className="mt-3 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[0.82rem] text-accent">
+        <p role="status" className="mt-3 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[0.82rem] text-accent-strong">
           {state.success}
         </p>
       )}

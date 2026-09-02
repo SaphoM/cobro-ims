@@ -30,8 +30,8 @@ export function ReceiveLine({ poId, remaining, unit }: { poId: string; remaining
           {pending ? 'Posting…' : `Receive (${unit})`}
         </button>
       </form>
-      {state.error && <p className="text-[0.72rem] text-[#f3a99a]">{state.error}</p>}
-      {state.success && <p className="text-[0.72rem] text-accent">{state.success}</p>}
+      {state.error && <p className="text-[0.72rem] text-danger-text">{state.error}</p>}
+      {state.success && <p className="text-[0.72rem] text-accent-strong">{state.success}</p>}
     </div>
   );
 }

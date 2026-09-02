@@ -1,9 +1,11 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { isUsingMockData, roleRepository } from '@/lib/data';
 import { signOutAction } from '@/app/dashboard/actions';
 import { NavLink } from '@/app/dashboard/nav-link';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Overview' },
@@ -30,25 +32,28 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex min-h-screen">
-      {/* CSS-only mobile nav toggle — no client JS needed to open/close the drawer. */}
+      {/* CSS-only mobile nav toggle - no client JS needed to open/close the drawer. */}
       <input type="checkbox" id="mobile-nav-toggle" className="peer/nav hidden" />
 
       <aside
         className="no-print fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col gap-6 overflow-y-auto border-r border-accent/[0.14] bg-surface px-4 py-6 transition-transform duration-200 ease-out peer-checked/nav:translate-x-0 min-[992px]:static min-[992px]:z-auto min-[992px]:w-60 min-[992px]:translate-x-0"
       >
         <div className="flex items-center justify-between px-1 min-[992px]:px-0">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
-            <svg viewBox="-36 -20 72 40" className="h-7 w-7 overflow-visible" aria-hidden="true">
-              <rect x="-30" y="1" width="28" height="14" rx="2" fill="none" stroke="var(--accent)" strokeOpacity="0.4" strokeWidth="2" />
-              <rect x="-14" y="-15" width="28" height="14" rx="2" fill="var(--accent)" stroke="var(--ink)" strokeOpacity="0.25" strokeWidth="1" />
-              <rect x="2" y="1" width="28" height="14" rx="2" fill="none" stroke="var(--accent)" strokeOpacity="0.7" strokeWidth="2" />
-            </svg>
-            <span className="flex items-center gap-1.5 font-display leading-none">
-              <span className="text-[1.15rem] font-extrabold text-text">COBRO</span>
-              <span className="rounded-full border border-accent/40 bg-surface-2 px-1.5 py-0.5 font-body text-[0.58rem] font-bold tracking-[0.1em] text-accent">
-                IMS
-              </span>
-            </span>
+          {/*
+            `brand-logo` handles the theme flip (Cobro's artwork ships black on
+            transparent, so it's inverted on dark and left alone on light) —
+            see globals.css. `w-auto` keeps the supplied 264x111 aspect ratio
+            rather than squashing the lockup.
+          */}
+          <Link href="/dashboard" className="flex items-center">
+            <Image
+              src="/Asset1.png"
+              alt="Cobro Concrete IMS"
+              width={264}
+              height={111}
+              priority
+              className="brand-logo h-11 w-auto"
+            />
           </Link>
           {/*
             Close control lives inside the drawer itself, which sits above the backdrop
@@ -58,11 +63,24 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <label
             htmlFor="mobile-nav-toggle"
             aria-label="Close navigation"
-            className="-mr-1 flex h-9 w-9 flex-none items-center justify-center rounded-lg text-text-muted hover:bg-white/5 hover:text-accent min-[992px]:hidden"
+            className="-mr-1 flex h-9 w-9 flex-none items-center justify-center rounded-lg text-text-muted hover:bg-neutral-soft hover:text-accent-strong min-[992px]:hidden"
           >
             ✕
           </label>
         </div>
+
+        {/*
+          Full label, not an icon alone: an icon-only switch up here read as
+          near-invisible (a faint 25%-opacity border on a 36px square) and
+          nobody found it without being told where to look. A solid border
+          and the word "Light"/"Dark" spelled out fixes that at a glance, and
+          it sits right under the logo - above the 15-item nav list, not
+          below it - so it's never a scroll away on a laptop screen. Shown in
+          the mobile drawer too (this whole aside renders there as well),
+          alongside the icon-only copy in the mobile header for one-tap access
+          without opening the drawer first.
+        */}
+        <ThemeToggle className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-accent/50 bg-surface-2 px-3 py-2.5 text-[0.86rem] font-bold text-accent-strong transition-colors hover:border-accent hover:bg-accent/10" />
 
         <nav className="flex flex-1 flex-col gap-0.5">
           {NAV_ITEMS.map((item) => (
@@ -75,12 +93,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="flex flex-col gap-2 border-t border-accent/[0.14] pt-4">
           <div className="flex flex-col px-1">
             <span className="text-[0.8rem] text-text-muted">{session.fullName}</span>
-            <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-accent">
+            <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-accent-strong">
               {role?.description ?? role?.name ?? 'Unknown role'}
             </span>
           </div>
           <form action={signOutAction}>
-            <button type="submit" className="px-1 text-left text-[0.8rem] text-text-faint hover:text-accent">
+            <button type="submit" className="px-1 text-left text-[0.8rem] text-text-faint hover:text-accent-strong">
               Sign out
             </button>
           </form>
@@ -119,17 +137,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
           >
             ☰
           </label>
-          <span className="flex items-center gap-1.5 font-display leading-none">
-            <span className="text-[1rem] font-extrabold text-text">COBRO</span>
-            <span className="rounded-full border border-accent/40 bg-surface-2 px-1.5 py-0.5 font-body text-[0.58rem] font-bold tracking-[0.1em] text-accent">
-              IMS
-            </span>
-          </span>
+          <Image
+            src="/Asset1.png"
+            alt="Cobro Concrete IMS"
+            width={264}
+            height={111}
+            className="brand-logo h-8 w-auto"
+          />
+          {/* On phones the sidebar (and its toggle) is behind the drawer, so the
+              theme switch gets its own always-visible spot in the header. */}
+          <ThemeToggle className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg border-2 border-accent/50 bg-surface-2 text-accent-strong transition-colors hover:border-accent hover:bg-accent/10 [&>span:last-child]:sr-only" />
         </header>
 
         {isUsingMockData && (
-          <div className="no-print border-b border-accent/30 bg-accent/[0.08] px-4 py-2 text-center text-[0.8rem] text-accent sm:px-6">
-            Running on mock data — no Supabase project is connected yet.
+          <div className="no-print border-b border-accent/30 bg-accent/[0.08] px-4 py-2 text-center text-[0.8rem] text-accent-strong sm:px-6">
+            Running on mock data - no Supabase project is connected yet.
           </div>
         )}
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>

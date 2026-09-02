@@ -30,7 +30,7 @@ export function ReceiveForm({
     const match = products.find((p) => p.barcode === barcode);
     if (match && productSelectRef.current) {
       productSelectRef.current.value = match.id;
-      setScanMessage({ text: `Matched ${match.sku} — ${match.name}.`, ok: true });
+      setScanMessage({ text: `Matched ${match.sku} - ${match.name}.`, ok: true });
       quantityRef.current?.focus();
     } else {
       setScanMessage({ text: `No product with barcode "${barcode}".`, ok: false });
@@ -59,7 +59,7 @@ export function ReceiveForm({
     <div className="rounded-2xl border border-accent/[0.14] bg-surface p-5">
       <h2 className="mb-1 font-display text-[1.05rem] font-medium text-text">Receive stock (GRN)</h2>
       <p className="mb-4 text-[0.83rem] text-text-muted">
-        Creates the purchase order, the goods receipt, and posts the receipt movement in one step — a
+        Creates the purchase order, the goods receipt, and posts the receipt movement in one step - a
         deliberate shortcut while full Purchase Order lifecycle management (RFQ Phase 3) doesn&apos;t exist
         yet. The schema underneath still models PO → GRN properly.
       </p>
@@ -83,13 +83,13 @@ export function ReceiveForm({
         <div className="flex gap-2">
           <button
             type="submit"
-            className="h-9 flex-1 rounded-lg border border-accent/30 bg-surface-2 px-3 py-1.5 text-[0.82rem] font-semibold text-accent hover:bg-accent/10 sm:flex-none"
+            className="h-9 flex-1 rounded-lg border border-accent/30 bg-surface-2 px-3 py-1.5 text-[0.82rem] font-semibold text-accent-strong hover:bg-accent/10 sm:flex-none"
           >
             Match
           </button>
           <CameraScanner
             buttonLabel="Scan with camera"
-            className="h-9 flex-1 rounded-lg border border-accent/30 bg-surface-2 px-3 py-1.5 text-[0.82rem] font-semibold text-accent hover:bg-accent/10 sm:flex-none"
+            className="h-9 flex-1 rounded-lg border border-accent/30 bg-surface-2 px-3 py-1.5 text-[0.82rem] font-semibold text-accent-strong hover:bg-accent/10 sm:flex-none"
             onScan={(value) => {
               if (scanBarcodeRef.current) scanBarcodeRef.current.value = value;
               scanFormRef.current?.requestSubmit();
@@ -98,7 +98,7 @@ export function ReceiveForm({
         </div>
       </form>
       {scanMessage && (
-        <p className={`mb-4 text-[0.78rem] ${scanMessage.ok ? 'text-accent' : 'text-danger'}`}>{scanMessage.text}</p>
+        <p className={`mb-4 text-[0.78rem] ${scanMessage.ok ? 'text-accent-strong' : 'text-danger'}`}>{scanMessage.text}</p>
       )}
 
       <form action={formAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -114,7 +114,7 @@ export function ReceiveForm({
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Warehouse</span>
+          <span className="text-[0.75rem] font-semibold text-text-muted">Store</span>
           <select name="warehouseId" required className={selectClass}>
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>
@@ -129,7 +129,7 @@ export function ReceiveForm({
           <select name="productId" required ref={productSelectRef} className={selectClass}>
             {products.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.sku} — {p.name}
+                {p.sku} - {p.name}
               </option>
             ))}
           </select>
@@ -166,12 +166,12 @@ export function ReceiveForm({
       </form>
 
       {state.error && (
-        <p role="alert" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.82rem] text-[#f3a99a]">
+        <p role="alert" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.82rem] text-danger-text">
           {state.error}
         </p>
       )}
       {state.success && (
-        <p role="status" className="mt-3 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[0.82rem] text-accent">
+        <p role="status" className="mt-3 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[0.82rem] text-accent-strong">
           {state.success}
         </p>
       )}

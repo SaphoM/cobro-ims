@@ -30,8 +30,8 @@ export function PaymentLine({ invoiceId, outstanding }: { invoiceId: string; out
           {pending ? 'Recording…' : 'Record payment'}
         </button>
       </form>
-      {state.error && <p className="text-[0.72rem] text-[#f3a99a]">{state.error}</p>}
-      {state.success && <p className="text-[0.72rem] text-accent">{state.success}</p>}
+      {state.error && <p className="text-[0.72rem] text-danger-text">{state.error}</p>}
+      {state.success && <p className="text-[0.72rem] text-accent-strong">{state.success}</p>}
     </div>
   );
 }

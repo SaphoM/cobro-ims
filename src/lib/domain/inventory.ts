@@ -54,6 +54,14 @@ export interface Product {
   barcode: string | null;
   reorderPoint: number | null;
   reorderQuantity: number | null;
+  /**
+   * The product's own price, set on the catalogue and changed only by a role
+   * holding `manage_pricing`. Deliberately NOT the same number as a stock
+   * movement's `unitCost`: unit cost is what one particular delivery
+   * actually cost and is what weighted-average cost is derived from, whereas
+   * this is the standing price for the item. Null means no price is set yet.
+   */
+  unitPrice: number | null;
   isActive: boolean;
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
@@ -198,6 +206,13 @@ export interface StockMovement {
   unitCost: number;
   referenceType: string | null;
   referenceId: UUID | null;
+  /**
+   * Free-text batch / lot / delivery-note reference captured at scan time,
+   * so a movement can be traced back to the consignment it arrived on.
+   * Recorded on the movement only - on-hand is still one figure per product
+   * per store, not split per batch.
+   */
+  batchRef: string | null;
   createdBy: UUID;
   createdAt: ISODateTime;
 }

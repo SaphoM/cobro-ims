@@ -38,7 +38,7 @@ export function ExportCsvButton<T extends object>({ filename, rows }: { filename
       type="button"
       onClick={handleExport}
       disabled={rows.length === 0}
-      className="rounded-lg border border-accent/30 bg-surface-2 px-3 py-1.5 text-[0.78rem] font-semibold text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
+      className="rounded-lg border border-accent/30 bg-surface-2 px-3 py-1.5 text-[0.78rem] font-semibold text-accent-strong transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
     >
       Export CSV
     </button>

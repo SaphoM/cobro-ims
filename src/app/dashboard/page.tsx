@@ -1,14 +1,20 @@
 import { productRepository, stockLedgerRepository, warehouseRepository } from '@/lib/data';
+import { getSession } from '@/lib/auth';
+import { canSeeCosts } from '@/lib/costs';
+import { HIDDEN_COST } from '@/lib/ui/cost-display';
 import { stockValue } from '@/lib/services/inventory-engine';
 import { RecordMovementForm } from '@/app/dashboard/record-movement-form';
+import { ReservedCell } from '@/app/dashboard/reserved-cell';
 import type { StockLedgerView } from '@/lib/domain/inventory';
 
 export default async function DashboardOverviewPage() {
-  const [products, warehouses, ledgerEntries] = await Promise.all([
+  const [products, warehouses, ledgerEntries, session] = await Promise.all([
     productRepository.list(),
     warehouseRepository.list(),
     stockLedgerRepository.listAll(),
+    getSession(),
   ]);
+  const showCosts = await canSeeCosts(session);
 
   const productById = new Map(products.map((p) => [p.id, p]));
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
@@ -39,7 +45,11 @@ export default async function DashboardOverviewPage() {
         <StatTile label="SKUs tracked" value={products.length.toLocaleString()} />
         <StatTile
           label="Stock on hand (value)"
-          value={`R ${totalStockValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          value={
+            showCosts
+              ? `R ${totalStockValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : HIDDEN_COST
+          }
         />
         <StatTile
           label="Below reorder point"
@@ -52,19 +62,26 @@ export default async function DashboardOverviewPage() {
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">
-          <h2 className="font-display text-[1.05rem] font-medium text-text">Multi-warehouse stock ledger</h2>
-          <p className="text-[0.83rem] text-text-muted">Weighted-average cost, live across every location.</p>
+          <h2 className="font-display text-[1.05rem] font-medium text-text">Store</h2>
+          <p className="text-[0.83rem] text-text-muted">
+            What is on the shelf right now, by location, at weighted-average cost. Tap a Reserved
+            figure to see which requisition is holding it.
+          </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] border-collapse text-[0.86rem]">
             <thead>
               <tr className="text-left text-text-faint">
                 <th className="px-5 py-2.5 font-medium">Product</th>
-                <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                <th className="px-5 py-2.5 font-medium">Store</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">On hand</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Reserved</th>
-                <th className="px-5 py-2.5 text-right font-medium tabular-nums">WAC</th>
-                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Stock value</th>
+                {showCosts && (
+                  <>
+                    <th className="px-5 py-2.5 text-right font-medium tabular-nums">WAC</th>
+                    <th className="px-5 py-2.5 text-right font-medium tabular-nums">Stock value</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -78,20 +95,28 @@ export default async function DashboardOverviewPage() {
                   <td className="px-5 py-3 text-right tabular-nums text-text">
                     {row.quantityOnHand.toLocaleString()} {row.product.unitOfMeasure}
                     {row.isBelowReorderPoint && (
-                      <span className="ml-2 rounded-full bg-danger/15 px-2 py-0.5 text-[0.68rem] font-semibold text-[#f3a99a]">
+                      <span className="ml-2 rounded-full bg-danger/15 px-2 py-0.5 text-[0.68rem] font-semibold text-danger-text">
                         Low
                       </span>
                     )}
                   </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">
-                    {row.quantityReserved.toLocaleString()}
+                  <td className="px-5 py-3 text-right tabular-nums">
+                    <ReservedCell
+                      productId={row.productId}
+                      warehouseId={row.warehouseId}
+                      quantityReserved={row.quantityReserved}
+                    />
                   </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">
-                    R {row.weightedAverageCost.toFixed(2)}
-                  </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-text">
-                    R {row.stockValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </td>
+                  {showCosts && (
+                    <>
+                      <td className="px-5 py-3 text-right tabular-nums text-text-muted">
+                        R {row.weightedAverageCost.toFixed(2)}
+                      </td>
+                      <td className="px-5 py-3 text-right tabular-nums text-text">
+                        R {row.stockValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>

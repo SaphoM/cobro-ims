@@ -28,10 +28,10 @@ export async function requestAdjustmentAction(
   const unitCostRaw = Number(formData.get('unitCost'));
 
   if (!warehouseId || !reasonCodeId || !productId) {
-    return { error: 'Warehouse, reason and product are required.', success: null };
+    return { error: 'Store, reason and product are required.', success: null };
   }
   if (!Number.isFinite(quantityRaw) || quantityRaw <= 0) {
-    return { error: 'Quantity must be a positive number — direction is set separately.', success: null };
+    return { error: 'Quantity must be a positive number - direction is set separately.', success: null };
   }
   if (!Number.isFinite(unitCostRaw) || unitCostRaw < 0) {
     return { error: 'Unit cost must be zero or a positive number.', success: null };

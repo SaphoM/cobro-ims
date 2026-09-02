@@ -37,7 +37,7 @@ export default async function ReceivingPage({
               <thead>
                 <tr className="text-left text-text-faint">
                   <th className="px-5 py-2.5 font-medium">GRN</th>
-                  <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                  <th className="px-5 py-2.5 font-medium">Store</th>
                   <th className="px-5 py-2.5 font-medium">Status</th>
                   <th className="px-5 py-2.5 font-medium">Received</th>
                 </tr>
@@ -46,10 +46,10 @@ export default async function ReceivingPage({
                 {receipts.map((r) => (
                   <tr key={r.id} className="border-t border-accent/[0.08]">
                     <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{r.grnNumber}</td>
-                    <td className="px-5 py-3 text-text-muted">{warehouseById.get(r.warehouseId)?.code ?? '—'}</td>
+                    <td className="px-5 py-3 text-text-muted">{warehouseById.get(r.warehouseId)?.code ?? '-'}</td>
                     <td className="px-5 py-3 text-text-muted capitalize">{r.status}</td>
                     <td className="px-5 py-3 text-text-muted">
-                      {r.receivedAt ? new Date(r.receivedAt).toLocaleString('en-ZA') : '—'}
+                      {r.receivedAt ? new Date(r.receivedAt).toLocaleString('en-ZA') : '-'}
                     </td>
                   </tr>
                 ))}

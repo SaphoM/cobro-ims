@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useActionState, useRef, useState } from 'react';
 import { signInAction, type SignInFormState } from '@/app/login/actions';
 import { DEMO_ACCOUNTS } from '@/lib/demo-credentials';
@@ -22,25 +23,25 @@ export function LoginForm() {
   }
 
   return (
-    <main className="relative w-full max-w-[404px] rounded-[22px] border border-accent/[0.14] bg-gradient-to-b from-surface to-bg-2 px-9 pt-11 pb-8 shadow-[0_40px_80px_-32px_rgba(0,0,0,0.7)]">
-      <div className="mb-1 flex flex-col items-center gap-3">
-        <svg viewBox="-36 -20 72 40" className="h-11 w-11 overflow-visible" aria-hidden="true">
-          <rect x="-30" y="1" width="28" height="14" rx="2" fill="none" stroke="var(--accent)" strokeOpacity="0.4" strokeWidth="2" />
-          <rect x="-14" y="-15" width="28" height="14" rx="2" fill="var(--accent)" stroke="var(--ink)" strokeOpacity="0.25" strokeWidth="1" />
-          <rect x="2" y="1" width="28" height="14" rx="2" fill="none" stroke="var(--accent)" strokeOpacity="0.7" strokeWidth="2" />
-        </svg>
-        <h1 className="flex items-center gap-2 font-display leading-none">
-          <span className="text-[2.1rem] font-extrabold tracking-tight text-text">COBRO</span>
-          <span className="translate-y-[-1px] rounded-full border border-accent/40 bg-surface-2 px-2.5 py-1 font-body text-[0.7rem] font-bold tracking-[0.14em] text-accent">
-            IMS
-          </span>
+    <main className="relative w-full max-w-[404px] rounded-[22px] border border-accent/[0.14] bg-gradient-to-b from-surface to-bg-2 px-9 pt-11 pb-8 card-shadow">
+      <div className="mb-1 flex flex-col items-center">
+        {/* Cobro's supplied lockup. `brand-logo` inverts it on dark only. */}
+        <h1 className="flex justify-center">
+          <Image
+            src="/Asset1.png"
+            alt="Cobro Concrete IMS - Inventory Management Systems"
+            width={264}
+            height={111}
+            priority
+            className="brand-logo h-[74px] w-auto"
+          />
         </h1>
       </div>
       <p className="mb-6 text-center text-[0.92rem] text-text-muted">Sign in to manage your inventory.</p>
 
       <div className="mb-5 flex flex-col gap-2.5 rounded-xl border border-accent/[0.14] bg-surface-2 px-3.5 py-3">
         <span className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-text-faint">
-          Demo accounts — pick a role to test RBAC
+          Demo accounts - pick a role to test RBAC
         </span>
         <div className="flex flex-wrap gap-1.5">
           {DEMO_ACCOUNTS.map((account, i) => (
@@ -50,7 +51,7 @@ export function LoginForm() {
               onClick={() => autofillDemo(i)}
               className={`rounded-full border px-2.5 py-1 text-[0.74rem] font-semibold transition-colors ${
                 selectedAccount === i
-                  ? 'border-accent bg-accent/15 text-accent'
+                  ? 'border-accent bg-accent/15 text-accent-strong'
                   : 'border-accent/20 text-text-muted hover:border-accent/40 hover:text-text'
               }`}
             >
@@ -75,7 +76,7 @@ export function LoginForm() {
       {state.error && (
         <div
           role="alert"
-          className="mb-4 rounded-[10px] border border-danger/40 bg-danger/10 px-3 py-2.5 text-[0.84rem] text-[#f3a99a]"
+          className="mb-4 rounded-[10px] border border-danger/40 bg-danger/10 px-3 py-2.5 text-[0.84rem] text-danger-text"
         >
           {state.error}
         </div>
@@ -98,7 +99,7 @@ export function LoginForm() {
         <label className="flex flex-col gap-2">
           <span className="flex items-baseline justify-between gap-3">
             <span className="text-[0.8rem] font-semibold text-text-muted">Password</span>
-            <a href="#" className="text-[0.8rem] text-text-faint hover:text-accent">
+            <a href="#" className="text-[0.8rem] text-text-faint hover:text-accent-strong">
               Forgot password?
             </a>
           </span>
@@ -116,7 +117,7 @@ export function LoginForm() {
               type="button"
               onClick={() => setShowPassword((v) => !v)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="absolute top-1/2 right-1.5 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-text-faint hover:bg-white/5 hover:text-text-muted"
+              className="absolute top-1/2 right-1.5 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-text-faint hover:bg-neutral-soft hover:text-text-muted"
             >
               {showPassword ? <EyeOffIcon /> : <EyeIcon />}
             </button>
@@ -138,7 +139,7 @@ export function LoginForm() {
       </form>
 
       <p className="mt-6 text-center text-[0.86rem] text-text-faint">
-        Need access? <a href="#" className="font-semibold text-accent hover:underline">Contact your administrator</a>
+        Need access? <a href="#" className="font-semibold text-accent-strong hover:underline">Contact your administrator</a>
       </p>
     </main>
   );

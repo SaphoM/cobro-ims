@@ -1,11 +1,9 @@
 'use client';
 
-import { useActionState } from 'react';
-import { recordMovementAction, type RecordMovementFormState } from '@/app/dashboard/actions';
+import { useState } from 'react';
+import { ScanMovement } from '@/app/dashboard/scan-movement';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import type { Product, Warehouse } from '@/lib/domain/inventory';
-
-const initialState: RecordMovementFormState = { error: null, success: null };
 
 const MOVEMENT_LABELS: Record<string, string> = {
   receipt: 'Receipt (GRN)',
@@ -16,39 +14,64 @@ const MOVEMENT_LABELS: Record<string, string> = {
   write_off: 'Write-off',
 };
 
+/**
+ * Every field is controlled here rather than left to the DOM, because the
+ * Scan flow both reads and writes them: scanning sets Product, and the
+ * quantity/cost typed in the scan dialog are the same values shown in the
+ * form. Keeping one source of truth means the form can never display
+ * something different from what actually gets posted.
+ *
+ * There is no submit button - Scan is the action (see ScanMovement). The
+ * fields stay visible and editable so the operator can see and adjust the
+ * whole movement before the scan commits it.
+ */
 export function RecordMovementForm({ products, warehouses }: { products: Product[]; warehouses: Warehouse[] }) {
-  const [state, formAction, pending] = useActionState(recordMovementAction, initialState);
+  const [productId, setProductId] = useState(products[0]?.id ?? '');
+  const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? '');
+  const [movementType, setMovementType] = useState('receipt');
+  const [quantity, setQuantity] = useState('1');
+  const [unitCost, setUnitCost] = useState('0');
+  const [posted, setPosted] = useState<string | null>(null);
 
   return (
     <div className="rounded-2xl border border-accent/[0.14] bg-surface p-5">
       <h2 className="mb-1 font-display text-[1.05rem] font-medium text-text">Record a stock movement</h2>
       <p className="mb-4 text-[0.83rem] text-text-muted">
-        Proves the inventory engine end-to-end: this posts an append-only movement, then re-derives the
-        ledger&apos;s quantity and weighted-average cost from it — the same path GRN, dispatch, transfers and
-        write-offs will all use once those modules exist.
+        Set the store, type and cost, then scan. The scan identifies the product from the catalogue,
+        confirms the quantity, and posts it - re-deriving on-hand and weighted-average cost through the
+        same engine goods receiving, requisitions, transfers and write-offs all use.
       </p>
 
-      <form action={formAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      {/*
+        Same five-column layout the form has always had, with Scan taking the
+        place the submit button used to occupy. `lg:col-start-3` is what pins
+        Scan directly beneath Store: grid auto-placement would otherwise drop
+        it into whatever cell fell free next, and the alignment would drift
+        the moment a field moved. The blank label row above the button matches
+        the label height on the controls beside it, so its top edge lines up
+        with them instead of riding high.
+      */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <label className="flex flex-col gap-1.5 lg:col-span-2">
           <span className="text-[0.75rem] font-semibold text-text-muted">Product</span>
           <select
-            name="productId"
-            required
+            value={productId}
+            onChange={(e) => setProductId(e.target.value)}
             className={selectClass}
           >
             {products.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.sku} — {p.name}
+                {p.sku} - {p.name}
               </option>
             ))}
           </select>
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Warehouse</span>
+          <span className="text-[0.75rem] font-semibold text-text-muted">Store</span>
           <select
-            name="warehouseId"
-            required
+            value={warehouseId}
+            onChange={(e) => setWarehouseId(e.target.value)}
             className={selectClass}
           >
             {warehouses.map((w) => (
@@ -62,9 +85,8 @@ export function RecordMovementForm({ products, warehouses }: { products: Product
         <label className="flex flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">Type</span>
           <select
-            name="movementType"
-            required
-            defaultValue="receipt"
+            value={movementType}
+            onChange={(e) => setMovementType(e.target.value)}
             className={selectClass}
           >
             {Object.entries(MOVEMENT_LABELS).map(([value, label]) => (
@@ -79,47 +101,48 @@ export function RecordMovementForm({ products, warehouses }: { products: Product
           <span className="text-[0.75rem] font-semibold text-text-muted">Quantity</span>
           <input
             type="number"
-            name="quantity"
             min="0.001"
             step="0.001"
-            required
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
             placeholder="0"
             className={inputClass}
           />
         </label>
 
-        <label className="flex flex-col gap-1.5">
+        <label className="flex flex-col gap-1.5 lg:col-start-1">
           <span className="text-[0.75rem] font-semibold text-text-muted">Unit cost (R)</span>
           <input
             type="number"
-            name="unitCost"
             min="0"
             step="0.01"
-            required
+            value={unitCost}
+            onChange={(e) => setUnitCost(e.target.value)}
             placeholder="0.00"
             className={inputClass}
           />
         </label>
 
-        <div className="flex items-end lg:col-span-5">
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-lg bg-accent px-5 py-2.5 text-[0.88rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:opacity-90"
-          >
-            {pending ? 'Posting…' : 'Post movement'}
-          </button>
+        <div className="flex flex-col gap-1.5 lg:col-start-3">
+          <span aria-hidden="true" className="text-[0.75rem] font-semibold text-text-muted">
+            &nbsp;
+          </span>
+          <ScanMovement
+            warehouseId={warehouseId}
+            movementType={movementType}
+            quantity={quantity}
+            unitCost={unitCost}
+            onQuantityChange={setQuantity}
+            onUnitCostChange={setUnitCost}
+            onProductIdentified={setProductId}
+            onPosted={setPosted}
+          />
         </div>
-      </form>
+      </div>
 
-      {state.error && (
-        <p role="alert" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.82rem] text-[#f3a99a]">
-          {state.error}
-        </p>
-      )}
-      {state.success && (
-        <p role="status" className="mt-3 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[0.82rem] text-accent">
-          {state.success}
+      {posted && (
+        <p role="status" className="mt-4 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[0.82rem] text-accent-strong">
+          {posted}
         </p>
       )}
     </div>

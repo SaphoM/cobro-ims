@@ -22,7 +22,7 @@ export function PurchaseOrderForm({
     <div className="rounded-2xl border border-accent/[0.14] bg-surface p-5">
       <h2 className="mb-1 font-display text-[1.05rem] font-medium text-text">New purchase order</h2>
       <p className="mb-4 text-[0.83rem] text-text-muted">
-        Saved as a draft — nothing is sent to the supplier or posted to the ledger until it&apos;s issued
+        Saved as a draft - nothing is sent to the supplier or posted to the ledger until it&apos;s issued
         and then received.
       </p>
 
@@ -39,7 +39,7 @@ export function PurchaseOrderForm({
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Warehouse</span>
+          <span className="text-[0.75rem] font-semibold text-text-muted">Store</span>
           <select name="warehouseId" required className={selectClass}>
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>
@@ -54,7 +54,7 @@ export function PurchaseOrderForm({
           <select name="productId" required className={selectClass}>
             {products.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.sku} — {p.name}
+                {p.sku} - {p.name}
               </option>
             ))}
           </select>
@@ -82,12 +82,12 @@ export function PurchaseOrderForm({
       </form>
 
       {state.error && (
-        <p role="alert" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.82rem] text-[#f3a99a]">
+        <p role="alert" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.82rem] text-danger-text">
           {state.error}
         </p>
       )}
       {state.success && (
-        <p role="status" className="mt-3 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[0.82rem] text-accent">
+        <p role="status" className="mt-3 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[0.82rem] text-accent-strong">
           {state.success}
         </p>
       )}

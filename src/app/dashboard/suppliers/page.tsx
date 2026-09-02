@@ -32,9 +32,9 @@ export default async function SuppliersPage() {
               {sorted.map((s) => (
                 <tr key={s.id} className="border-t border-accent/[0.08]">
                   <td className="px-5 py-3 text-text">{s.name}</td>
-                  <td className="px-5 py-3 text-text-muted">{s.contactEmail ?? '—'}</td>
-                  <td className="px-5 py-3 text-text-muted">{s.contactPhone ?? '—'}</td>
-                  <td className="px-5 py-3 text-text-muted">{s.address ?? '—'}</td>
+                  <td className="px-5 py-3 text-text-muted">{s.contactEmail ?? '-'}</td>
+                  <td className="px-5 py-3 text-text-muted">{s.contactPhone ?? '-'}</td>
+                  <td className="px-5 py-3 text-text-muted">{s.address ?? '-'}</td>
                 </tr>
               ))}
             </tbody>

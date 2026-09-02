@@ -14,7 +14,7 @@ export default async function TransfersPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-display text-[1.3rem] font-medium text-text">Inter-warehouse transfers</h1>
+        <h1 className="font-display text-[1.3rem] font-medium text-text">Inter-store transfers</h1>
         <p className="text-[0.86rem] text-text-muted">In-transit stock is out of the source ledger but not yet in the destination&apos;s.</p>
       </div>
 
@@ -48,8 +48,8 @@ export default async function TransfersPage() {
                       <span
                         className={`rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${
                           t.status === 'in_transit'
-                            ? 'bg-accent/15 text-accent'
-                            : 'bg-white/5 text-text-muted'
+                            ? 'bg-accent/15 text-accent-strong'
+                            : 'bg-neutral-soft text-text-muted'
                         }`}
                       >
                         {t.status === 'in_transit' ? 'In transit' : 'Completed'}
@@ -58,7 +58,7 @@ export default async function TransfersPage() {
                     <td className="px-5 py-3 text-right">
                       {t.status === 'in_transit' && (
                         <form action={completeTransferAction.bind(null, t.id)}>
-                          <button type="submit" className="text-[0.8rem] font-semibold text-accent hover:text-accent-hover">
+                          <button type="submit" className="text-[0.8rem] font-semibold text-accent-strong hover:text-accent-hover">
                             Mark received
                           </button>
                         </form>

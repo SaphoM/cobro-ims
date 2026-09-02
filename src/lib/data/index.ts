@@ -23,6 +23,7 @@ import {
   mockStockMovementRepository,
   mockSupplierRepository,
   mockTransferRepository,
+  mockSettingsRepository,
   mockUserRepository,
   mockWarehouseRepository,
 } from '@/lib/data/mock/repositories';
@@ -52,5 +53,6 @@ export const invoiceRepository = mockInvoiceRepository;
 export const adjustmentReasonRepository = mockAdjustmentReasonRepository;
 export const stockAdjustmentRepository = mockStockAdjustmentRepository;
 export const userRepository = mockUserRepository;
+export const settingsRepository = mockSettingsRepository;
 
 export const isUsingMockData = DATA_SOURCE === 'mock';

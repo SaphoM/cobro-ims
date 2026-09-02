@@ -28,9 +28,9 @@ export default async function BomPage({
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Bill of materials</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Flat parent → component structure — the schema&apos;s committed shape. Whether Cobro needs
+          Flat parent → component structure - the schema&apos;s committed shape. Whether Cobro needs
           nested/multi-level BOM is still a{' '}
-          <span className="text-accent">BUSINESS DECISION REQUIRED</span> item; this covers what&apos;s
+          <span className="text-accent-strong">BUSINESS DECISION REQUIRED</span> item; this covers what&apos;s
           built today.
         </p>
       </div>
@@ -53,14 +53,14 @@ export default async function BomPage({
             </option>
             {sortedProducts.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.sku} — {p.name}
+                {p.sku} - {p.name}
               </option>
             ))}
           </select>
         </label>
         <button
           type="submit"
-          className="h-9 rounded-lg border border-accent/30 bg-surface-2 px-5 py-1.5 text-[0.88rem] font-semibold text-accent hover:bg-accent/10"
+          className="h-9 rounded-lg border border-accent/30 bg-surface-2 px-5 py-1.5 text-[0.88rem] font-semibold text-accent-strong hover:bg-accent/10"
         >
           View BOM
         </button>
@@ -77,7 +77,7 @@ export default async function BomPage({
             </p>
             {componentOptions.length === 0 ? (
               <p className="text-[0.83rem] text-text-faint">
-                No other products available to add — either every product is already on this BOM, or the
+                No other products available to add - either every product is already on this BOM, or the
                 catalogue only has this one product.
               </p>
             ) : (
@@ -93,7 +93,7 @@ export default async function BomPage({
             </div>
             {bomLines.length === 0 ? (
               <p className="px-5 py-6 text-[0.85rem] text-text-faint">
-                No components yet — {selected.sku} has no bill of materials.
+                No components yet - {selected.sku} has no bill of materials.
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -155,7 +155,7 @@ export default async function BomPage({
                 </label>
                 <button
                   type="submit"
-                  className="h-9 rounded-lg border border-accent/30 bg-surface-2 px-4 py-1.5 text-[0.85rem] font-semibold text-accent hover:bg-accent/10"
+                  className="h-9 rounded-lg border border-accent/30 bg-surface-2 px-4 py-1.5 text-[0.85rem] font-semibold text-accent-strong hover:bg-accent/10"
                 >
                   Recalculate
                 </button>
@@ -176,7 +176,7 @@ export default async function BomPage({
                       return (
                         <tr key={line.id} className="border-t border-accent/[0.08]">
                           <td className="px-5 py-3 text-text">
-                            {component?.sku} <span className="text-text-faint">— {component?.name}</span>
+                            {component?.sku} <span className="text-text-faint">- {component?.name}</span>
                           </td>
                           <td className="px-5 py-3 text-right tabular-nums text-text">
                             {(line.quantity * explosionQty).toLocaleString()} {component?.unitOfMeasure}

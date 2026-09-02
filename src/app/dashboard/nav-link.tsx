@@ -18,7 +18,7 @@ export function NavLink({ href, children }: { href: string; children: React.Reac
         if (toggle) toggle.checked = false;
       }}
       className={`rounded-lg px-3 py-2 text-[0.86rem] transition-colors ${
-        active ? 'bg-accent/[0.12] font-medium text-accent' : 'text-text-muted hover:bg-white/5 hover:text-text'
+        active ? 'bg-accent/[0.12] font-medium text-accent-strong' : 'text-text-muted hover:bg-neutral-soft hover:text-text'
       }`}
     >
       {children}

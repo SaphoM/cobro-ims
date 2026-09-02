@@ -61,7 +61,7 @@ export async function recordPaymentAction(
     revalidatePath('/dashboard/invoices');
     return {
       error: null,
-      success: `Payment of R${amount.toFixed(2)} recorded — ${invoice.invoiceNumber} is now ${invoice.status.replace('_', ' ')}.`,
+      success: `Payment of R${amount.toFixed(2)} recorded - ${invoice.invoiceNumber} is now ${invoice.status.replace('_', ' ')}.`,
     };
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Could not record the payment.', success: null };
@@ -91,7 +91,7 @@ export async function issueCreditNoteAction(
     return { error: 'Credit amount must be a positive number.', success: null };
   }
   if (!reason) {
-    return { error: 'A reason is required — e.g. return, pricing correction, goodwill.', success: null };
+    return { error: 'A reason is required - e.g. return, pricing correction, goodwill.', success: null };
   }
 
   try {
@@ -106,7 +106,7 @@ export async function issueCreditNoteAction(
     revalidatePath('/dashboard/invoices');
     return {
       error: null,
-      success: `${creditNote.creditNoteNumber} issued for R${amount.toFixed(2)} — ${invoice.invoiceNumber} is now ${invoice.status.replace('_', ' ')}.`,
+      success: `${creditNote.creditNoteNumber} issued for R${amount.toFixed(2)} - ${invoice.invoiceNumber} is now ${invoice.status.replace('_', ' ')}.`,
     };
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Could not issue the credit note.', success: null };

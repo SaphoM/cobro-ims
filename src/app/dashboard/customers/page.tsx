@@ -10,7 +10,7 @@ export default async function CustomersPage() {
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Departments</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Internal workshops and departments — feeds the requesting-department picker on the requisitions
+          Internal workshops and departments - feeds the requesting-department picker on the requisitions
           page. Not customer records; Cobro IMS is internal MRO stock control, not a sales platform.
         </p>
       </div>
@@ -35,9 +35,9 @@ export default async function CustomersPage() {
               {sorted.map((c) => (
                 <tr key={c.id} className="border-t border-accent/[0.08]">
                   <td className="px-5 py-3 text-text">{c.name}</td>
-                  <td className="px-5 py-3 text-text-muted">{c.contactEmail ?? '—'}</td>
-                  <td className="px-5 py-3 text-text-muted">{c.contactPhone ?? '—'}</td>
-                  <td className="px-5 py-3 text-text-muted">{c.address ?? '—'}</td>
+                  <td className="px-5 py-3 text-text-muted">{c.contactEmail ?? '-'}</td>
+                  <td className="px-5 py-3 text-text-muted">{c.contactPhone ?? '-'}</td>
+                  <td className="px-5 py-3 text-text-muted">{c.address ?? '-'}</td>
                 </tr>
               ))}
             </tbody>

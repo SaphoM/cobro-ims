@@ -10,13 +10,13 @@ export default async function AuditLogPage() {
         <h1 className="font-display text-[1.3rem] font-medium text-text">Audit log</h1>
         <p className="text-[0.86rem] text-text-muted">
           Every approval, issue, receipt, dispatch, invoice and product-catalogue change writes an entry
-          here. Append-only by construction today — see the note below on what &quot;immutable&quot; means
+          here. Append-only by construction today - see the note below on what &quot;immutable&quot; means
           before a real database exists.
         </p>
       </div>
 
-      <div className="rounded-xl border border-accent/30 bg-accent/[0.08] px-4 py-3 text-[0.82rem] text-accent">
-        The RFQ requires the audit log to be immutable <em>enforced at the database level</em> — no record
+      <div className="rounded-xl border border-accent/30 bg-accent/[0.08] px-4 py-3 text-[0.82rem] text-accent-strong">
+        The RFQ requires the audit log to be immutable <em>enforced at the database level</em> - no record
         may ever be deleted or modified. The mock repository here has no update/delete method at all, so
         nothing in this codebase can alter an entry once written, but that&apos;s an application-layer
         guarantee, not a database one. The actual trigger that enforces this in Postgres is written and
@@ -50,7 +50,7 @@ export default async function AuditLogPage() {
                     <td className="px-5 py-3">
                       <span
                         className={`rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${
-                          e.action === 'insert' ? 'bg-accent/15 text-accent' : 'bg-white/5 text-text-muted'
+                          e.action === 'insert' ? 'bg-accent/15 text-accent-strong' : 'bg-neutral-soft text-text-muted'
                         }`}
                       >
                         {e.action}
@@ -58,7 +58,7 @@ export default async function AuditLogPage() {
                     </td>
                     <td className="px-5 py-3 font-mono-brand text-[0.72rem] text-text-faint">{e.recordId}</td>
                     <td className="px-5 py-3 text-text-muted">
-                      {e.changedBy ? (userById.get(e.changedBy)?.fullName ?? e.changedBy) : '—'}
+                      {e.changedBy ? (userById.get(e.changedBy)?.fullName ?? e.changedBy) : '-'}
                     </td>
                   </tr>
                 ))}

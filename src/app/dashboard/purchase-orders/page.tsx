@@ -26,9 +26,9 @@ export default async function PurchaseOrdersPage() {
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Purchase orders</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Draft → issue → receive (one or more times — partial receipts are tracked against the order).
+          Draft → issue → receive (one or more times - partial receipts are tracked against the order).
           For ad-hoc receipts with no PO, use{' '}
-          <a href="/dashboard/receiving" className="text-accent hover:underline">
+          <a href="/dashboard/receiving" className="text-accent-strong hover:underline">
             Goods receiving
           </a>{' '}
           instead.
@@ -51,7 +51,7 @@ export default async function PurchaseOrdersPage() {
                   <th className="px-5 py-2.5 font-medium">PO</th>
                   <th className="px-5 py-2.5 font-medium">Supplier</th>
                   <th className="px-5 py-2.5 font-medium">Product</th>
-                  <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                  <th className="px-5 py-2.5 font-medium">Store</th>
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">Ordered</th>
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">Received</th>
                   <th className="px-5 py-2.5 font-medium">Status</th>
@@ -67,7 +67,7 @@ export default async function PurchaseOrdersPage() {
                       <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{po.poNumber}</td>
                       <td className="px-5 py-3 text-text-muted">{supplierById.get(po.supplierId)?.name}</td>
                       <td className="px-5 py-3 text-text-muted">
-                        {product?.sku} <span className="text-text-faint">— {product?.name}</span>
+                        {product?.sku} <span className="text-text-faint">- {product?.name}</span>
                       </td>
                       <td className="px-5 py-3 text-text-muted">{warehouseById.get(po.warehouseId)?.code}</td>
                       <td className="px-5 py-3 text-right tabular-nums text-text">
@@ -82,7 +82,7 @@ export default async function PurchaseOrdersPage() {
                       <td className="px-5 py-3 text-right">
                         {po.status === 'draft' && (
                           <form action={issuePurchaseOrderAction.bind(null, po.id)}>
-                            <button type="submit" className="text-[0.8rem] font-semibold text-accent hover:text-accent-hover">
+                            <button type="submit" className="text-[0.8rem] font-semibold text-accent-strong hover:text-accent-hover">
                               Issue
                             </button>
                           </form>
@@ -105,11 +105,11 @@ export default async function PurchaseOrdersPage() {
 
 function StatusPill({ status }: { status: PoStatus }) {
   const styles: Record<PoStatus, string> = {
-    draft: 'bg-white/5 text-text-muted',
-    issued: 'bg-accent/15 text-accent',
-    partially_received: 'bg-accent/15 text-accent',
-    received: 'bg-white/5 text-text-muted',
-    cancelled: 'bg-danger/15 text-[#f3a99a]',
+    draft: 'bg-neutral-soft text-text-muted',
+    issued: 'bg-accent/15 text-accent-strong',
+    partially_received: 'bg-accent/15 text-accent-strong',
+    received: 'bg-neutral-soft text-text-muted',
+    cancelled: 'bg-danger/15 text-danger-text',
   };
   const labels: Record<PoStatus, string> = {
     draft: 'Draft',

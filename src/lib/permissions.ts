@@ -28,6 +28,7 @@ export type Permission =
   | 'manage_invoices'
   | 'manage_suppliers'
   | 'manage_customers'
+  | 'manage_pricing'
   | 'view_reports';
 
 const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {

@@ -26,6 +26,7 @@ export async function createProductAction(
   const barcode = String(formData.get('barcode') ?? '').trim();
   const reorderPointRaw = formData.get('reorderPoint');
   const reorderQuantityRaw = formData.get('reorderQuantity');
+  const unitPriceRaw = String(formData.get('unitPrice') ?? '').trim();
 
   if (!sku || !name || !unitOfMeasure) {
     return { error: 'SKU, name and unit of measure are required.', success: null };
@@ -39,6 +40,7 @@ export async function createProductAction(
       barcode: barcode || null,
       reorderPoint: reorderPointRaw ? Number(reorderPointRaw) : null,
       reorderQuantity: reorderQuantityRaw ? Number(reorderQuantityRaw) : null,
+      unitPrice: unitPriceRaw === '' ? null : Number(unitPriceRaw),
     });
     await auditLogRepository.write({
       tableName: 'products',
@@ -48,7 +50,7 @@ export async function createProductAction(
       after: product,
     });
     revalidatePath('/dashboard/products');
-    return { error: null, success: `Added ${product.sku} — ${product.name}.` };
+    return { error: null, success: `Added ${product.sku} - ${product.name}.` };
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Could not create product.', success: null };
   }

@@ -249,10 +249,12 @@ export interface MovementHistoryRow {
   quantity: number;
   unitCost: number;
   referenceType: string | null;
+  /** Batch / delivery-note reference captured when the movement was scanned. */
+  batchRef: string | null;
 }
 
 export function buildMovementHistory(
-  movements: { productId: string; warehouseId: string; movementType: string; quantity: number; unitCost: number; referenceType: string | null; createdAt: string }[],
+  movements: { productId: string; warehouseId: string; movementType: string; quantity: number; unitCost: number; referenceType: string | null; batchRef: string | null; createdAt: string }[],
   products: Product[],
   warehouses: Warehouse[]
 ): MovementHistoryRow[] {
@@ -268,6 +270,7 @@ export function buildMovementHistory(
       quantity: m.quantity,
       unitCost: m.unitCost,
       referenceType: m.referenceType,
+      batchRef: m.batchRef,
     }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

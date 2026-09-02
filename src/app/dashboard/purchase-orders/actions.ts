@@ -110,7 +110,7 @@ export async function receivePurchaseOrderAction(
     revalidatePath('/dashboard');
     return {
       error: null,
-      success: `Received ${quantity} on ${purchaseOrder.poNumber} — now ${purchaseOrder.status.replace('_', ' ')}.`,
+      success: `Received ${quantity} on ${purchaseOrder.poNumber} - now ${purchaseOrder.status.replace('_', ' ')}.`,
     };
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Could not post the receipt.', success: null };

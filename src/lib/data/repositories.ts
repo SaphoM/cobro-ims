@@ -76,6 +76,7 @@ export interface CreateProductInput {
   barcode?: string | null;
   reorderPoint?: number | null;
   reorderQuantity?: number | null;
+  unitPrice?: number | null;
 }
 
 export interface AddBomLineInput {
@@ -91,6 +92,12 @@ export interface ProductRepository {
   /** Barcode/QR lookup — RFQ Phase 5. Matches on the exact barcode value scanned. */
   getByBarcode(barcode: string): Promise<Product | null>;
   create(input: CreateProductInput): Promise<Product>;
+  /**
+   * Changes a product's standing price. Separate from `create` because it is
+   * separately permissioned - only `manage_pricing` may call it - and it is
+   * the one product field that changes on its own schedule.
+   */
+  setUnitPrice(productId: string, unitPrice: number | null): Promise<Product>;
   /**
    * Flat parent -> component BOM only — the schema/migration's committed
    * shape. Whether Cobro needs nested/multi-level BOM (e.g. a palletised
@@ -125,6 +132,8 @@ export interface RecordMovementInput {
   unitCost: number;
   referenceType?: string;
   referenceId?: string;
+  /** Batch / lot / delivery-note reference, recorded on the movement. */
+  batchRef?: string | null;
   createdBy: string;
 }
 
@@ -300,6 +309,25 @@ export interface InvoiceRepository {
    */
   issueCreditNote(invoiceId: string, amount: number, reason: string, issuedBy: string): Promise<{ invoice: Invoice; creditNote: CreditNote }>;
   listCreditNotes(invoiceId: string): Promise<CreditNote[]>;
+}
+
+/**
+ * App-wide settings. Currently just one flag, but it is a repository rather
+ * than a constant because it is operator-controlled state that has to
+ * survive alongside the rest of the data and will move to Supabase with it.
+ */
+export interface AppSettings {
+  /**
+   * When false, roles without `manage_pricing` see no money anywhere -
+   * prices, unit costs, weighted-average cost and stock values are all
+   * withheld. Admin always sees them regardless.
+   */
+  showCostsToAllRoles: boolean;
+}
+
+export interface SettingsRepository {
+  get(): Promise<AppSettings>;
+  setShowCostsToAllRoles(visible: boolean): Promise<AppSettings>;
 }
 
 export interface UserRepository {

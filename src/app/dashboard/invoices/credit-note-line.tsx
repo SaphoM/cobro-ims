@@ -32,13 +32,13 @@ export function CreditNoteLine({ invoiceId, outstanding }: { invoiceId: string; 
         <button
           type="submit"
           disabled={pending}
-          className="h-9 rounded-lg border border-accent/30 px-3 py-1.5 text-[0.78rem] font-semibold text-accent transition-colors hover:bg-accent/10 disabled:opacity-90"
+          className="h-9 rounded-lg border border-accent/30 px-3 py-1.5 text-[0.78rem] font-semibold text-accent-strong transition-colors hover:bg-accent/10 disabled:opacity-90"
         >
           {pending ? 'Issuing…' : 'Issue credit note'}
         </button>
       </form>
-      {state.error && <p className="text-[0.72rem] text-[#f3a99a]">{state.error}</p>}
-      {state.success && <p className="text-[0.72rem] text-accent">{state.success}</p>}
+      {state.error && <p className="text-[0.72rem] text-danger-text">{state.error}</p>}
+      {state.success && <p className="text-[0.72rem] text-accent-strong">{state.success}</p>}
     </div>
   );
 }

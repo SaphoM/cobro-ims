@@ -52,8 +52,10 @@ import type {
   ReceivingRepository,
   RecordMovementInput,
   RequestAdjustmentInput,
+  AppSettings,
   RoleRepository,
   SalesOrderRepository,
+  SettingsRepository,
   StockAdjustmentRepository,
   StockLedgerRepository,
   StockMovementRepository,
@@ -129,6 +131,7 @@ async function postMovement(input: RecordMovementInput) {
     unitCost: input.unitCost,
     referenceType: input.referenceType ?? null,
     referenceId: input.referenceId ?? null,
+    batchRef: input.batchRef?.trim() ? input.batchRef.trim() : null,
     createdBy: input.createdBy,
     createdAt: new Date().toISOString(),
   };
@@ -191,6 +194,17 @@ export const mockProductRepository: ProductRepository = {
     if (state.products.some((p) => p.sku.toLowerCase() === input.sku.toLowerCase())) {
       throw new Error(`SKU "${input.sku}" already exists.`);
     }
+    // A duplicate barcode is worse than a duplicate SKU: getByBarcode (the
+    // scan station, the labels page) returns the first match with no way to
+    // tell two products apart by their barcode alone, so a duplicate here
+    // would make the scanner silently resolve to the wrong product every
+    // time the second one is scanned. Blocked at creation - the one place a
+    // barcode enters the system, since there's no product-edit path that
+    // could introduce one after the fact.
+    if (input.barcode && state.products.some((p) => p.barcode === input.barcode)) {
+      const clash = state.products.find((p) => p.barcode === input.barcode)!;
+      throw new Error(`Barcode "${input.barcode}" is already assigned to ${clash.sku} - ${clash.name}.`);
+    }
     const now = new Date().toISOString();
     const product: Product = {
       id: randomUUID(),
@@ -202,11 +216,22 @@ export const mockProductRepository: ProductRepository = {
       barcode: input.barcode ?? null,
       reorderPoint: input.reorderPoint ?? null,
       reorderQuantity: input.reorderQuantity ?? null,
+      unitPrice: input.unitPrice ?? null,
       isActive: true,
       createdAt: now,
       updatedAt: now,
     };
     state.products.push(product);
+    return product;
+  },
+  async setUnitPrice(productId, unitPrice) {
+    const product = state.products.find((p) => p.id === productId);
+    if (!product) throw new Error('That product could not be found.');
+    if (unitPrice !== null && (!Number.isFinite(unitPrice) || unitPrice < 0)) {
+      throw new Error('Price must be zero or a positive number.');
+    }
+    product.unitPrice = unitPrice;
+    product.updatedAt = new Date().toISOString();
     return product;
   },
   async listBom(parentProductId): Promise<ProductBomLine[]> {
@@ -221,7 +246,7 @@ export const mockProductRepository: ProductRepository = {
         (l) => l.parentProductId === input.parentProductId && l.componentProductId === input.componentProductId
       )
     ) {
-      throw new Error('That component is already on this BOM — remove it first to change the quantity.');
+      throw new Error('That component is already on this BOM - remove it first to change the quantity.');
     }
     const line: ProductBomLine = {
       id: randomUUID(),
@@ -388,7 +413,7 @@ export const mockReceivingRepository: ReceivingRepository = {
 
 function withLine(po: PurchaseOrder): PurchaseOrderWithLine {
   const line = state.purchaseOrderLines.get(po.id);
-  if (!line) throw new Error(`Purchase order ${po.poNumber} has no line — data inconsistency.`);
+  if (!line) throw new Error(`Purchase order ${po.poNumber} has no line - data inconsistency.`);
   return { ...po, line };
 }
 
@@ -537,7 +562,7 @@ export const mockTransferRepository: TransferRepository = {
     if (transfer.status !== 'in_transit') throw new Error(`Transfer is already ${transfer.status}.`);
 
     const line = pendingTransferLines.get(transferId);
-    if (!line) throw new Error('Transfer line details missing — cannot complete.');
+    if (!line) throw new Error('Transfer line details missing - cannot complete.');
 
     await postMovement({
       productId: line.productId,
@@ -606,7 +631,7 @@ export const mockStockAdjustmentRepository: StockAdjustmentRepository = {
 
     if (decision === 'approved') {
       const line = pendingAdjustmentLines.get(adjustmentId);
-      if (!line) throw new Error('Adjustment line details missing — cannot approve.');
+      if (!line) throw new Error('Adjustment line details missing - cannot approve.');
       await postMovement({
         productId: line.productId,
         warehouseId: adjustment.warehouseId,
@@ -819,6 +844,23 @@ export const mockInvoiceRepository: InvoiceRepository = {
   },
   async listCreditNotes(invoiceId) {
     return state.creditNotes.filter((c) => c.invoiceId === invoiceId);
+  },
+};
+
+/**
+ * Costs are visible to every role by default, matching how the app behaved
+ * before this setting existed - turning it off is a deliberate act by an
+ * admin, not something that silently happens on first run.
+ */
+const settingsState: AppSettings = { showCostsToAllRoles: true };
+
+export const mockSettingsRepository: SettingsRepository = {
+  async get() {
+    return { ...settingsState };
+  },
+  async setShowCostsToAllRoles(visible: boolean) {
+    settingsState.showCostsToAllRoles = visible;
+    return { ...settingsState };
   },
 };
 

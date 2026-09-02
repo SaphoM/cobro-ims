@@ -33,12 +33,12 @@ export default async function AdjustmentsPage({
       </div>
 
       {session && !session.mfaEnrolled && (
-        <div className="rounded-xl border border-accent/30 bg-accent/[0.08] px-4 py-3 text-[0.82rem] text-accent">
+        <div className="rounded-xl border border-accent/30 bg-accent/[0.08] px-4 py-3 text-[0.82rem] text-accent-strong">
           Approving or rejecting requires 2FA. Enable it under{' '}
           <a href="/dashboard/security" className="font-semibold underline">
             Security
           </a>{' '}
-          first — requesting an adjustment doesn&apos;t need it.
+          first - requesting an adjustment doesn&apos;t need it.
         </div>
       )}
 
@@ -56,7 +56,7 @@ export default async function AdjustmentsPage({
               <thead>
                 <tr className="text-left text-text-faint">
                   <th className="px-5 py-2.5 font-medium">Adjustment</th>
-                  <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                  <th className="px-5 py-2.5 font-medium">Store</th>
                   <th className="px-5 py-2.5 font-medium">Reason</th>
                   <th className="px-5 py-2.5 font-medium">Status</th>
                   <th className="px-5 py-2.5 font-medium"></th>
@@ -75,7 +75,7 @@ export default async function AdjustmentsPage({
                       {a.status === 'pending_approval' && (
                         <div className="flex justify-end gap-3">
                           <form action={decideAdjustmentAction.bind(null, a.id, 'approved')}>
-                            <button type="submit" className="text-[0.8rem] font-semibold text-accent hover:text-accent-hover">
+                            <button type="submit" className="text-[0.8rem] font-semibold text-accent-strong hover:text-accent-hover">
                               Approve
                             </button>
                           </form>
@@ -100,9 +100,9 @@ export default async function AdjustmentsPage({
 
 function StatusPill({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    pending_approval: 'bg-accent/15 text-accent',
-    approved: 'bg-white/5 text-text-muted',
-    rejected: 'bg-danger/15 text-[#f3a99a]',
+    pending_approval: 'bg-accent/15 text-accent-strong',
+    approved: 'bg-neutral-soft text-text-muted',
+    rejected: 'bg-danger/15 text-danger-text',
   };
   const labels: Record<string, string> = {
     pending_approval: 'Pending approval',

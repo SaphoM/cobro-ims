@@ -2,9 +2,17 @@
 
 /*
   Design tokens carried over from the approved login-page mockup:
-  neutral grey surfaces, one orange accent, dark-only (Cobro IMS is an
-  internal operations tool — warehouse floor / back office — so there is
-  a single committed theme rather than a light variant nobody asked for).
+  neutral grey surfaces, one orange accent. Dark is the committed default
+  (Cobro IMS is an internal operations tool — warehouse floor / back
+  office); light is opt-in via the theme toggle, which sets
+  `data-theme="light"` on <html> and persists the choice in localStorage.
+
+  Every colour in the app resolves through these variables, so a theme is
+  defined once here rather than per component. Two rules keep it that way:
+    - never hardcode a hex in a component — add a token instead;
+    - anything that must flip between themes (the logo's invert filter, the
+      <select> arrow) is keyed off `[data-theme='light']`
+      further down this file, not off a utility class.
 */
 :root {
   color-scheme: dark;
@@ -13,17 +21,33 @@
   --surface: #222224;
   --surface-2: #2b2b2d;
   --surface-3: #333335;
-  --accent: #f0a13c;
-  --accent-hover: #ffb85c;
-  --accent-active: #cf8726;
+  /* Cobro's brand orange, exact: #EE983C / rgb(238, 152, 60). Used for fills,
+     borders and icons in both themes - it is the brand, so it does not get
+     darkened or tinted anywhere. */
+  --accent: #ee983c;
+  --accent-hover: #ffb05a;
+  --accent-active: #d07f26;
+  /* Accent used as TEXT. On dark the brand orange reads at ~7.7:1, so it is
+     the same colour; light mode overrides this (see below) because #EE983C on
+     white is only ~2:1 and would be unreadable at small sizes. Fills keep the
+     exact brand orange either way - only text shifts. */
+  --accent-strong: #ee983c;
+  /* Text that sits ON the accent fill. Near-black on the brand orange: ~8:1. */
   --ink: #1b1207;
   --text: #f2f0ec;
   --text-muted: #a8a5a0;
   --text-faint: #6d6a65;
-  --border: rgba(240, 161, 60, 0.14);
-  --border-strong: rgba(240, 161, 60, 0.4);
+  --border: rgba(238, 152, 60, 0.14);
+  --border-strong: rgba(238, 152, 60, 0.4);
   --danger: #e2604a;
-  --success: #f0a13c;
+  /* Error/failure *text*. Distinct from --danger (used for borders and
+     tinted fills) because a colour that reads on one background is
+     unreadable on the other. */
+  --danger-text: #f3a99a;
+  /* The neutral "quiet chip / hover" wash — a lift on dark, a dip on light. */
+  --neutral-soft: rgba(255, 255, 255, 0.05);
+  --card-shadow: 0 40px 80px -32px rgba(0, 0, 0, 0.7);
+  --success: #ee983c;
 
   /* Standard height for every single-line form control (input, select) across the
      app — Tailwind's `h-9` (2.25rem) resolves to this same value, and every control
@@ -38,6 +62,49 @@
   --control-height: 36px;
 }
 
+/*
+  Light theme.
+
+  Surfaces are neutral grey-to-white, deliberately with no warm tint: an
+  earlier pass used beige/brown surfaces and a darkened-amber accent, which
+  read as muddy brown rather than as Cobro's orange. Greys here are neutral
+  so the only colour on the page is the brand orange itself.
+
+  The accent keeps the exact brand orange for every FILL (buttons, chips,
+  borders, icons) - `bg-accent` with the near-black `--ink` on top is ~8:1,
+  so the brand colour is never compromised. Only accent TEXT shifts, via
+  `--accent-strong`: #EE983C on white is ~2:1 and unreadable at 13px, so
+  links and labels use a deeper orange that is still unmistakably orange
+  (hue 32deg, ~91% saturation - brown is desaturated, this is not). Picked
+  at 5.6:1 on white rather than the 4.5 minimum, because the same colour
+  also sits on accent-tinted fills (bg-accent/[0.08] banners, /15 chips)
+  which cost ~0.7 of that ratio; a value that only just cleared 4.5 on white
+  failed on every one of those.
+*/
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f4f5f6;
+  --bg-2: #e8eaec;
+  --surface: #ffffff;
+  --surface-2: #f5f6f7;
+  --surface-3: #e9eaec;
+  --accent: #ee983c;
+  --accent-hover: #d9812a;
+  --accent-active: #c06f1e;
+  --accent-strong: #9c5707;
+  --ink: #1b1207;
+  --text: #1a1c1e;
+  --text-muted: #52565b;
+  --text-faint: #6b7075;
+  --border: rgba(20, 22, 24, 0.14);
+  --border-strong: rgba(238, 152, 60, 0.55);
+  --danger: #c0392b;
+  --danger-text: #a32718;
+  --neutral-soft: rgba(20, 22, 24, 0.06);
+  --card-shadow: 0 24px 48px -28px rgba(20, 22, 24, 0.18);
+  --success: #9c5707;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-bg-2: var(--bg-2);
@@ -47,11 +114,14 @@
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-active: var(--accent-active);
+  --color-accent-strong: var(--accent-strong);
   --color-ink: var(--ink);
   --color-text: var(--text);
   --color-text-muted: var(--text-muted);
   --color-text-faint: var(--text-faint);
   --color-danger: var(--danger);
+  --color-danger-text: var(--danger-text);
+  --color-neutral-soft: var(--neutral-soft);
 
   --font-display: var(--font-unbounded);
   --font-body: var(--font-manrope);
@@ -68,8 +138,43 @@ body {
   font-family: var(--font-manrope), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-* {
-  border-color: var(--border);
+/*
+  This default has to live inside Tailwind's own `base` layer, not as a bare
+  top-level rule. CSS Cascade Layers give every un-layered rule higher
+  priority than ANY rule inside a `@layer`, full stop, regardless of
+  selector specificity - and Tailwind v4 puts every utility class (including
+  every `border-*` colour, `border-danger`, `border-[#...]`, all of them) in
+  `@layer utilities`. A bare `* { border-color }` outside any layer was
+  therefore silently winning over every one of those utilities everywhere in
+  the app: components that set a border colour via a Tailwind class kept
+  rendering this default instead, with no visual sign anything was wrong
+  short of comparing the actual rendered hex to what the class said it
+  should be. Wrapping it in `@layer base` puts it in the same layer Tailwind
+  itself uses for this exact kind of reset, so later layers (`utilities`)
+  correctly take priority again, same as Tailwind's docs assume they will.
+*/
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+}
+
+/* Cobro's supplied artwork is black on transparent. It has to be inverted to
+   read on the dark chrome, and left exactly as delivered on light — so the
+   flip lives here, keyed off the theme, rather than as an `invert` utility
+   baked into the markup where it could only ever be right half the time.
+   Asset2 (the photographic lockup) is deliberately NOT in this class:
+   inverting a photograph wrecks it in either theme. */
+.brand-logo {
+  filter: invert(1);
+}
+
+:root[data-theme='light'] .brand-logo {
+  filter: none;
+}
+
+.card-shadow {
+  box-shadow: var(--card-shadow);
 }
 
 /* Form control height standard — 36px (--control-height) for every single-line input
@@ -106,6 +211,13 @@ select {
   background-size: 16px 16px;
 }
 
+/* The arrow above is a data: URL, so its stroke colour can't read a var() —
+   the light theme needs its own copy stroked in that theme's --text-muted
+   (#55514b), or the dropdown chevron all but vanishes on white. */
+:root[data-theme='light'] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2355514b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+}
+
 /* Mobile nav drawer (dashboard/layout.tsx, CSS-only via #mobile-nav-toggle) — lock
    background scroll while it's open, so content behind the dimmed backdrop can't be
    scrolled underneath it on touch devices.
@@ -127,6 +239,11 @@ select {
 @media print {
   .no-print {
     display: none !important;
+  }
+  /* Logos on label stock must survive "don't print background graphics". */
+  .print-exact {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   html,
   body {

@@ -19,7 +19,7 @@ export function AddComponentForm({ parentProductId, componentOptions }: { parent
           <select name="componentProductId" required className={selectClass}>
             {componentOptions.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.sku} — {p.name}
+                {p.sku} - {p.name}
               </option>
             ))}
           </select>
@@ -37,12 +37,12 @@ export function AddComponentForm({ parentProductId, componentOptions }: { parent
         </button>
       </form>
       {state.error && (
-        <p role="alert" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.82rem] text-[#f3a99a]">
+        <p role="alert" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.82rem] text-danger-text">
           {state.error}
         </p>
       )}
       {state.success && (
-        <p role="status" className="mt-3 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[0.82rem] text-accent">
+        <p role="status" className="mt-3 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[0.82rem] text-accent-strong">
           {state.success}
         </p>
       )}

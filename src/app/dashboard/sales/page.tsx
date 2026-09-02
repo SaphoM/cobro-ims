@@ -1,6 +1,6 @@
 import { customerRepository, productRepository, salesOrderRepository, warehouseRepository } from '@/lib/data';
 import { SalesOrderForm } from '@/app/dashboard/sales/sales-order-form';
-import { cancelSalesOrderAction, confirmSalesOrderAction, dispatchSalesOrderAction } from '@/app/dashboard/sales/actions';
+import { RequisitionActionsCell } from '@/app/dashboard/sales/requisition-actions-cell';
 import type { SalesOrderStatus } from '@/lib/domain/inventory';
 
 export default async function SalesPage({
@@ -25,8 +25,8 @@ export default async function SalesPage({
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Requisitions</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Internal stock requests from a department or workshop — draft → approve (reserves stock) → issue
-          (posts the outbound movement, releases the reservation). Not customer sales — see
+          Internal stock requests from a department or workshop - draft → approve (reserves stock) → issue
+          (posts the outbound movement, releases the reservation). Not customer sales - see
           docs/ARCHITECTURE.md for why this module was repurposed from Sales &amp; Dispatch.
         </p>
       </div>
@@ -47,7 +47,7 @@ export default async function SalesPage({
                   <th className="px-5 py-2.5 font-medium">Requisition</th>
                   <th className="px-5 py-2.5 font-medium">Department</th>
                   <th className="px-5 py-2.5 font-medium">Product</th>
-                  <th className="px-5 py-2.5 font-medium">Warehouse</th>
+                  <th className="px-5 py-2.5 font-medium">Store</th>
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">Qty</th>
                   <th className="px-5 py-2.5 text-right font-medium tabular-nums">Value</th>
                   <th className="px-5 py-2.5 font-medium">Status</th>
@@ -62,7 +62,7 @@ export default async function SalesPage({
                       <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{o.orderNumber}</td>
                       <td className="px-5 py-3 text-text-muted">{customerById.get(o.customerId)?.name}</td>
                       <td className="px-5 py-3 text-text-muted">
-                        {product?.sku} <span className="text-text-faint">— {product?.name}</span>
+                        {product?.sku} <span className="text-text-faint">- {product?.name}</span>
                       </td>
                       <td className="px-5 py-3 text-text-muted">{warehouseById.get(o.warehouseId)?.code}</td>
                       <td className="px-5 py-3 text-right tabular-nums text-text">
@@ -79,29 +79,7 @@ export default async function SalesPage({
                         <StatusPill status={o.status} />
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <div className="flex justify-end gap-3">
-                          {o.status === 'draft' && (
-                            <form action={confirmSalesOrderAction.bind(null, o.id)}>
-                              <button type="submit" className="text-[0.8rem] font-semibold text-accent hover:text-accent-hover">
-                                Approve
-                              </button>
-                            </form>
-                          )}
-                          {o.status === 'confirmed' && (
-                            <form action={dispatchSalesOrderAction.bind(null, o.id)}>
-                              <button type="submit" className="text-[0.8rem] font-semibold text-accent hover:text-accent-hover">
-                                Issue
-                              </button>
-                            </form>
-                          )}
-                          {(o.status === 'draft' || o.status === 'confirmed') && (
-                            <form action={cancelSalesOrderAction.bind(null, o.id)}>
-                              <button type="submit" className="text-[0.8rem] font-semibold text-text-faint hover:text-danger">
-                                Cancel
-                              </button>
-                            </form>
-                          )}
-                        </div>
+                        <RequisitionActionsCell orderId={o.id} status={o.status} />
                       </td>
                     </tr>
                   );
@@ -117,10 +95,10 @@ export default async function SalesPage({
 
 function StatusPill({ status }: { status: SalesOrderStatus }) {
   const styles: Record<SalesOrderStatus, string> = {
-    draft: 'bg-white/5 text-text-muted',
-    confirmed: 'bg-accent/15 text-accent',
-    dispatched: 'bg-white/5 text-text-muted',
-    cancelled: 'bg-danger/15 text-[#f3a99a]',
+    draft: 'bg-neutral-soft text-text-muted',
+    confirmed: 'bg-accent/15 text-accent-strong',
+    dispatched: 'bg-neutral-soft text-text-muted',
+    cancelled: 'bg-danger/15 text-danger-text',
   };
   const labels: Record<SalesOrderStatus, string> = {
     draft: 'Draft',

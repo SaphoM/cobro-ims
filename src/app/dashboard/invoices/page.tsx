@@ -28,7 +28,7 @@ export default async function InvoicesPage() {
         <h1 className="font-display text-[1.3rem] font-medium text-text">Invoicing & billing</h1>
         <p className="text-[0.86rem] text-text-muted">
           One VAT-compliant invoice per dispatched sales order. Generate one from the{' '}
-          <a href="/dashboard/sales" className="text-accent hover:underline">
+          <a href="/dashboard/sales" className="text-accent-strong hover:underline">
             Sales & dispatch
           </a>{' '}
           page once an order is dispatched.
@@ -91,12 +91,12 @@ export default async function InvoicesPage() {
                       <td className="px-5 py-3 text-right tabular-nums text-text-muted">
                         {inv.creditedAmount > 0
                           ? `R ${inv.creditedAmount.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : '—'}
+                          : '-'}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text-muted">
                         {dueDate.toLocaleDateString('en-ZA')}
                         {isOverdue && (
-                          <span className="ml-2 rounded-full bg-danger/15 px-2 py-0.5 text-[0.68rem] font-semibold text-[#f3a99a]">
+                          <span className="ml-2 rounded-full bg-danger/15 px-2 py-0.5 text-[0.68rem] font-semibold text-danger-text">
                             {ageingDays}d overdue
                           </span>
                         )}
@@ -137,10 +137,10 @@ function StatTile({ label, value, tone = 'default' }: { label: string; value: st
 
 function StatusPill({ status }: { status: InvoiceStatus }) {
   const styles: Record<InvoiceStatus, string> = {
-    unpaid: 'bg-danger/15 text-[#f3a99a]',
-    partially_paid: 'bg-accent/15 text-accent',
-    paid: 'bg-white/5 text-text-muted',
-    cancelled: 'bg-white/5 text-text-faint',
+    unpaid: 'bg-danger/15 text-danger-text',
+    partially_paid: 'bg-accent/15 text-accent-strong',
+    paid: 'bg-neutral-soft text-text-muted',
+    cancelled: 'bg-neutral-soft text-text-faint',
   };
   const labels: Record<InvoiceStatus, string> = {
     unpaid: 'Unpaid',
