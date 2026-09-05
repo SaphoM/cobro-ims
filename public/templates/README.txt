@@ -40,8 +40,19 @@ Columns:
   reorder_quantity    Optional. How much you'd typically reorder at
                       once. Informational only for now.
 
-The three example rows in the file are just that — examples, showing
-the format. Delete them and replace with your real items.
+The 12 rows already in the file are examples, not Cobro's real items —
+generic MRO spares (bearings, filters, grease, welding rods, PPE, etc.)
+showing the format and how much detail to fill in per column,
+including what an optional column looks like left blank (see
+FLT-OIL-STD's blank description, or most rows' blank barcode). Delete
+all 12 and replace with your real items — don't leave any example rows
+mixed in with the real data you send back.
+
+If a value itself contains a comma (e.g. a description like "Rubber,
+full-face"), wrap that whole value in double quotes so it isn't read
+as two separate columns — Excel/Google Sheets do this for you
+automatically when you save as CSV, so you only need to worry about it
+if you're editing the raw file directly in a text editor.
 
 --------------------------------------------------------------------
 FILE 2: opening-stock-import-template.csv
@@ -73,6 +84,12 @@ Columns:
 If the same item is held at more than one location, give it one row
 per location.
 
+The 12 example rows here use the same SKUs as the product file's
+examples, spread across all three demo warehouse codes — showing that
+every sku here must exist in the product file, and that one item can
+appear more than once if it's held in more than one place. Delete all
+12 and replace with your real stock counts.
+
 --------------------------------------------------------------------
 A FEW RULES THAT WILL MAKE THIS GO SMOOTHLY
 --------------------------------------------------------------------
@@ -86,6 +103,9 @@ A FEW RULES THAT WILL MAKE THIS GO SMOOTHLY
   data is harder to spot and fix once it's loaded.
 - Keep these as plain CSV (comma-separated) files — if you edit them
   in Excel, use "Save As → CSV" rather than saving as .xlsx.
+- Remove every example row before sending your completed file back —
+  they're there to show the format only, not to be imported as real
+  stock.
 
 Questions about any of this — ask X Spark before filling in a large
 batch, so we can confirm the format matches what the import expects.

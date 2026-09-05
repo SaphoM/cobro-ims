@@ -1,4 +1,13 @@
 sku,name,description,unit_of_measure,barcode,reorder_point,reorder_quantity
 BRG-6205-2RS,"Bearing 6205 2RS",25x52x15mm sealed ball bearing,ea,6009876543210,10,50
+BRG-6305-2RS,"Bearing 6305 2RS",25x62x17mm sealed ball bearing,ea,6009876543215,8,40
 FLT-OIL-STD,"Oil filter, standard spin-on",,ea,6009876543211,20,100
+FLT-AIR-HD,"Air filter, heavy-duty",Fits diesel compressor units,ea,,10,40
 LUBE-GREASE-5KG,"General purpose grease, 5kg tub",Lithium-based EP2,tub,,5,20
+LUBE-OIL-20L,"Hydraulic oil, 20L drum",ISO VG46,drum,,4,12
+BELT-VBELT-A47,"V-belt, A47",Standard classical A-section,ea,,6,24
+GASKET-FLG-50MM,"Flange gasket, 50mm","Rubber, full-face",ea,,15,60
+GLOVE-WORK-L,"Work gloves, size L","Leather palm, cotton back",pair,,20,100
+WELD-ROD-E6013-3.2,"Welding rod E6013 3.2mm",General purpose mild steel electrode,kg,,10,25
+HOSE-CLAMP-32MM,"Hose clamp, 32mm",Stainless steel worm-drive,ea,,25,100
+PPE-EARPLUG-BOX,"Disposable earplugs, box of 200","Foam, NRR 32",box,,3,10
