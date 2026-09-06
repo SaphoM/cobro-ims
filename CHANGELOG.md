@@ -4,6 +4,16 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.18.2 — 2026-09-06
+
+**UI: collapse the demo-accounts card on `/login` behind a chevron toggle.**
+- The RBAC-testing card (role buttons + autofilled email/password) was open by default, taking up a
+  third of the login card before a user even looks at the sign-in form
+- Now collapsed by default with a clickable header row and a chevron that rotates on open — same
+  autofill behaviour once expanded, nothing else on the page changed
+- Verified live: loads collapsed, expands on click, autofill still fills email/password correctly
+- One file changed: `src/app/login/login-form.tsx`
+
 ## v0.18.1 — 2026-09-06
 
 **Fix: grant purchase-order permission to both Stores roles, not Admin-only.**
