@@ -42,16 +42,18 @@ export type Permission =
  * ERP hierarchy. See docs/ARCHITECTURE.md §1 for the full rationale and the
  * migration from the previous (admin/warehouse_clerk/procurement/viewer) set.
  *
- *   admin              — system administration, purchasing, supplier management, product/
- *                         category management, thresholds, reporting, management visibility.
- *                         Consolidates what used to be separate Procurement and Viewer roles.
- *                         Multiple Admins are expected and fully supported — nothing here or
- *                         in the user model treats Admin as a singleton.
- *   stores_manager     — the operational store/inventory function: receive, scan in, reserve,
- *                         process requisitions, issue, scan out, transfer, catalogue upkeep.
- *                         Not system administration — creating users/Admins stays Admin-only.
- *   stores_clerk       — day-to-day store transactions: the same physical stock actions as
- *                         Stores Manager, minus catalogue/threshold management.
+ *   admin              — system administration, supplier management, product/category management,
+ *                         thresholds, reporting, management visibility. Consolidates what used to
+ *                         be separate Procurement and Viewer roles. Multiple Admins are expected
+ *                         and fully supported — nothing here or in the user model treats Admin as
+ *                         a singleton.
+ *   stores_manager     — the operational store/inventory function: order stock from external
+ *                         suppliers (purchase orders), receive, scan in, reserve, process
+ *                         requisitions, issue, scan out, transfer, catalogue upkeep. Not system
+ *                         administration — creating users/Admins stays Admin-only.
+ *   stores_clerk       — day-to-day store transactions: the same physical stock actions and
+ *                         supplier purchase orders as Stores Manager, minus catalogue/threshold
+ *                         management.
  *   engineer_requester — factory-floor staff who request MRO stock on behalf of their section
  *                         (see `area` on User). Can create and track their own requisitions;
  *                         cannot approve, issue, or otherwise touch the inventory ledger.
@@ -60,6 +62,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
   admin: '*',
   stores_manager: [
     'manage_catalogue',
+    'manage_purchase_orders',
     'manage_receiving',
     'manage_transfers',
     'request_adjustments',
@@ -68,6 +71,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
     'view_reports',
   ],
   stores_clerk: [
+    'manage_purchase_orders',
     'manage_receiving',
     'manage_transfers',
     'request_adjustments',

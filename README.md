@@ -290,10 +290,11 @@ applied (see `supabase/migrations/20260816100000_audit_log_immutability.sql`).
   from which area. See **User management** below and `docs/ARCHITECTURE.md` §1.
 - **User management** (`/dashboard/users`, Admin-only) — create users (Name, Email, Role, and an Area when
   the role is Engineer / Requester) and change an existing user's role, area, or active status. Four roles
-  today: **Admin** (everything — system config, purchasing, suppliers, catalogue, thresholds, reporting;
-  more than one Admin is fully supported), **Stores Manager** and **Stores Clerk** (the operational store
-  function — receive, scan in/out, reserve, process and issue requisitions, transfer stock; no system
-  administration), and **Engineer / Requester** (raises and tracks their own requisitions, tied to a
+  today: **Admin** (everything — system config, suppliers, catalogue, thresholds, reporting; more than
+  one Admin is fully supported), **Stores Manager** and **Stores Clerk** (the operational store
+  function — order stock from external suppliers, receive, scan in/out, reserve, process and issue
+  requisitions, transfer stock; no system administration), and **Engineer / Requester** (raises and
+  tracks their own requisitions, tied to a
   factory Area — Mechanical, Electrical, Workshop, Maintenance, etc. — but never touches the inventory
   ledger directly). Every user-admin action (create, role change, area change, activate/deactivate) is
   audited. A user created here can sign in immediately with a documented default password (mock auth only,

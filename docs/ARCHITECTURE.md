@@ -74,15 +74,19 @@ resulting WAC math checked by hand):
   and `src/lib/data/mock/seed.ts`; the short version:
 
   - **Admin** — consolidates the old Admin, Procurement, and Viewer roles: system administration, user
-    management, purchasing, suppliers, catalogue, thresholds, reporting, management visibility. `'*'` in
+    management, suppliers, catalogue, thresholds, reporting, management visibility. `'*'` in
     `ROLE_PERMISSIONS`, unchanged. **Multiple Admins are fully supported** — nothing in the user model or
     the new `/dashboard/users` screen treats Admin as a singleton; creating a second Admin doesn't touch
     the first.
-  - **Stores Manager** — new tier, didn't exist before. The operational store function: catalogue,
-    receiving, transfers, adjustments-request, create + process requisitions, reports. Not system
-    administration — `manage_users` stays Admin-only.
-  - **Stores Clerk** — the old Warehouse Clerk, renamed and reduced: the same physical stock actions as
-    Stores Manager minus catalogue/threshold management.
+  - **Stores Manager** — new tier, didn't exist before. The operational store function: **ordering stock
+    from external suppliers (purchase orders)**, catalogue, receiving, transfers, adjustments-request,
+    create + process requisitions, reports. Not system administration — `manage_users` stays Admin-only.
+  - **Stores Clerk** — the old Warehouse Clerk, renamed and reduced: the same physical stock actions and
+    supplier purchase orders as Stores Manager minus catalogue/threshold management.
+  - **Purchasing (`manage_purchase_orders`)** — held by Admin (`'*'`) and both Stores roles; Engineer /
+    Requester does not hold it. Corrected after initial delivery of this feature, where it was left
+    Admin-only by oversight — Cobro's actual workflow has Stores placing orders with suppliers directly,
+    not routing every reorder through Admin.
   - **Engineer / Requester** — genuinely new. Factory-floor staff who request MRO stock on behalf of their
     section. Holds exactly one permission, `create_requisitions` — not `manage_sales_orders`, which is
     what approves/issues/cancels. This is the one substantive permission split this pass made: creating a
