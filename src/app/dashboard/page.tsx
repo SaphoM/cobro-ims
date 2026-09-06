@@ -24,8 +24,10 @@ export default async function DashboardOverviewPage() {
   // itself re-checks this independently either way.
   const canRequest = session ? await hasPermission(session, 'create_requisitions') : false;
   // Same permission the Product catalogue's price field requires - Admin
-  // only. Everyone else gets the quick requisition's Unit value as a
-  // read-only display of the catalogue price, not an editable field.
+  // only. Everyone else gets the quick requisition's Unit value AND the
+  // stock-movement form's Unit cost as a read-only display of the catalogue
+  // price, not an editable field. Seeing the figure is a separate rule
+  // (`showCosts` above) - this one is only about changing it.
   const canEditPrice = session ? await hasPermission(session, 'manage_pricing') : false;
 
   const productById = new Map(products.map((p) => [p.id, p]));
@@ -90,7 +92,13 @@ export default async function DashboardOverviewPage() {
         />
       </section>
 
-      <RecordMovementForm products={products} warehouses={warehouses} ledger={ledgerEntries} />
+      <RecordMovementForm
+        products={products}
+        warehouses={warehouses}
+        ledger={ledgerEntries}
+        canEditPrice={canEditPrice}
+        showCosts={showCosts}
+      />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">

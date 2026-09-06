@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ScanMovement } from '@/app/dashboard/scan-movement';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
+import { HIDDEN_COST } from '@/lib/ui/cost-display';
 import type { Product, StockLedgerEntry, Warehouse } from '@/lib/domain/inventory';
 
 const MOVEMENT_LABELS: Record<string, string> = {
@@ -29,6 +30,8 @@ export function RecordMovementForm({
   products,
   warehouses,
   ledger,
+  canEditPrice,
+  showCosts,
 }: {
   products: Product[];
   warehouses: Warehouse[];
@@ -36,6 +39,18 @@ export function RecordMovementForm({
    *  optional so any existing caller that doesn't pass it still compiles;
    *  the counter just doesn't render without it. */
   ledger?: StockLedgerEntry[];
+  /** `manage_pricing` - Admin only. Setting what stock cost is a pricing
+   *  decision, the same authority that sets price on the catalogue, so
+   *  everyone else gets the figure as a read-only display and the server
+   *  ignores whatever unit cost their form submits (see
+   *  recordMovementAction). Every role still SEES the cost - this gates
+   *  changing it, not seeing it. */
+  canEditPrice: boolean;
+  /** The separate, Admin-controlled "show costs to all roles" setting (see
+   *  src/lib/costs.ts). Off means money is withheld from this viewer
+   *  entirely, so the read-only display shows the withheld marker rather
+   *  than a figure. */
+  showCosts: boolean;
 }) {
   const [productId, setProductId] = useState(products[0]?.id ?? '');
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? '');
@@ -85,6 +100,7 @@ export function RecordMovementForm({
           onUnitCostChange={setUnitCost}
           onProductIdentified={setProductId}
           onPosted={setPosted}
+          canEditPrice={canEditPrice}
           triggerHeightClassName="min-h-[45px]"
         />
       </div>
@@ -187,16 +203,45 @@ export function RecordMovementForm({
           </label>
 
           <label className="flex flex-col gap-1.5 lg:col-start-1">
-            <span className="text-[0.75rem] font-semibold text-text-muted">Unit cost (R)</span>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={unitCost}
-              onChange={(e) => setUnitCost(e.target.value)}
-              placeholder="0.00"
-              className={inputClass}
-            />
+            <span className="text-[0.75rem] font-semibold text-text-muted">
+              Unit cost (R)
+              {!canEditPrice && showCosts && (
+                <span className="ml-1 font-normal text-text-faint">from the catalogue</span>
+              )}
+            </span>
+            {canEditPrice ? (
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={unitCost}
+                onChange={(e) => setUnitCost(e.target.value)}
+                placeholder="0.00"
+                className={inputClass}
+              />
+            ) : (
+              /*
+                Display-only for every role except Admin - and deliberately
+                NOT a disabled input: there is nothing to interact with, so
+                it's plain bold text rather than a control drawn to look
+                unavailable. Same treatment the Quick requisition modal's
+                Unit value already uses for the same `manage_pricing` reason.
+
+                It shows the SELECTED PRODUCT'S catalogue price rather than
+                the `unitCost` state, because that's the figure the server
+                will actually post for this user (recordMovementAction
+                re-derives it and ignores whatever the form sent) - showing
+                the raw state, which starts at 0 until a scan prefills it,
+                would show a number that isn't what gets recorded.
+              */
+              <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+                {!showCosts
+                  ? HIDDEN_COST
+                  : selectedProduct?.unitPrice != null
+                    ? `R ${selectedProduct.unitPrice.toFixed(2)}`
+                    : 'No price set'}
+              </div>
+            )}
           </label>
 
           <div className="flex flex-col gap-1.5 lg:col-start-3">
@@ -212,6 +257,7 @@ export function RecordMovementForm({
               onUnitCostChange={setUnitCost}
               onProductIdentified={setProductId}
               onPosted={setPosted}
+              canEditPrice={canEditPrice}
             />
           </div>
         </div>

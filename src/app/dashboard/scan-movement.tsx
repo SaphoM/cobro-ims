@@ -75,6 +75,7 @@ export function ScanMovement({
   onUnitCostChange,
   onProductIdentified,
   onPosted,
+  canEditPrice = false,
   triggerHeightClassName = 'h-9',
 }: {
   warehouseId: string;
@@ -85,6 +86,12 @@ export function ScanMovement({
   onUnitCostChange: (value: string) => void;
   onProductIdentified: (productId: string) => void;
   onPosted: (message: string) => void;
+  /** `manage_pricing` - Admin only. Gates CHANGING the unit cost, not seeing
+   *  it: every role that may see money still sees the figure here, as bold
+   *  read-only text. Gating it on the form alone would be theatre, since
+   *  this dialog posts the movement - and the server ignores a non-Admin's
+   *  submitted cost regardless (see recordMovementAction). */
+  canEditPrice?: boolean;
   /** Height utility class for the trigger button - defaults to the 36px
    *  (`h-9`) standard every other control on this form uses, so it lines up
    *  with Store/Type/Quantity/Unit cost when rendered inline with them.
@@ -671,7 +678,25 @@ export function ScanMovement({
             </div>
 
             <div className="mt-3 flex flex-col gap-3">
-              {product.costsVisible ? (
+              {product.costsVisible && !canEditPrice ? (
+                /*
+                  Visible but not editable - the usual case for Stores.
+                  Bold orange text, no field outline: setting what stock cost
+                  is a pricing decision (`manage_pricing`, Admin only), while
+                  seeing it is governed separately by `costsVisible`. The
+                  figure shown is the product's own catalogue price, which is
+                  what the server will post for this user no matter what the
+                  form sends.
+                */
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[0.8rem] font-semibold text-text-muted">
+                    Unit cost (R) <span className="font-normal text-text-faint">from the catalogue</span>
+                  </span>
+                  <div className="text-right text-[1.15rem] font-bold tabular-nums text-accent-strong">
+                    {product.unitPrice != null ? `R ${product.unitPrice.toFixed(2)}` : 'No price set'}
+                  </div>
+                </div>
+              ) : product.costsVisible ? (
                 /*
                   A plain, right-aligned number field - no +/- steppers. Unit
                   cost is usually just confirmed as-is (it's prefilled from

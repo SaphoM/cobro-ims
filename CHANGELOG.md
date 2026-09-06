@@ -4,6 +4,39 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.25.0 — 2026-09-06
+
+**Unit cost is Admin-only to set - visible to everyone, changeable by nobody else.**
+- The stock-movement Unit cost now follows the same rule the Quick requisition's Unit value already did:
+  `manage_pricing` (Admin) edits it, every other role sees it. Setting what stock cost is a pricing
+  decision, the same authority that sets price on the catalogue - it is not a store-floor choice
+- Non-Admin roles get the figure as **plain bold orange text, no input outline** (the product's catalogue
+  price), in both places it appeared: the Overview's "Record a stock movement" card and the scan dialog's
+  count step. Gating only the form would have been theatre, since the dialog is what posts
+- **Enforced server-side, not just hidden**: `recordMovementAction` now discards a non-Admin's submitted
+  `unitCost` outright and re-derives it - catalogue price first, then the location's existing WAC, and a
+  clear refusal if there is neither (never zero, which would silently drag WAC down and corrupt the stock
+  valuation). What posts therefore always matches the figure the user was shown
+- Seeing costs at all remains a separate, Admin-controlled setting (`showCostsToAllRoles`,
+  `src/lib/costs.ts`) - untouched here. Costs-hidden roles still see the withheld marker, not a price
+- Verified live: as Admin the field is still an editable input; as Stores Manager it renders as
+  `R 118.00` (computed colour `rgb(238,152,60)`, font-weight 700, 0px border, and zero `<input>` elements
+  in that label), and posting 1 bag moved WAC 92.79 → 92.80 with stock value up exactly R118.00 -
+  i.e. costed at the catalogue price, not at the zero the form would have sent
+- Files changed: `src/app/dashboard/record-movement-form.tsx`, `src/app/dashboard/scan-movement.tsx`,
+  `src/app/dashboard/page.tsx`, `src/app/dashboard/actions.ts`
+
+**README brought back in line with the app.**
+- Fixed stale documentation of the standalone `/dashboard/scan` page, removed back in v0.20.0 - four
+  references (§5.1 control-height exceptions, Engineer stations, the module list, the project-layout tree)
+  still described it as a live page
+- Documented what had shipped but was never written up: the Admin requisition-creation exclusion (v0.21.0),
+  the RBAC-scoped notification bell (v0.24.0), the mobile Scan-first Overview layout (v0.23.0), and the
+  Unit cost rule above
+- §2 status table gained rows for each; §9.13 (low-stock notification recipients) narrowed to what is
+  genuinely still open - out-of-band push/email to a named person, since the in-app half now exists
+- Files changed: `README.md`
+
 ## v0.24.1 — 2026-09-06
 
 **Scan dialog subtitle, larger.**

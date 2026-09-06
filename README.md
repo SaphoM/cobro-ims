@@ -103,7 +103,11 @@ the resulting numbers hand-checked):
 | Phase 6 — User Management, Security, Audit Trail | RBAC enforcement (real, 4 demo roles) + audit log | ✅ |
 | | DB-level audit log immutability trigger | ⏳ written, not applied (no live DB) |
 | | 2FA gate on the most sensitive action (approve/reject adjustments) | ✅ |
+| | Admin excluded from creating requisitions (Admin purchases, Engineers requisition) | ✅ |
+| | Unit cost immutable to all but Admin (`manage_pricing`), enforced server-side | ✅ |
+| | In-app notification bell, scoped per role | ✅ (no push/email — §9.13) |
 | Responsive / mobile | Full browser functionality down to a 375px viewport | ✅ |
+| | Mobile-first Scan layout on the Overview (scan-only below `sm`) | ✅ |
 | Authentication | Real Supabase Auth | **Deferred by explicit direction**, not oversight |
 | Core Data | Live Supabase project | **Deferred by explicit direction** — see §4 |
 | Testing, Training, UAT, Production | — | Not started |
@@ -199,13 +203,16 @@ border/corner rendering that a plain `height` rule can't fully override. See the
 rule in `globals.css` for the full explanation, including why Safari needs the prefixed property
 specifically.
 
-**Two exceptions, deliberately not on the 36px standard:**
-- The `/dashboard/scan` barcode/QR lookup's hero input and camera button — a single, oversized,
-  intentionally large touch target for warehouse-floor scanning, not one of a dense row of fields.
+**Three exceptions, deliberately not on the 36px standard:**
+- The scan dialog's hero code input and camera button — a single, oversized, intentionally large touch
+  target for factory-floor scanning, not one of a dense row of fields.
 - The login page's email/password fields — a single centered auth card, not a dashboard data-entry row.
+- The Overview's **mobile-only** Scan button (45px, full width) — below the `sm` breakpoint it is the only
+  control on that card, a standalone primary action with nothing beside it to align to. On tablet and
+  desktop the same button sits inline with the other fields and is back on the 36px standard.
 
-Shrinking either to match a dense form row would be a visual redesign, not a consistency fix — they were
-never inconsistent with anything, they're deliberately their own size.
+Shrinking any of them to match a dense form row would be a visual redesign, not a consistency fix — they
+were never inconsistent with anything, they're deliberately their own size.
 
 Primary submit buttons (Post receipt, Save as draft, Create order, etc.) also stay their own larger size —
 they're standalone full-width actions on their own row, not one of several controls that need to align
@@ -292,28 +299,35 @@ full per-page breakdown.
   request from a department/workshop, or from one Engineer to another: draft (nothing reserved) → approve
   (reserves stock, no ledger movement, no WAC change) → accept/issue (moves the stock at the ledger's
   current WAC, releases the reservation) or cancel from draft/approved (releases any reservation, posts
-  nothing). Order numbers are `REQ-####`. Creating one only needs `create_requisitions` (Stores Manager,
-  Stores Clerk, and Engineer / Requester all hold it). Approving and accepting are ownership-aware, not
+  nothing). Order numbers are `REQ-####`. Creating one needs `create_requisitions` — Stores Manager,
+  Stores Clerk and Engineer / Requester hold it, and **Admin deliberately does not**, despite holding
+  `'*'` for everything else: requisitioning is an internal request *against Stores*, while Admin's
+  equivalent need is met by a Purchase Order *against a supplier*. Admin keeps full read/oversight
+  (`view_requisitions`) and can still approve/issue/cancel — it just cannot originate one, and the create
+  form is replaced for Admin with a note pointing at Purchase Orders. Approving and accepting are
+  ownership-aware, not
   just role-based: a store-sourced requisition is still Stores/Admin's call, but one sourced from an
   Engineer's own station (see **Engineer stations** below) can only be approved by that Engineer, and any
   requisition's own requester can accept/pick it up themselves regardless of role — the button reads
   "Accept" on their own row, "Issue" everywhere else. An Engineer / Requester sees their own requisitions
   plus any peer request sourced from their own station, each tagged with the requester's **Area**; every
   other role sees the full list. See **Engineer stations** below and `docs/ARCHITECTURE.md` §1.
-- **Engineer stations** (part of Requisitions + `/dashboard/scan`) — every Engineer / Requester gets a
+- **Engineer stations** (part of Requisitions + the Overview's scan card) — every Engineer / Requester gets a
   personal station the moment they're created (auto-created, a real `Warehouse` row like any store,
   tracked by the same WAC engine). Accepting an approved requisition moves stock there rather than making
   it vanish, so it's still on-hand and visible to everyone — including on another Engineer's own
   Requisitions "Store" picker, so a peer can requisition an unused item straight off someone else's
-  station instead of waiting on a fresh store pickup. A **Use** mode on the scan station (shown only to
+  station instead of waiting on a fresh store pickup. A **Use** mode on the scan card (shown only to
   someone with a station, locked to posting against their own) records stock they've actually consumed —
   it leaves tracked inventory for good, same as a Scan OUT, but can never touch anyone else's station or a
   store. See `docs/ARCHITECTURE.md` §1 for the full accept → use → peer-pickup workflow, live-verified
   end-to-end with two Engineers.
 - **User management** (`/dashboard/users`, Admin-only) — create users (Name, Email, Role, and an Area when
   the role is Engineer / Requester) and change an existing user's role, area, or active status. Four roles
-  today: **Admin** (everything — system config, suppliers, catalogue, thresholds, reporting; more than
-  one Admin is fully supported), **Stores Manager** and **Stores Clerk** (the operational store
+  today: **Admin** (system config, purchasing, suppliers, catalogue, thresholds, pricing, reporting,
+  management oversight; more than one Admin is fully supported — with **two deliberate exclusions**: Admin
+  cannot create a requisition, and receiving is not treated as Admin's job. Admin purchases; Stores
+  receives, reserves and issues), **Stores Manager** and **Stores Clerk** (the operational store
   function — order stock from external suppliers, receive, scan in/out, reserve, process and issue
   requisitions, transfer stock; no system administration), and **Engineer / Requester** (raises and
   tracks their own requisitions, tied to a factory Area — Mechanical, Electrical, Workshop, Maintenance,
@@ -330,8 +344,37 @@ full per-page breakdown.
   sales. Kept rather than deleted in case Cobro's real business (they do sell concrete externally) ever
   needs a genuine customer-billing module — that would be a new, separate decision, not this one.
 - **Dashboard overview** (`/dashboard`) — live KPIs (SKUs tracked, total stock value, below-reorder-point
-  count) and the multi-warehouse stock ledger table, plus a generic "record a movement" form that exercises
-  the engine directly (the original proof-of-concept before the dedicated workflow pages existed).
+  count), the **Stock by location** ledger table (every store and every Engineer's station), and
+  **Record a stock movement** — the app's single scanning surface since the standalone `/dashboard/scan`
+  page was folded into it. Set Product/Store/Type/Quantity/Unit cost, then Scan: the scan identifies the
+  item, confirms the count, and posts it through the same WAC engine everything else uses.
+  - **Unit cost is Admin-only to set** (`manage_pricing`). Every other role still *sees* the figure —
+    shown as plain bold orange text, the product's catalogue price, no input — because what stock cost is
+    a pricing decision, the same authority that sets price on the catalogue. This is enforced server-side,
+    not just hidden: `recordMovementAction` discards a non-Admin's submitted unit cost and re-derives it
+    from the catalogue price (falling back to the location's existing WAC), so what posts always matches
+    what they were shown. Seeing costs at all is a *separate*, Admin-controlled setting (§7 Security).
+  - **On mobile** (below the `sm` breakpoint) the card collapses to just the heading and a large Scan
+    button — a Stores Clerk on the floor is scanning, not filling in a five-field form. The trade-off is
+    deliberate: Store has one real option since the single-store consolidation, quantity comes from the
+    scan count, and unit cost is Admin-only anyway — so the only thing a phone can't set is movement
+    **Type**, which defaults to Receipt (GRN). Dispatch/Transfer/Adjustment/Write-off need a wider screen.
+- **Notifications** (bell icon, sidebar on desktop / header on mobile) — a red count badge and a dropdown
+  of "what needs my attention right now", **scoped by role to what that role actually does**, not to
+  everything its permissions technically allow:
+  - **Admin** — items below reorder point (their purchasing trigger) and store-sourced requisitions
+    awaiting approval.
+  - **Stores Manager / Stores Clerk** — requisitions awaiting approval, and purchase orders awaiting
+    receiving.
+  - **Engineer / Requester** — their own requisitions approved and ready to collect, and peer pickup
+    requests from their own station awaiting their approval.
+
+  Note what's deliberately *absent*: Admin holds `manage_receiving` via `'*'`, but receiving is Stores'
+  physical job, so "purchase orders awaiting receiving" never appears for Admin. It is also **not** a
+  persisted notification feed — no table, no read/unread state, no timestamps. There's no backend to push
+  or persist them yet, and inventing one would be a second source of truth for state the app already
+  derives live from the ledger everywhere else; `src/lib/notifications.ts` recomputes the snapshot per
+  render instead. Real push/email notification to a named recipient remains an open decision (§9.13).
 - **Dashboards & reports** (`/dashboard/reports`) — fourteen: stock valuation, low stock, warehouse
   summary, dormant stock, requisition summary, department summary, pick list, purchase order summary,
   supplier summary, open purchase orders, stock movement history, receiving history, movement type totals,
@@ -339,12 +382,13 @@ full per-page breakdown.
   with the rest of dormant invoicing — §1.1 — dropping the count from 15 to 14 against the RFQ's "15+"
   target; the function itself still exists in `reports.ts`, unused.) Export formats today are **CSV only**
   — the RFQ mentions PDF/Excel too; not built yet, see §11.
-- **Barcode / QR scan** (`/dashboard/scan`) — scan or type a barcode to look up a product and its stock
-  across every warehouse, or post a real movement: Scan IN (receiving), Scan OUT (issuing), and — only for
-  a role with their own station — **Use**, which records stock an Engineer has consumed from their own
-  station (see **Engineer stations** above). Two input methods, same for every mode: a **USB/Bluetooth
-  scanner** (they act as keyboard input, submitting a plain form on Enter — no client JS needed) and the
-  **browser camera** on phones and tablets.
+- **Barcode / QR scan** (on the Overview — see **Dashboard overview** above) — scan or type a code to
+  identify a product and post a real movement against it. There is **one** scan surface, not two: the
+  standalone `/dashboard/scan` page was removed and folded into the Overview's "Record a stock movement"
+  card, so there is a single place where scanning happens and a single set of rules governing it. Two
+  input methods: a **USB/Bluetooth scanner** (they act as keyboard input, submitting on Enter) and the
+  **browser camera** on phones and tablets. The dialog scans to identify, then counts — every further scan
+  of the same code adds one, with "Remove 1" to walk a miscount back — and posts on demand.
 - **Scanning at the operational touchpoints** — the same camera-or-USB scan-to-identify pattern is wired
   into **Goods receiving**, **Transfers**, and **Sales & dispatch** (scan to select the product on the
   existing form), and into the **Product catalogue** (scan to fill the Barcode field on a new product).
@@ -431,9 +475,11 @@ the RFQ / SoW does not define them. Confirm with Cobro before further engineerin
     nothing behaviour the underlying dispatch logic already had. Does Cobro need partial fulfilment?
 12. **Who can cancel a requisition.** Currently anyone with `manage_sales_orders` (the same permission that
     creates/approves/issues) — no separate "who's allowed to cancel someone else's request" rule exists.
-13. **Low-stock notification recipients.** The dashboard tile and the Low Stock report surface the
-    condition; there's no push/email notification to a specific person or role. Who should be notified,
-    and how?
+13. **Low-stock notification recipients.** The dashboard tile, the Low Stock report and now the in-app
+    notification bell all surface the condition (the bell shows it to Admin, whose job replenishment is).
+    What's still undecided is anything that reaches someone *not currently looking at the app*: there is
+    no push, email or SMS to a named person, and no persisted/acknowledgeable notification record. Who
+    should be notified out-of-band, through what channel, and does an alert need to be acknowledged?
 
 Full detail and rationale for each lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §5.
 
@@ -493,7 +539,8 @@ src/app/
     suppliers/, customers/          List + add pickers (customers/ now labeled "Departments" in the UI)
     invoices/                       Dormant — invoicing, payments, credit notes; still functional, unlinked
     reports/                        Dashboards & reports (14 of "15+"), CSV export per table
-    scan/                            Barcode/QR lookup (USB scanner-friendly GET form + camera scan)
+    scan/                            Scan actions + (now-unreferenced) components; the page itself was
+                                     folded into the Overview — scanning lives there, see §7
     labels/                          Print-ready label sheets with real QR (@media print, .no-print)
     audit-log/                      Append-only audit trail viewer
     security/                       Mock 2FA enrollment, gating the most sensitive action

@@ -3,8 +3,13 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getSession, destroySession } from '@/lib/auth';
-import { auditLogRepository, stockLedgerRepository, stockMovementRepository } from '@/lib/data';
-import { checkPermission, type Permission } from '@/lib/permissions';
+import {
+  auditLogRepository,
+  productRepository,
+  stockLedgerRepository,
+  stockMovementRepository,
+} from '@/lib/data';
+import { checkPermission, hasPermission, type Permission } from '@/lib/permissions';
 import { canSeeCosts } from '@/lib/costs';
 import type { StockMovementType } from '@/lib/domain/inventory';
 
@@ -104,16 +109,36 @@ export async function recordMovementAction(
     guessing zero would be exactly the corruption above - so that case is
     refused and pointed at someone who can set the price.
   */
+  /*
+    Setting what stock cost is a pricing decision - `manage_pricing`, Admin
+    only, the same authority that sets price on the catalogue. Everyone else
+    sees the figure but cannot choose it, so their submitted `unitCost` is
+    discarded here rather than merely hidden in the UI: the field being
+    read-only on the form and in the scan dialog is a courtesy, this is the
+    boundary. Their movement is costed from the product's own catalogue
+    price, which is exactly the figure those read-only displays show, so
+    what posts always matches what they were shown.
+  */
   const costsVisible = await canSeeCosts(session);
+  const canEditPrice = await hasPermission(session, 'manage_pricing');
   let unitCost = unitCostRaw;
-  if (!costsVisible) {
-    const existing = await stockLedgerRepository.get(productId, warehouseId);
-    if (existing && existing.weightedAverageCost > 0) {
+  if (!canEditPrice) {
+    const [product, existing] = await Promise.all([
+      productRepository.getById(productId),
+      stockLedgerRepository.get(productId, warehouseId),
+    ]);
+    if (product?.unitPrice != null && product.unitPrice > 0) {
+      unitCost = product.unitPrice;
+    } else if (existing && existing.weightedAverageCost > 0) {
+      // No catalogue price set, so inherit what this stock is already
+      // carried at here - never zero, which would silently drag the
+      // location's weighted-average cost down and corrupt the valuation.
       unitCost = existing.weightedAverageCost;
     } else if (!OUTBOUND_TYPES.includes(movementType)) {
       return {
-        error:
-          'This is the first stock of this item at this store, so it needs a unit cost - and prices are hidden for your role. Ask an administrator to record this receipt, or to make prices visible.',
+        error: costsVisible
+          ? 'This item has no catalogue price and no stock at this store yet, so there is no cost to record it at. Ask an administrator to set the price first.'
+          : 'This is the first stock of this item at this store, so it needs a unit cost - and prices are hidden for your role. Ask an administrator to record this receipt, or to make prices visible.',
         success: null,
       };
     } else {
