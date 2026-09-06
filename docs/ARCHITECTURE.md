@@ -209,6 +209,65 @@ resulting WAC math checked by hand):
   - Not touched: authentication architecture, database schema, the WAC inventory engine, dashboard visual
     design, the scanner engine (its existing per-mode permission checks already matched the brief), the
     36px control standard (unchanged), and accounting/customer-sales scope.
+- **Engineer stations — accept, use, and peer-to-peer pickup** (client follow-up: "Engineer reserves stock
+  from stores, store reserves stock, engineer comes and scans to accept stock items, engineer scans again
+  when using stock... other engineer can see items at store and at other engineers' stations, can
+  requisition from other engineer's station if item not used"). The requisition flow above (create →
+  approve → issue) didn't model where accepted-but-not-yet-used stock physically sits, or that it can move
+  engineer-to-engineer without going back through a store. This closes that gap by extending the *existing*
+  warehouse/transfer/WAC machinery rather than building a parallel system:
+  - **A station is a Warehouse.** `Warehouse` gained `type: 'store' | 'engineer_station'` and
+    `ownerUserId` (`src/lib/domain/inventory.ts`). Every repository, report, and the Overview stock table
+    that already iterates "every warehouse" picked up stations automatically, with zero changes to their
+    own logic — a station's on-hand, WAC, and stock value are computed by the exact same `applyMovement`
+    engine a store's are. One is auto-created (`ensureStation`, `src/app/dashboard/users/actions.ts`) the
+    moment a user becomes an Engineer / Requester, whether at creation or a later role change.
+  - **Accept = the existing Issue action, redirected.** `salesOrderRepository.dispatch` (called by both
+    Stores' "Issue" button and the requester's own click) now checks whether the requester has a station:
+    if so, it posts a `transfer_out` at the source + `transfer_in` at the station (carrying the source's
+    WAC, the same rule an inter-warehouse transfer already used) instead of the old vanish-style
+    `dispatch`. The stock is still fully tracked, just relocated to the requester's own shelf. A
+    non-Engineer requisitioning for immediate use at the store itself still gets the old plain dispatch —
+    nothing changes for that case.
+  - **Who can click Accept/Issue and Approve is now ownership-aware, not just role-based**
+    (`src/app/dashboard/sales/actions.ts`). `confirmSalesOrderAction`: Stores/Admin approve a store-sourced
+    requisition as before; a requisition sourced from an Engineer's own station can *only* be approved by
+    that Engineer — Stores has no say over stock sitting on someone's personal shelf. `dispatchSalesOrderAction`:
+    Stores/Admin can still issue anything; the requisition's own requester can also accept it themselves,
+    which is the literal "Engineer scans/clicks to pick up stock" step. `cancelSalesOrderAction`: the
+    requester can cancel their own still-draft request; once reserved it's Stores/Admin only, since
+    cancelling then releases someone else's held stock. `RequisitionActionsCell` takes explicit
+    `canApprove`/`canAccept`/`canCancel` booleans per row instead of one blanket "can process" flag, and
+    labels the button "Accept" (not "Issue") on the requester's own row.
+  - **Peer pickup — requisitioning from another Engineer's station, not just a store.** The Store picker
+    on `/dashboard/sales` now lists every store *and* every other Engineer's station (never your own — see
+    `createSalesOrderAction`'s guard), labelled by the owner's name rather than a code. Creating one, being
+    approved by the owning Engineer, and being accepted by the requester is the exact same flow as a store
+    pickup — no separate "peer request" concept was built, because none was needed.
+  - **Use** (`/dashboard/scan`, new `'use'` `ScanDirection` and `'usage'` `StockMovementType`) — a fourth
+    scan mode, shown only to someone with a station. It always posts against that one station (the picker
+    is forced there and disabled in this mode) and only decreases it — the negative-stock guard reuses the
+    same message pattern Scan OUT already had. `usage` is kept distinct from `dispatch` in the domain type
+    (not reused) specifically so "how much has this Engineer actually used" is its own reportable figure,
+    even though the WAC engine treats it identically (outbound, no WAC change) — nothing in
+    `applyMovement` needed to change.
+  - **Requisition creation guard:** you can never requisition from your own station (`createSalesOrderAction`)
+    — it's already yours.
+  - **Purchase orders/Goods receiving pickers now list stores only** (`w.type === 'store'`) — a supplier
+    delivery or a formal PO was never meant to land straight in someone's personal station.
+  - **Verified live, full loop:** created a second Engineer (Sarah Naidoo / Electrical) via `/dashboard/users`
+    and confirmed her station auto-created; Demo Engineer (Thabo/Mechanical) requisitioned 10 bags of cement
+    from DBN-FAC, Stores Manager approved it, Thabo clicked his own "Accept" and DBN-FAC dropped
+    1,840→1,830 while his station gained 10 at the carried WAC (R92.50); Sarah then requisitioned 4 bags
+    from *Thabo's station specifically* (shown in the picker as "Demo Engineer's station"), Thabo approved
+    it himself (Stores never touched it), Sarah accepted it and Thabo's station dropped 10→6 while Sarah's
+    gained 4 at the same carried WAC; Sarah then used Scan → Use mode (locked to her own station) to record
+    1 bag used (station 4→3, session tally "1 used"), and a follow-up attempt to use 10 when only 2 remained
+    was correctly rejected ("using 10 would take it negative... Lower Qty per scan to 2 or less"). The
+    Overview stock table showed both individually-named stations, each tagged "station", throughout.
+  - Not touched: the requisition/`SalesOrder` schema (no new fields — Requester/Area are still derived from
+    `createdBy`, same as before), the core `applyMovement` WAC engine, and every workflow that doesn't
+    involve an Engineer's own station (store-to-store transfers, receiving, adjustments, purchase orders).
 - **Product catalogue** (`/dashboard/products`) — list + add product.
 - **Goods receiving** (`/dashboard/receiving`) — a "quick receive" flow that creates the PO, PO line, GRN
   and GRN line, then posts the stock movement. Deliberately skips a separate PO-issuing step since full
@@ -449,6 +508,7 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
   DB-level immutability trigger is written (`supabase/migrations/20260816100000_...sql`) but not applied
   anywhere yet — needs a live project |
 | Requisitions (draft/approve/issue) — repurposed from Sales & Dispatch | Real logic and UI — see §1 |
+| Engineer stations (accept, use, peer-to-peer pickup) | **Real** — a station is a real Warehouse row, auto-created per Engineer, tracked by the same WAC engine as any store. Accept/Use/peer-pickup all verified live end-to-end — see §1 |
 | Purchase order lifecycle (draft/issue/partial-receive) | Real logic and UI — see §1 |
 | Invoicing & billing (VAT, payments, ageing) | **Dormant** — real code, unreachable from nav — see §1 |
 | Accounting Integration (Sage/QuickBooks/Xero) | Not started — **explicitly deferred by client decision**, see §5.5 |
@@ -543,4 +603,10 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
     (create + role/area/active status exist today; identity fields don't), and a decision on whether the
     factory Area list (`src/lib/areas.ts`) stays a fixed constant or becomes a repository-backed,
     Admin-managed list.
-11. Phase 8: system testing, UAT, training materials, production cutover.
+11. Engineer-station follow-ons from §1: no notification tells an Engineer a peer requisition is waiting
+    on their station for approval — they only see it by opening Requisitions themselves; a per-Engineer
+    "usage" report (rather than just the running session tally on `/dashboard/scan`) would need to sum
+    `usage`-type movements by station over time; deactivating an Engineer leaves their station (and
+    whatever's still on it) untouched — what should happen to that stock is a business decision, not an
+    engineering one, and isn't resolved here.
+12. Phase 8: system testing, UAT, training materials, production cutover.

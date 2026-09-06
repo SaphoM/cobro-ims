@@ -289,23 +289,37 @@ full per-page breakdown.
   `write_off`); rejecting never does. Approving/rejecting requires the `approve_adjustments` permission —
   admin-only in the current placeholder matrix (§9.2).
 - **Requisitions** (`/dashboard/sales` — route unchanged, page repurposed per §1.1) — an internal stock
-  request from a department/workshop: draft (nothing reserved) → approve (reserves stock, no ledger
-  movement, no WAC change) → issue (posts the real outbound movement at the ledger's current WAC, releases
-  the reservation) or cancel from draft/approved (releases any reservation, posts nothing). Order numbers
-  are `REQ-####`. Creating one only needs the `create_requisitions` permission (Stores Manager, Stores
-  Clerk, and Engineer / Requester all hold it); approving/issuing/cancelling stays on `manage_sales_orders`
-  (Stores only, not Engineer). An Engineer / Requester sees and can raise only their own requisitions here,
-  tagged with their **Area**; every other role sees the full list, each row showing who requested it and
-  from which area. See **User management** below and `docs/ARCHITECTURE.md` §1.
+  request from a department/workshop, or from one Engineer to another: draft (nothing reserved) → approve
+  (reserves stock, no ledger movement, no WAC change) → accept/issue (moves the stock at the ledger's
+  current WAC, releases the reservation) or cancel from draft/approved (releases any reservation, posts
+  nothing). Order numbers are `REQ-####`. Creating one only needs `create_requisitions` (Stores Manager,
+  Stores Clerk, and Engineer / Requester all hold it). Approving and accepting are ownership-aware, not
+  just role-based: a store-sourced requisition is still Stores/Admin's call, but one sourced from an
+  Engineer's own station (see **Engineer stations** below) can only be approved by that Engineer, and any
+  requisition's own requester can accept/pick it up themselves regardless of role — the button reads
+  "Accept" on their own row, "Issue" everywhere else. An Engineer / Requester sees their own requisitions
+  plus any peer request sourced from their own station, each tagged with the requester's **Area**; every
+  other role sees the full list. See **Engineer stations** below and `docs/ARCHITECTURE.md` §1.
+- **Engineer stations** (part of Requisitions + `/dashboard/scan`) — every Engineer / Requester gets a
+  personal station the moment they're created (auto-created, a real `Warehouse` row like any store,
+  tracked by the same WAC engine). Accepting an approved requisition moves stock there rather than making
+  it vanish, so it's still on-hand and visible to everyone — including on another Engineer's own
+  Requisitions "Store" picker, so a peer can requisition an unused item straight off someone else's
+  station instead of waiting on a fresh store pickup. A **Use** mode on the scan station (shown only to
+  someone with a station, locked to posting against their own) records stock they've actually consumed —
+  it leaves tracked inventory for good, same as a Scan OUT, but can never touch anyone else's station or a
+  store. See `docs/ARCHITECTURE.md` §1 for the full accept → use → peer-pickup workflow, live-verified
+  end-to-end with two Engineers.
 - **User management** (`/dashboard/users`, Admin-only) — create users (Name, Email, Role, and an Area when
   the role is Engineer / Requester) and change an existing user's role, area, or active status. Four roles
   today: **Admin** (everything — system config, suppliers, catalogue, thresholds, reporting; more than
   one Admin is fully supported), **Stores Manager** and **Stores Clerk** (the operational store
   function — order stock from external suppliers, receive, scan in/out, reserve, process and issue
   requisitions, transfer stock; no system administration), and **Engineer / Requester** (raises and
-  tracks their own requisitions, tied to a
-  factory Area — Mechanical, Electrical, Workshop, Maintenance, etc. — but never touches the inventory
-  ledger directly). Every user-admin action (create, role change, area change, activate/deactivate) is
+  tracks their own requisitions, tied to a factory Area — Mechanical, Electrical, Workshop, Maintenance,
+  etc. — and can accept stock into, and record their own usage from, their own personal station, but never
+  touches a store's ledger directly — see **Engineer stations** above). Every user-admin action (create,
+  role change, area change, activate/deactivate) is
   audited. A user created here can sign in immediately with a documented default password (mock auth only,
   see §8) — real per-user credentials are a §11 authentication-phase item.
 - **Suppliers** (`/dashboard/suppliers`) and **Departments** (`/dashboard/customers` — route unchanged) —
@@ -326,9 +340,11 @@ full per-page breakdown.
   target; the function itself still exists in `reports.ts`, unused.) Export formats today are **CSV only**
   — the RFQ mentions PDF/Excel too; not built yet, see §11.
 - **Barcode / QR scan** (`/dashboard/scan`) — scan or type a barcode to look up a product and its stock
-  across every warehouse. Two input methods, same lookup: a **USB/Bluetooth scanner** (they act as keyboard
-  input, submitting a plain form on Enter — no client JS needed) and the **browser camera** on phones and
-  tablets.
+  across every warehouse, or post a real movement: Scan IN (receiving), Scan OUT (issuing), and — only for
+  a role with their own station — **Use**, which records stock an Engineer has consumed from their own
+  station (see **Engineer stations** above). Two input methods, same for every mode: a **USB/Bluetooth
+  scanner** (they act as keyboard input, submitting a plain form on Enter — no client JS needed) and the
+  **browser camera** on phones and tablets.
 - **Scanning at the operational touchpoints** — the same camera-or-USB scan-to-identify pattern is wired
   into **Goods receiving**, **Transfers**, and **Sales & dispatch** (scan to select the product on the
   existing form), and into the **Product catalogue** (scan to fill the Barcode field on a new product).
@@ -367,10 +383,11 @@ correct — with the resulting quantities/costs/VAT amounts hand-verified agains
 | User management (`/dashboard/users`) | **Real** — Admin-only create user + edit role/area/active-status, fully audited. Multiple Admins verified live. Editing name/email after creation isn't built yet, §11 |
 | Audit log | **Real** — every audited action writes an append-only entry, viewable at `/dashboard/audit-log`. DB-level immutability trigger written, not applied (no live project) |
 | Accounting integration (Sage/QuickBooks/Xero) | Not started — **explicitly deferred by client decision**, not just unchosen (§7.5) |
-| Requisitions (draft → approve → issue), internal stock requests | Real logic and UI — repurposed from Sales & Dispatch, §1.1 |
+| Requisitions (draft → approve → accept/issue), internal stock requests | Real logic and UI — repurposed from Sales & Dispatch, §1.1 |
+| Engineer stations (accept, use, peer-to-peer pickup) | **Real** — auto-created per Engineer, a real Warehouse tracked by the same WAC engine. Verified live end-to-end with two Engineers |
 | Invoicing, payments, credit notes | **Dormant** — real code, no longer reachable from navigation, §1.1 |
 | Dashboards & reports (14 of "15+", CSV export; PDF/Excel not built) | Real logic and UI |
-| Barcode/QR scanning — USB scanner + browser camera, at five touchpoints | Real logic and UI |
+| Barcode/QR scanning — USB scanner + browser camera, at five touchpoints, plus a Use mode for Engineer stations | Real logic and UI |
 | QR code generation on product labels | **Real** — `qrcode` package, verified by encode→decode round-trip |
 | Product labels (print-ready sheets) | Real logic and UI |
 | Bill of materials (flat, + explosion calculator) | Real logic and UI |

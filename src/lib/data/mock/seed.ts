@@ -122,12 +122,61 @@ export const users: User[] = [
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   },
+  // Two more Engineers, seeded directly (rather than only reachable by
+  // creating them live via /dashboard/users) so more-than-one engineer
+  // station exists by default - the mock data layer resets on every server
+  // restart, so a station created live during a session doesn't survive
+  // one. Sign in with NEW_USER_DEFAULT_PASSWORD (src/lib/demo-credentials.ts) -
+  // the same mock-auth path any admin-created user gets, these two just
+  // aren't on the login page's quick-pick card since that's one account
+  // per ROLE, not per person.
+  {
+    id: 'user-engineer-2',
+    email: 'sarah.naidoo@cobroconcrete.co.za',
+    fullName: 'Sarah Naidoo',
+    roleId: 'role-engineer',
+    area: 'Electrical',
+    isActive: true,
+    mfaEnrolled: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'user-engineer-3',
+    email: 'karabo.dlamini@cobroconcrete.co.za',
+    fullName: 'Karabo Dlamini',
+    roleId: 'role-engineer',
+    area: 'Workshop',
+    isActive: true,
+    mfaEnrolled: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
 ];
 
 export const warehouses: Warehouse[] = [
-  { id: 'wh-dbn', code: 'DBN-FAC', name: 'Durban Factory', address: 'Durban, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
-  { id: 'wh-pmb', code: 'PMB-WH', name: 'Pietermaritzburg Warehouse', address: 'Pietermaritzburg, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
-  { id: 'wh-rbb', code: 'RBB-DEP', name: 'Richards Bay Depot', address: 'Richards Bay, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
+  // A single physical Store - Cobro operates from one location. The
+  // Pietermaritzburg and Richards Bay entries that used to sit alongside
+  // this one are gone; their seeded stock was folded into this one's
+  // ledger below rather than dropped, so total on-hand doesn't silently
+  // change. Inter-store Transfers keeps its schema/UI (see
+  // /dashboard/transfers) but has nothing to demo it against until a
+  // second real Store exists - Engineer-station transfers (accept/peer
+  // pickup) are unaffected, since those move between Warehouse rows of a
+  // different type. See docs/ARCHITECTURE.md §1.
+  { id: 'wh-dbn', code: 'DBN-FAC', name: 'Durban Store', address: 'Durban, KZN', isActive: true, type: 'store', ownerUserId: null, createdAt: '2026-01-01T00:00:00Z' },
+  // Demo Engineer's own station - stock they've accepted from a store but
+  // not yet used sits here. Auto-created the same way any new Engineer /
+  // Requester gets one on account creation; seeded directly here only
+  // because this demo user predates that code path. See Warehouse's doc
+  // comment (src/lib/domain/inventory.ts) for the full workflow.
+  { id: 'wh-station-engineer', code: 'ENG-STATION', name: "Demo Engineer's station", address: null, isActive: true, type: 'engineer_station', ownerUserId: 'user-viewer', createdAt: '2026-01-01T00:00:00Z' },
+  // Two more Engineer stations, one per additional seeded Engineer above -
+  // demonstrates the peer-pickup workflow (requisitioning an unused item
+  // off another Engineer's station) without needing to create users live
+  // first every time the mock server restarts.
+  { id: 'wh-station-engineer-2', code: 'STA-SNAIDOO', name: "Sarah Naidoo's station", address: null, isActive: true, type: 'engineer_station', ownerUserId: 'user-engineer-2', createdAt: '2026-01-01T00:00:00Z' },
+  { id: 'wh-station-engineer-3', code: 'STA-KDLAMINI', name: "Karabo Dlamini's station", address: null, isActive: true, type: 'engineer_station', ownerUserId: 'user-engineer-3', createdAt: '2026-01-01T00:00:00Z' },
 ];
 
 export const products: Product[] = [
@@ -140,15 +189,22 @@ export const products: Product[] = [
 ];
 
 /** Initial stock ledger snapshot — as if this is the state after Discover-phase data migration. */
+// Consolidated onto the single remaining Store: each product's former
+// multi-store quantities are summed here, with the weighted-average cost
+// re-blended across whatever quantity/cost pairs used to sit at each store
+// (the same math applyMovement itself would do for a real inbound
+// transfer) - so nothing was dropped or double-counted, just merged.
 export const stockLedger: StockLedgerEntry[] = [
-  { productId: 'prod-cem-42-5', warehouseId: 'wh-dbn', quantityOnHand: 1840, quantityReserved: 120, weightedAverageCost: 92.5, updatedAt: '2026-08-10T08:00:00Z' },
-  { productId: 'prod-cem-42-5', warehouseId: 'wh-pmb', quantityOnHand: 410, quantityReserved: 0, weightedAverageCost: 94.1, updatedAt: '2026-08-09T14:00:00Z' },
-  { productId: 'prod-block-140', warehouseId: 'wh-dbn', quantityOnHand: 12400, quantityReserved: 2000, weightedAverageCost: 6.85, updatedAt: '2026-08-11T09:30:00Z' },
-  { productId: 'prod-block-140', warehouseId: 'wh-rbb', quantityOnHand: 1850, quantityReserved: 0, weightedAverageCost: 7.1, updatedAt: '2026-08-08T11:00:00Z' },
+  // Was 1,840 @ R92.50 (DBN) + 410 @ R94.10 (PMB) = 2,250 @ R92.79 blended.
+  { productId: 'prod-cem-42-5', warehouseId: 'wh-dbn', quantityOnHand: 2250, quantityReserved: 120, weightedAverageCost: 92.79, updatedAt: '2026-08-10T08:00:00Z' },
+  // Was 12,400 @ R6.85 (DBN) + 1,850 @ R7.10 (RBB) = 14,250 @ R6.88 blended.
+  { productId: 'prod-block-140', warehouseId: 'wh-dbn', quantityOnHand: 14250, quantityReserved: 2000, weightedAverageCost: 6.88, updatedAt: '2026-08-11T09:30:00Z' },
   { productId: 'prod-block-90', warehouseId: 'wh-dbn', quantityOnHand: 5200, quantityReserved: 0, weightedAverageCost: 5.4, updatedAt: '2026-08-11T09:30:00Z' },
-  { productId: 'prod-paver-60', warehouseId: 'wh-pmb', quantityOnHand: 265, quantityReserved: 40, weightedAverageCost: 148.2, updatedAt: '2026-08-07T10:00:00Z' },
+  // Was entirely at PMB - moved here unchanged, no other quantity to blend with.
+  { productId: 'prod-paver-60', warehouseId: 'wh-dbn', quantityOnHand: 265, quantityReserved: 40, weightedAverageCost: 148.2, updatedAt: '2026-08-07T10:00:00Z' },
   { productId: 'prod-aggregate-19', warehouseId: 'wh-dbn', quantityOnHand: 38, quantityReserved: 0, weightedAverageCost: 410, updatedAt: '2026-08-12T07:45:00Z' },
-  { productId: 'prod-rebar-y12', warehouseId: 'wh-rbb', quantityOnHand: 640, quantityReserved: 0, weightedAverageCost: 118.75, updatedAt: '2026-08-06T13:00:00Z' },
+  // Was entirely at RBB - moved here unchanged, no other quantity to blend with.
+  { productId: 'prod-rebar-y12', warehouseId: 'wh-dbn', quantityOnHand: 640, quantityReserved: 0, weightedAverageCost: 118.75, updatedAt: '2026-08-06T13:00:00Z' },
 ];
 
 export const suppliers: Supplier[] = [
@@ -161,6 +217,13 @@ export const customers: Customer[] = [
   { id: 'cust-thabo-construction', name: 'Thabo Construction', contactEmail: 'procurement@thaboconstruction.co.za', contactPhone: '031 555 0301', address: 'Umlazi, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
   { id: 'cust-kzn-builders', name: 'KZN Builders Merchant', contactEmail: 'orders@kznbuilders.co.za', contactPhone: '033 555 0288', address: 'Pietermaritzburg, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
   { id: 'cust-msunduzi-dev', name: 'Msunduzi Developments', contactEmail: 'accounts@msunduzidev.co.za', contactPhone: '033 555 0412', address: 'Msunduzi, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
+  // A Store can also be the requesting party on its own requisition (e.g.
+  // replenishing its own counter/yard stock, not on behalf of an external
+  // department) - one Customer record per physical Store so it's a normal,
+  // correctly-typed option in the same "Requesting department" picker,
+  // rather than a special case bolted onto the Store type. Add one here
+  // for every entry in `warehouses` with type: 'store'.
+  { id: 'cust-store-dbn', name: 'Durban Store (internal use)', contactEmail: null, contactPhone: null, address: 'Durban, KZN', isActive: true, createdAt: '2026-01-01T00:00:00Z' },
 ];
 
 export const adjustmentReasonCodes: AdjustmentReasonCode[] = [

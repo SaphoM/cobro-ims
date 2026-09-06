@@ -42,7 +42,14 @@ export default async function ReceivingPage({
         <p className="text-[0.86rem] text-text-muted">PO-linked receipts, posted straight into the stock ledger.</p>
       </div>
 
-      <ReceiveForm suppliers={suppliers} warehouses={warehouses} products={products} initialBarcode={barcode} />
+      {/* Real physical stores only - goods from a supplier land in a store,
+          never straight into an Engineer's personal station. */}
+      <ReceiveForm
+        suppliers={suppliers}
+        warehouses={warehouses.filter((w) => w.type === 'store')}
+        products={products}
+        initialBarcode={barcode}
+      />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">

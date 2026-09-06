@@ -94,7 +94,9 @@ export function RecordMovementForm({
           {ledger && (
             <span className={`text-[0.82rem] font-bold ${availableQty === 0 ? 'text-danger' : 'text-accent-strong'}`}>
               {availableQty.toLocaleString()} {selectedProduct?.unitOfMeasure ?? ''} available
-              {selectedWarehouse ? ` at ${selectedWarehouse.code}` : ''}
+              {selectedWarehouse
+                ? ` at ${selectedWarehouse.type === 'engineer_station' ? selectedWarehouse.name : selectedWarehouse.code}`
+                : ''}
               {availableQty === 0 && ' - none on hand here'}
             </span>
           )}
@@ -109,7 +111,7 @@ export function RecordMovementForm({
           >
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.code}
+                {w.type === 'engineer_station' ? w.name : `${w.code} - ${w.name}`}
               </option>
             ))}
           </select>

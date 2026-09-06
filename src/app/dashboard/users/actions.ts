@@ -2,10 +2,32 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
-import { auditLogRepository, roleRepository, userRepository } from '@/lib/data';
+import { auditLogRepository, roleRepository, userRepository, warehouseRepository } from '@/lib/data';
 import { hasPermission, requirePermission } from '@/lib/permissions';
 import { FACTORY_AREAS } from '@/lib/areas';
 import { NEW_USER_DEFAULT_PASSWORD } from '@/lib/demo-credentials';
+import type { User } from '@/lib/domain/inventory';
+
+/**
+ * Every Engineer / Requester gets exactly one personal station — a
+ * Warehouse row of type `engineer_station` they own — the first time they
+ * become one, whether at account creation or a later role change. Stock
+ * they accept from a store (or from another Engineer's station) sits here
+ * until they use it. Idempotent: does nothing if one already exists (e.g.
+ * moved out of the role and back). See Warehouse's doc comment in
+ * src/lib/domain/inventory.ts for the full accept/use workflow.
+ */
+async function ensureStation(user: User): Promise<void> {
+  const existing = await warehouseRepository.getByOwner(user.id);
+  if (existing) return;
+  await warehouseRepository.create({
+    code: `STA-${user.id.slice(0, 8).toUpperCase()}`,
+    name: `${user.fullName}'s station`,
+    address: null,
+    type: 'engineer_station',
+    ownerUserId: user.id,
+  });
+}
 
 export interface CreateUserFormState {
   error: string | null;
@@ -52,6 +74,7 @@ export async function createUserAction(
 
   try {
     const user = await userRepository.create({ email, fullName, roleId, area });
+    if (isEngineer) await ensureStation(user);
     await auditLogRepository.write({
       tableName: 'users',
       recordId: user.id,
@@ -111,6 +134,7 @@ export async function updateUserRoleAction(userId: string, formData: FormData) {
     await userRepository.updateArea(userId, null);
   }
   const user = await userRepository.updateRole(userId, roleId);
+  if (role.name === 'engineer_requester') await ensureStation(user);
   await auditLogRepository.write({
     tableName: 'users',
     recordId: userId,

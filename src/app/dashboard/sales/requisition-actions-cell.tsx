@@ -27,9 +27,24 @@ const initialState: RequisitionActionState = { error: null, success: null };
 export function RequisitionActionsCell({
   orderId,
   status,
+  canApprove,
+  canAccept,
+  acceptLabel = 'Issue',
+  canCancel,
 }: {
   orderId: string;
   status: SalesOrderStatus;
+  /** Stores/Admin (any store-sourced requisition), or the owning Engineer
+   *  when this one is sourced from their own station (a peer pickup). */
+  canApprove: boolean;
+  /** Stores/Admin, or this requisition's own requester accepting/picking
+   *  up their own approved stock. */
+  canAccept: boolean;
+  /** "Accept" for the requester's own row, "Issue" for everyone else - same
+   *  underlying action, different label depending on who's looking. */
+  acceptLabel?: 'Issue' | 'Accept';
+  /** Stores/Admin any time, or the requester themselves while still draft. */
+  canCancel: boolean;
 }) {
   const [approveState, approve, approving] = useActionState(
     confirmSalesOrderAction.bind(null, orderId),
@@ -50,7 +65,7 @@ export function RequisitionActionsCell({
   return (
     <div className="flex flex-col items-end gap-1.5">
       <div className="flex justify-end gap-3">
-        {status === 'draft' && (
+        {status === 'draft' && canApprove && (
           <form action={approve}>
             <button
               type="submit"
@@ -61,18 +76,18 @@ export function RequisitionActionsCell({
             </button>
           </form>
         )}
-        {status === 'confirmed' && (
+        {status === 'confirmed' && canAccept && (
           <form action={issue}>
             <button
               type="submit"
               disabled={busy}
               className="text-[0.8rem] font-semibold text-accent-strong hover:text-accent-hover disabled:opacity-60"
             >
-              {issuing ? 'Issuing…' : 'Issue'}
+              {issuing ? `${acceptLabel === 'Accept' ? 'Accepting' : 'Issuing'}…` : acceptLabel}
             </button>
           </form>
         )}
-        {(status === 'draft' || status === 'confirmed') && (
+        {(status === 'draft' || status === 'confirmed') && canCancel && (
           <form action={cancel}>
             <button
               type="submit"

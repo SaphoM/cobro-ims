@@ -54,7 +54,9 @@ export default async function PurchaseOrdersPage() {
         </p>
       </div>
 
-      <PurchaseOrderForm suppliers={suppliers} warehouses={warehouses} products={products} />
+      {/* Real physical stores only - a supplier delivery is never ordered
+          straight into an Engineer's personal station. */}
+      <PurchaseOrderForm suppliers={suppliers} warehouses={warehouses.filter((w) => w.type === 'store')} products={products} />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">

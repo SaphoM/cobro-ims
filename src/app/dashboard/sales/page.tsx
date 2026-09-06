@@ -1,4 +1,12 @@
-import { customerRepository, productRepository, roleRepository, salesOrderRepository, userRepository, warehouseRepository } from '@/lib/data';
+import {
+  customerRepository,
+  productRepository,
+  roleRepository,
+  salesOrderRepository,
+  stockLedgerRepository,
+  userRepository,
+  warehouseRepository,
+} from '@/lib/data';
 import { getSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 import { SalesOrderForm } from '@/app/dashboard/sales/sales-order-form';
@@ -11,32 +19,43 @@ export default async function SalesPage({
   searchParams: Promise<{ barcode?: string }>;
 }) {
   const { barcode } = await searchParams;
-  const [customers, warehouses, products, allOrders, users, session] = await Promise.all([
+  const [customers, warehouses, products, allOrders, users, ledger, session] = await Promise.all([
     customerRepository.list(),
     warehouseRepository.list(),
     productRepository.list(),
     salesOrderRepository.list(),
     userRepository.list(),
+    stockLedgerRepository.listAll(),
     getSession(),
   ]);
 
   const role = session ? await roleRepository.getById(session.roleId) : null;
-  // Engineer / Requester sees only requisitions they raised themselves -
-  // they request stock, they don't process anyone else's request (see
-  // docs/ARCHITECTURE.md §1). Every other role still sees the full list,
-  // same as before this role model existed.
   const isEngineer = role?.name === 'engineer_requester';
-  const orders = isEngineer && session ? allOrders.filter((o) => o.createdBy === session.id) : allOrders;
-  // Engineers request; they never approve, issue or cancel - their own
-  // request included. Hiding the action buttons here is on top of the
-  // server-side `manage_sales_orders` check the actions themselves make,
-  // not instead of it.
+  const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
+  // Engineer / Requester sees requisitions they raised themselves, PLUS any
+  // peer requisition sourced from their own station (see Warehouse's doc
+  // comment in src/lib/domain/inventory.ts) - they need to see those to
+  // Approve/release them. Every other role still sees the full list, same
+  // as before this role model existed.
+  const myStationId = session ? warehouses.find((w) => w.ownerUserId === session.id)?.id : undefined;
+  const orders =
+    isEngineer && session
+      ? allOrders.filter((o) => o.createdBy === session.id || o.warehouseId === myStationId)
+      : allOrders;
+  // Stores/Admin can process every requisition, unchanged. An Engineer
+  // additionally gets two narrow, ownership-based rights the server checks
+  // independently in sales/actions.ts: approving a peer pickup sourced from
+  // their own station, and accepting/cancelling their own request.
   const canProcess = session ? await hasPermission(session, 'manage_sales_orders') : false;
 
   const customerById = new Map(customers.map((c) => [c.id, c]));
-  const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
   const productById = new Map(products.map((p) => [p.id, p]));
   const userById = new Map(users.map((u) => [u.id, u]));
+  // Requisition sources: every store, plus every OTHER Engineer's station -
+  // seeing an unused item sitting on a peer's shelf and requesting it
+  // straight from there (instead of a fresh store pickup) is the point of
+  // stations being visible at all. Never your own - see createSalesOrderAction.
+  const requestableWarehouses = warehouses.filter((w) => w.id !== myStationId);
 
   return (
     <div className="flex flex-col gap-6">
@@ -49,7 +68,13 @@ export default async function SalesPage({
         </p>
       </div>
 
-      <SalesOrderForm customers={customers} warehouses={warehouses} products={products} initialBarcode={barcode} />
+      <SalesOrderForm
+        customers={customers}
+        warehouses={requestableWarehouses}
+        products={products}
+        ledger={ledger}
+        initialBarcode={barcode}
+      />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">
@@ -82,6 +107,12 @@ export default async function SalesPage({
                 {orders.map((o) => {
                   const product = productById.get(o.productId);
                   const requester = userById.get(o.createdBy);
+                  const sourceWarehouse = warehouseById.get(o.warehouseId);
+                  const isOwnRequest = session?.id === o.createdBy;
+                  const isSourceStationOwner = session?.id != null && sourceWarehouse?.ownerUserId === session.id;
+                  const canApprove = canProcess || isSourceStationOwner;
+                  const canAccept = canProcess || isOwnRequest;
+                  const canCancel = canProcess || (isOwnRequest && o.status === 'draft');
                   return (
                     <tr key={o.id} className="border-t border-accent/[0.08]">
                       <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{o.orderNumber}</td>
@@ -91,7 +122,9 @@ export default async function SalesPage({
                       <td className="px-5 py-3 text-text-muted">
                         {product?.sku} <span className="text-text-faint">- {product?.name}</span>
                       </td>
-                      <td className="px-5 py-3 text-text-muted">{warehouseById.get(o.warehouseId)?.code}</td>
+                      <td className="px-5 py-3 text-text-muted">
+                        {sourceWarehouse?.type === 'engineer_station' ? sourceWarehouse.name : sourceWarehouse?.code}
+                      </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text">
                         {o.quantityOrdered.toLocaleString()} {product?.unitOfMeasure}
                       </td>
@@ -106,7 +139,16 @@ export default async function SalesPage({
                         <StatusPill status={o.status} />
                       </td>
                       <td className="px-5 py-3 text-right">
-                        {canProcess && <RequisitionActionsCell orderId={o.id} status={o.status} />}
+                        {(canApprove || canAccept || canCancel) && (
+                          <RequisitionActionsCell
+                            orderId={o.id}
+                            status={o.status}
+                            canApprove={canApprove}
+                            canAccept={canAccept}
+                            acceptLabel={!canProcess && isOwnRequest ? 'Accept' : 'Issue'}
+                            canCancel={canCancel}
+                          />
+                        )}
                       </td>
                     </tr>
                   );

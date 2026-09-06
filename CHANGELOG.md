@@ -4,6 +4,42 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.20.0 — 2026-09-06
+
+**Scan station consolidated onto Overview; single-store demo data; Quick requisition shortcut.**
+- Removed the standalone `/dashboard/scan` page and its nav link. Scanning (Look up, Scan IN, Scan OUT,
+  and the Engineer-station Use mode from v0.19.x) now lives entirely on the Overview's existing "Record a
+  stock movement" card - one scan surface instead of two. The reusable scan components/actions stay in
+  the codebase (currently unreferenced) in case a dedicated entry point is wanted again later
+- Demo data reduced to a single physical Store (Durban Store / DBN-FAC) - Pietermaritzburg and Richards
+  Bay removed, with their seeded stock consolidated into Durban's ledger (blended WAC), not dropped.
+  Inter-store Transfers keeps its page/schema but has nothing to demo between real stores until a second
+  one exists; Engineer-station transfers (accept/peer pickup) are unaffected
+- Store names now say "Store" consistently (was a Factory/Warehouse/Depot mix); Store pickers show the
+  full name alongside the code (`DBN-FAC - Durban Store`), matching how Engineer stations are already shown
+- Two more Engineers seeded (Sarah Naidoo/Electrical, Karabo Dlamini/Workshop) so more-than-one Engineer
+  station exists by default, without needing to create them live first every session restart
+- A Store can now be its own "requesting department" (a Customer record per Store), so a Store can raise
+  a requisition for its own use, not only external departments
+- **New: Quick requisition** - a small icon on each "Stock by location" row (shown only to a session with
+  `create_requisitions`, hidden on the viewer's own station) opens a compact modal with Product/Store
+  already fixed to that row - only Department, Quantity, and Unit value are left to fill in. Reuses
+  `createSalesOrderAction` directly, so there's no second validation/permission path to keep in sync.
+  Unit value prefills from the catalogue price and is read-only for every role except Admin
+  (`manage_pricing`, the same authority that edits price on the catalogue itself). Shows on-hand at the
+  row's own location plus a secondary "Also on hand at ..." line covering every other store and Engineer's
+  station currently holding the product, so a requester sees the full picture without leaving the modal
+- The same live "available units" counter (updates as Product/Store selection changes) is now on the full
+  Requisitions page's create form too, not just Overview and the Quick requisition modal
+- `npx tsc --noEmit` and `npm run lint` both clean (only the pre-existing, deferred `static-version/`
+  issues remain)
+- Files changed: `src/app/dashboard/page.tsx`, `record-movement-form.tsx`, `actions.ts`,
+  `sales/page.tsx`, `sales/sales-order-form.tsx`, `scan/actions.ts`, `scan/scan-help.tsx`,
+  `scan/scan-station.tsx`, `users/actions.ts`, `src/lib/data/repositories.ts`,
+  `src/lib/data/mock/repositories.ts`, `src/lib/data/mock/seed.ts`, `src/lib/domain/inventory.ts`,
+  `src/lib/nav-items.ts`, `purchase-orders/page.tsx`, `receiving/page.tsx`. Removed:
+  `scan/page.tsx`. New: `src/app/dashboard/quick-requisition-button.tsx`
+
 ## v0.19.2 — 2026-09-06
 
 **Fix: product catalogue and BOM editing are Admin-only, not Stores Manager too.**

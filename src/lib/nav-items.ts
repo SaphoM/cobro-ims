@@ -12,8 +12,8 @@ import type { Permission } from '@/lib/permissions';
  *
  * `permission: null` means every signed-in role sees the item (Overview,
  * Product catalogue, Bill of materials, Requisitions, Departments,
- * Dashboards & reports, Barcode/QR scan, Security — all either universally
- * relevant or already self-scoped by the page itself). Everything else
+ * Dashboards & reports, Security — all either universally relevant or
+ * already self-scoped by the page itself). Everything else
  * names the one `Permission` that separates "sees this" from "doesn't" —
  * reusing an existing permission rather than inventing a menu-only flag, so
  * the nav can never drift from what the page/action actually enforces.
@@ -36,7 +36,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/sales', label: 'Requisitions', permission: 'create_requisitions' },
   { href: '/dashboard/customers', label: 'Departments', permission: null },
   { href: '/dashboard/reports', label: 'Dashboards & reports', permission: 'view_reports' },
-  { href: '/dashboard/scan', label: 'Barcode / QR scan', permission: null },
   { href: '/dashboard/labels', label: 'Product labels', permission: 'manage_receiving' },
   { href: '/dashboard/audit-log', label: 'Audit log', permission: 'view_audit_log' },
   { href: '/dashboard/security', label: 'Security (2FA)', permission: null },

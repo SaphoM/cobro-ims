@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getSession, destroySession } from '@/lib/auth';
-import { stockLedgerRepository, stockMovementRepository } from '@/lib/data';
+import { auditLogRepository, stockLedgerRepository, stockMovementRepository } from '@/lib/data';
 import { checkPermission, type Permission } from '@/lib/permissions';
 import { canSeeCosts } from '@/lib/costs';
 import type { StockMovementType } from '@/lib/domain/inventory';
@@ -13,7 +13,7 @@ export interface RecordMovementFormState {
   success: string | null;
 }
 
-const OUTBOUND_TYPES: StockMovementType[] = ['dispatch', 'transfer_out', 'write_off'];
+const OUTBOUND_TYPES: StockMovementType[] = ['dispatch', 'transfer_out', 'write_off', 'usage'];
 
 /**
  * The permission each movement type actually requires, rather than one
@@ -28,11 +28,12 @@ const OUTBOUND_TYPES: StockMovementType[] = ['dispatch', 'transfer_out', 'write_
  * does all day.
  *
  * Gating per type keeps the hole closed while unblocking the common case:
- * a warehouse clerk can scan stock in and out (the same two permissions the
- * scan station on /dashboard/scan uses, so the two paths agree), but
- * write-offs and adjustments still require `approve_adjustments`, which is
- * MFA-gated in permissions.ts. Those two are the WAC-affecting types that
- * post with no second approver, and they stay locked down.
+ * a warehouse clerk can scan stock in and out via the Scan button on this
+ * form (`manage_receiving`/`manage_sales_orders`, the same two permissions
+ * the standalone scan station used before it was removed), but write-offs
+ * and adjustments still require `approve_adjustments`, which is MFA-gated
+ * in permissions.ts. Those two are the WAC-affecting types that post with
+ * no second approver, and they stay locked down.
  */
 const PERMISSION_BY_TYPE: Record<StockMovementType, Permission> = {
   receipt: 'manage_receiving',
@@ -41,6 +42,13 @@ const PERMISSION_BY_TYPE: Record<StockMovementType, Permission> = {
   transfer_out: 'manage_transfers',
   adjustment: 'approve_adjustments',
   write_off: 'approve_adjustments',
+  // Not actually selectable from this generic form (see MOVEMENT_LABELS in
+  // record-movement-form.tsx) - 'usage' is only ever posted by an Engineer's
+  // own "Use" scan on the Overview scan station, which checks station
+  // ownership directly rather than a role permission. This entry exists
+  // only so PERMISSION_BY_TYPE stays exhaustively typed; `approve_adjustments`
+  // is a deliberately unreachable-in-practice fallback, never meant to be hit.
+  usage: 'approve_adjustments',
 };
 
 export async function recordMovementAction(
@@ -116,7 +124,7 @@ export async function recordMovementAction(
   const signedQuantity = OUTBOUND_TYPES.includes(movementType) ? -quantityRaw : quantityRaw;
 
   try {
-    const { ledger } = await stockMovementRepository.record({
+    const { movement, ledger } = await stockMovementRepository.record({
       productId,
       warehouseId,
       movementType,
@@ -127,7 +135,21 @@ export async function recordMovementAction(
       createdBy: session.id,
     });
 
+    // Every other mutating path in the app (adjustments, requisitions, the
+    // old scan station) writes its own audit entry - `stockMovementRepository
+    // .record` itself doesn't do this for any caller, by design, so it was
+    // missing here specifically. Scan-in/out from this form is a real stock
+    // movement like any other and needs the same who/what/when trail.
+    await auditLogRepository.write({
+      tableName: 'stock_movements',
+      recordId: movement.id,
+      action: 'insert',
+      changedBy: session.id,
+      after: movement,
+    });
+
     revalidatePath('/dashboard');
+    revalidatePath('/dashboard/audit-log');
     return {
       error: null,
       success: costsVisible

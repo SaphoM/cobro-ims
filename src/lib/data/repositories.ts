@@ -36,9 +36,24 @@ import type {
   Warehouse,
 } from '@/lib/domain/inventory';
 
+export interface CreateWarehouseInput {
+  code: string;
+  name: string;
+  address: string | null;
+  type: 'store' | 'engineer_station';
+  ownerUserId: string | null;
+}
+
 export interface WarehouseRepository {
   list(): Promise<Warehouse[]>;
   getById(id: string): Promise<Warehouse | null>;
+  /** Creates a new location. Used today only to auto-create an Engineer's
+   *  own station when their user account is created — see
+   *  src/app/dashboard/users/actions.ts. */
+  create(input: CreateWarehouseInput): Promise<Warehouse>;
+  /** The one station belonging to this user, if any — null for every role
+   *  except Engineer / Requester. */
+  getByOwner(ownerUserId: string): Promise<Warehouse | null>;
 }
 
 export interface RoleRepository {
@@ -281,6 +296,7 @@ export interface CreateSalesOrderInput {
  */
 export interface SalesOrderRepository {
   list(): Promise<SalesOrder[]>;
+  getById(orderId: string): Promise<SalesOrder | null>;
   create(input: CreateSalesOrderInput): Promise<SalesOrder>;
   confirm(orderId: string): Promise<SalesOrder>;
   dispatch(orderId: string, dispatchedBy: string): Promise<SalesOrder>;

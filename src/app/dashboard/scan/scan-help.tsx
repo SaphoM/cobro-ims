@@ -160,7 +160,7 @@ export function ScanHelp() {
                 </ol>
               </HelpSection>
 
-              <HelpSection title="The three modes, and who can use them">
+              <HelpSection title="The modes, and who can use them">
                 <ul className="space-y-2">
                   <li>
                     <strong className="text-text">Look up only</strong> - reads a code and shows stock.
@@ -175,6 +175,13 @@ export function ScanHelp() {
                     <strong className="text-text">Scan OUT</strong> - posts an issue (stock down). Needs
                     the requisition-issuing permission - Admin, Stores Manager and Stores Clerk have it;
                     Engineer / Requester doesn&apos;t.
+                  </li>
+                  <li>
+                    <strong className="text-text">Use</strong> - only shown to someone with their own
+                    station (an Engineer / Requester). Records stock they&apos;ve accepted and are now
+                    consuming - it leaves tracked inventory for good, the same way a Scan OUT does, but
+                    can only ever post against their own station, never a store or anyone else&apos;s.
+                    Nobody without a station sees this mode at all.
                   </li>
                 </ul>
               </HelpSection>
@@ -221,9 +228,9 @@ export function ScanHelp() {
                     closing the scanner.
                   </li>
                   <li>
-                    In Scan IN / Scan OUT mode the camera stays open after a hit so you can work through
-                    a stack of items without reopening it each time - rescanning the same code needs
-                    about 1.4 seconds, but a different item is accepted immediately.
+                    In Scan IN / Scan OUT / Use mode the camera stays open after a hit so you can work
+                    through a stack of items without reopening it each time - rescanning the same code
+                    needs about 1.4 seconds, but a different item is accepted immediately.
                   </li>
                   <li>
                     The camera only reads real QR codes - it decodes with the same library the printed

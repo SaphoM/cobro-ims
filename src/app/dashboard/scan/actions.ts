@@ -30,7 +30,7 @@ import { checkPermission, type Permission } from '@/lib/permissions';
 import { canSeeCosts } from '@/lib/costs';
 import type { Product } from '@/lib/domain/inventory';
 
-export type ScanDirection = 'in' | 'out';
+export type ScanDirection = 'in' | 'out' | 'use';
 
 export interface ScanStockRow {
   warehouseId: string;
@@ -210,6 +210,13 @@ export interface PostScanInput {
  * capability (`manage_sales_orders`, which is what the repurposed
  * Requisitions module uses). A warehouse clerk holds both; procurement can
  * only scan in; a viewer can do neither.
+ *
+ * "Use" (an Engineer consuming stock at their own station) isn't gated by a
+ * role permission at all - it's gated by ownership. Any signed-in user may
+ * post a `usage` movement, but only at the ONE warehouse that is their own
+ * station (`warehouse.ownerUserId === session.id`), which the scan station
+ * enforces client-side by never letting that picker point anywhere else in
+ * Use mode. This check is the real boundary, not that client behaviour.
  */
 export async function postScanAction(input: PostScanInput): Promise<ScanResult> {
   const session = await getSession();
@@ -217,12 +224,6 @@ export async function postScanAction(input: PostScanInput): Promise<ScanResult> 
 
   const barcode = normaliseScan(input.barcode);
   if (!barcode) return failure('Nothing was scanned.');
-
-  const permission: Permission = input.direction === 'in' ? 'manage_receiving' : 'manage_sales_orders';
-  const permissionCheck = await checkPermission(session, permission);
-  if (!permissionCheck.allowed) {
-    return failure(permissionCheck.reason ?? 'You do not have permission to do that.', barcode);
-  }
 
   const quantity = Number(input.quantity);
   if (!Number.isFinite(quantity) || quantity <= 0) {
@@ -236,6 +237,18 @@ export async function postScanAction(input: PostScanInput): Promise<ScanResult> 
 
   const warehouse = await warehouseRepository.getById(input.warehouseId);
   if (!warehouse) return failure('Pick a warehouse before scanning.', barcode);
+
+  if (input.direction === 'use') {
+    if (warehouse.ownerUserId !== session.id) {
+      return failure('You can only record usage at your own station.', barcode);
+    }
+  } else {
+    const permission: Permission = input.direction === 'in' ? 'manage_receiving' : 'manage_sales_orders';
+    const permissionCheck = await checkPermission(session, permission);
+    if (!permissionCheck.allowed) {
+      return failure(permissionCheck.reason ?? 'You do not have permission to do that.', barcode);
+    }
+  }
 
   const existing = await stockLedgerRepository.get(product.id, warehouse.id);
 
@@ -271,28 +284,32 @@ export async function postScanAction(input: PostScanInput): Promise<ScanResult> 
       // not "genuinely out of stock" - the two need different next actions
       // from the operator, so the message says which one this is and names
       // where the stock actually sits, if it sits anywhere.
-      const elsewhere = await stockElsewhere(product.id, warehouse.id);
+      const verb = input.direction === 'use' ? 'use' : 'scan out';
+      const elsewhere = input.direction === 'use' ? '' : ` ${await stockElsewhere(product.id, warehouse.id)}`;
       if (onHand === 0) {
         return failure(
-          `${product.sku} has no stock at ${warehouse.code} - there's nothing here to scan out. Double-check ` +
-            `${warehouse.code} is the right warehouse before scanning again. ${elsewhere}`,
+          input.direction === 'use'
+            ? `Nothing of ${product.sku} is sitting at your station right now - there's nothing to record as used.`
+            : `${product.sku} has no stock at ${warehouse.code} - there's nothing here to scan out. Double-check ` +
+                `${warehouse.code} is the right warehouse before scanning again.${elsewhere}`,
           barcode
         );
       }
       return failure(
         `Only ${onHand.toLocaleString()} ${product.unitOfMeasure} of ${product.sku} on hand at ${warehouse.code} - ` +
-          `scanning out ${quantity.toLocaleString()} would take it negative. Lower Qty per scan to ${onHand.toLocaleString()} ` +
-          `or less, or split it across multiple scans. ${elsewhere}`,
+          `${verb === 'use' ? 'using' : 'scanning out'} ${quantity.toLocaleString()} would take it negative. Lower Qty ` +
+          `per scan to ${onHand.toLocaleString()} or less, or split it across multiple scans.${elsewhere}`,
         barcode
       );
     }
   }
 
   try {
+    const movementType = input.direction === 'in' ? 'receipt' : input.direction === 'use' ? 'usage' : 'dispatch';
     const { movement, ledger } = await stockMovementRepository.record({
       productId: product.id,
       warehouseId: warehouse.id,
-      movementType: input.direction === 'in' ? 'receipt' : 'dispatch',
+      movementType,
       quantity: input.direction === 'in' ? quantity : -quantity,
       unitCost,
       referenceType: 'scan_station',
@@ -314,9 +331,10 @@ export async function postScanAction(input: PostScanInput): Promise<ScanResult> 
     revalidatePath('/dashboard/reports');
     revalidatePath('/dashboard/audit-log');
 
+    const directionLabel = input.direction === 'in' ? 'IN' : input.direction === 'use' ? 'USED' : 'OUT';
     return {
       ok: true,
-      message: `${input.direction === 'in' ? 'IN' : 'OUT'} ${quantity.toLocaleString()} ${product.unitOfMeasure} · ${product.sku} @ ${warehouse.code}`,
+      message: `${directionLabel} ${quantity.toLocaleString()} ${product.unitOfMeasure} · ${product.sku} @ ${warehouse.code}`,
       barcode,
       product: await buildProductView(product),
       notFound: false,

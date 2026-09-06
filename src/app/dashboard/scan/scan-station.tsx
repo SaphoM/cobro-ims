@@ -29,11 +29,17 @@ interface LogRow {
   scanCount: number;
 }
 
-const MODES: { value: Mode; label: string; hint: string }[] = [
+const BASE_MODES: { value: Mode; label: string; hint: string }[] = [
   { value: 'in', label: 'Scan IN', hint: 'Every scan posts a receipt - stock goes up.' },
   { value: 'out', label: 'Scan OUT', hint: 'Every scan posts an issue - stock goes down.' },
   { value: 'lookup', label: 'Look up only', hint: 'Reads the code and shows stock. Nothing is posted.' },
 ];
+
+/** Only offered to someone with their own station (an Engineer / Requester) -
+ *  posts against that one station, never a store, and can never take it
+ *  below what's actually sitting there. See Warehouse's doc comment in
+ *  src/lib/domain/inventory.ts for the accept/use workflow. */
+const USE_MODE = { value: 'use' as Mode, label: 'Use', hint: 'Every scan records stock you’ve used from your own station - it leaves tracked inventory for good.' };
 
 /**
  * A scanner double-firing the same code within a few frames is a hardware
@@ -46,10 +52,16 @@ const DUPLICATE_GUARD_MS = 250;
 export function ScanStation({
   warehouses,
   initialBarcode,
+  stationWarehouseId,
 }: {
   warehouses: Warehouse[];
   initialBarcode: string;
+  /** This viewer's own station, if they have one (Engineer / Requester
+   *  only) - enables the "Use" mode and is the only warehouse it can ever
+   *  post against. Null/undefined for every other role. */
+  stationWarehouseId?: string | null;
 }) {
+  const MODES = stationWarehouseId ? [...BASE_MODES, USE_MODE] : BASE_MODES;
   const [mode, setMode] = useState<Mode>('lookup');
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? '');
   const [quantity, setQuantity] = useState('1');
@@ -236,6 +248,7 @@ export function ScanStation({
 
   const unitsIn = log.reduce((s, r) => s + (r.ok && r.mode === 'in' ? r.quantity ?? 0 : 0), 0);
   const unitsOut = log.reduce((s, r) => s + (r.ok && r.mode === 'out' ? r.quantity ?? 0 : 0), 0);
+  const unitsUsed = log.reduce((s, r) => s + (r.ok && r.mode === 'use' ? r.quantity ?? 0 : 0), 0);
   const postedCount = log.filter((r) => r.ok && r.mode !== 'lookup').length;
 
   return (
@@ -256,6 +269,10 @@ export function ScanStation({
                 aria-pressed={active}
                 onClick={() => {
                   setMode(m.value);
+                  // "Use" only ever posts against the caller's own station -
+                  // force the picker there rather than leaving whatever
+                  // store/other-station was last selected in Scan IN/OUT.
+                  if (m.value === 'use' && stationWarehouseId) setWarehouseId(stationWarehouseId);
                   focusInput();
                 }}
                 className={`rounded-xl border px-4 py-2.5 text-[0.9rem] font-bold transition-colors ${
@@ -275,12 +292,12 @@ export function ScanStation({
             <select
               value={warehouseId}
               onChange={(e) => setWarehouseId(e.target.value)}
-              disabled={!posting}
+              disabled={!posting || mode === 'use'}
               className={`${selectClass} disabled:opacity-50`}
             >
               {warehouses.map((w) => (
                 <option key={w.id} value={w.id}>
-                  {w.code} - {w.name}
+                  {w.type === 'engineer_station' ? w.name : `${w.code} - ${w.name}`}
                 </option>
               ))}
             </select>
@@ -515,7 +532,7 @@ export function ScanStation({
             <h2 className="font-display text-[1.05rem] font-medium text-text">This session</h2>
             <p className="text-[0.82rem] text-text-muted">
               {postedCount} movement{postedCount === 1 ? '' : 's'} posted · {unitsIn.toLocaleString()} in ·{' '}
-              {unitsOut.toLocaleString()} out
+              {unitsOut.toLocaleString()} out{stationWarehouseId ? ` · ${unitsUsed.toLocaleString()} used` : ''}
             </p>
           </div>
           {log.length > 0 && (

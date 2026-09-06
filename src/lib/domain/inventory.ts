@@ -35,12 +35,36 @@ export interface User {
   updatedAt: ISODateTime;
 }
 
+/**
+ * A stock location the WAC engine tracks on-hand/reserved/WAC for. Two kinds:
+ *
+ *   'store'            — a real physical warehouse (the original concept).
+ *   'engineer_station' — a personal holding location for one Engineer /
+ *                         Requester (`ownerUserId`), auto-created when that
+ *                         user is created (see src/app/dashboard/users/actions.ts).
+ *                         Stock an Engineer has accepted (picked up) but not
+ *                         yet used sits here — visible to everyone the same
+ *                         way a store's stock is, so another Engineer can
+ *                         requisition unused stock straight off it instead
+ *                         of waiting on a fresh store pickup. See
+ *                         docs/ARCHITECTURE.md §1 for the full workflow.
+ *
+ * Every existing repository/report that iterates "warehouses" already works
+ * unchanged for a station — it's a Warehouse row like any other, not a
+ * parallel system. `type`/`ownerUserId` only matter to the two places that
+ * need to tell a station apart from a store: who may create one (Admin, via
+ * user creation) and who may approve a requisition sourced from one (the
+ * station's own owner, not Stores) — see confirmSalesOrderAction.
+ */
 export interface Warehouse {
   id: UUID;
   code: string;
   name: string;
   address: string | null;
   isActive: boolean;
+  type: 'store' | 'engineer_station';
+  /** Set only when `type === 'engineer_station'` — that Engineer's user id. */
+  ownerUserId: UUID | null;
   createdAt: ISODateTime;
 }
 
@@ -200,7 +224,15 @@ export type StockMovementType =
   | 'transfer_out'
   | 'transfer_in'
   | 'adjustment'
-  | 'write_off';
+  | 'write_off'
+  /** An Engineer / Requester consuming stock already sitting at their own
+   *  station (posted by the "Use" mode on /dashboard/scan). Outbound, same
+   *  as `dispatch` - it leaves tracked inventory for good - but kept as its
+   *  own type so "how much has this Engineer actually used" is a distinct,
+   *  reportable figure rather than indistinguishable from a store issuing
+   *  stock outward. See src/lib/domain/inventory.ts's Warehouse doc comment
+   *  for the full accept/use workflow. */
+  | 'usage';
 
 /** Append-only. This is the audit-critical table the stock ledger is derived from. */
 export interface StockMovement {

@@ -64,6 +64,7 @@ import type {
   TransferRepository,
   UserRepository,
   WarehouseRepository,
+  CreateWarehouseInput,
   WriteAuditEntryInput,
 } from '@/lib/data/repositories';
 import { applyMovement } from '@/lib/services/inventory-engine';
@@ -81,6 +82,7 @@ import {
 // Module-level mutable state, seeded once per server process.
 const state = {
   products: [...seedProducts] as Product[],
+  warehouses: [...seedWarehouses] as Warehouse[],
   users: [...seedUsers] as User[],
   suppliers: [...seedSuppliers] as Supplier[],
   customers: [...seedCustomers] as Customer[],
@@ -142,10 +144,27 @@ async function postMovement(input: RecordMovementInput) {
 
 export const mockWarehouseRepository: WarehouseRepository = {
   async list(): Promise<Warehouse[]> {
-    return seedWarehouses;
+    return state.warehouses;
   },
   async getById(id) {
-    return seedWarehouses.find((w) => w.id === id) ?? null;
+    return state.warehouses.find((w) => w.id === id) ?? null;
+  },
+  async create(input: CreateWarehouseInput): Promise<Warehouse> {
+    const warehouse: Warehouse = {
+      id: randomUUID(),
+      code: input.code,
+      name: input.name,
+      address: input.address,
+      isActive: true,
+      type: input.type,
+      ownerUserId: input.ownerUserId,
+      createdAt: new Date().toISOString(),
+    };
+    state.warehouses.push(warehouse);
+    return warehouse;
+  },
+  async getByOwner(ownerUserId) {
+    return state.warehouses.find((w) => w.type === 'engineer_station' && w.ownerUserId === ownerUserId) ?? null;
   },
 };
 
@@ -678,6 +697,9 @@ export const mockSalesOrderRepository: SalesOrderRepository = {
     state.salesOrders.push(order);
     return order;
   },
+  async getById(orderId) {
+    return state.salesOrders.find((o) => o.id === orderId) ?? null;
+  },
   async confirm(orderId) {
     const order = state.salesOrders.find((o) => o.id === orderId);
     if (!order) throw new Error('Sales order not found.');
@@ -699,20 +721,52 @@ export const mockSalesOrderRepository: SalesOrderRepository = {
     const ledger = state.ledger.get(ledgerKey(order.productId, order.warehouseId));
     if (!ledger) throw new Error('No stock ledger entry for this product/warehouse.');
 
-    // Post the actual outbound movement at the ledger's current WAC (the
-    // sale's unit_price is revenue, not cost — COGS is valued at WAC).
-    await postMovement({
-      productId: order.productId,
-      warehouseId: order.warehouseId,
-      movementType: 'dispatch',
-      quantity: -Math.abs(order.quantityOrdered),
-      unitCost: ledger.weightedAverageCost,
-      referenceType: 'sales_order',
-      referenceId: order.id,
-      createdBy: dispatchedBy,
-    });
-    // Release the reservation now that the stock has actually left.
+    // Release the reservation now that the stock is actually about to move.
     await mockStockLedgerRepository.adjustReserved(order.productId, order.warehouseId, -order.quantityOrdered);
+
+    // Whoever raised this requisition has a personal station (an Engineer /
+    // Requester always does - see Warehouse's doc comment) — "Issue" always
+    // lands the stock there, never just vanishes it, so it's still tracked
+    // as on-hand (at the requester's own station) until they actually use
+    // it. Only when the requester has no station (a non-Engineer role
+    // requisitioning for immediate use at the store itself) does this fall
+    // back to the old plain outbound `dispatch`.
+    const destination = await mockWarehouseRepository.getByOwner(order.createdBy);
+    if (destination && destination.id !== order.warehouseId) {
+      await postMovement({
+        productId: order.productId,
+        warehouseId: order.warehouseId,
+        movementType: 'transfer_out',
+        quantity: -Math.abs(order.quantityOrdered),
+        unitCost: ledger.weightedAverageCost,
+        referenceType: 'sales_order',
+        referenceId: order.id,
+        createdBy: dispatchedBy,
+      });
+      await postMovement({
+        productId: order.productId,
+        warehouseId: destination.id,
+        movementType: 'transfer_in',
+        quantity: Math.abs(order.quantityOrdered),
+        unitCost: ledger.weightedAverageCost,
+        referenceType: 'sales_order',
+        referenceId: order.id,
+        createdBy: dispatchedBy,
+      });
+    } else {
+      // Post the actual outbound movement at the ledger's current WAC (the
+      // sale's unit_price is revenue, not cost — COGS is valued at WAC).
+      await postMovement({
+        productId: order.productId,
+        warehouseId: order.warehouseId,
+        movementType: 'dispatch',
+        quantity: -Math.abs(order.quantityOrdered),
+        unitCost: ledger.weightedAverageCost,
+        referenceType: 'sales_order',
+        referenceId: order.id,
+        createdBy: dispatchedBy,
+      });
+    }
 
     order.status = 'dispatched';
     order.dispatchedAt = new Date().toISOString();

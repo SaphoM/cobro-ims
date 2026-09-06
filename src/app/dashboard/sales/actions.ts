@@ -10,6 +10,7 @@ import {
   warehouseRepository,
 } from '@/lib/data';
 import { hasPermission, requirePermission } from '@/lib/permissions';
+import type { User } from '@/lib/domain/inventory';
 
 export interface SalesOrderFormState {
   error: string | null;
@@ -72,6 +73,9 @@ export async function createSalesOrderAction(
   ]);
   if (!product) return { error: 'That product could not be found.', success: null };
   if (!warehouse) return { error: 'That store could not be found.', success: null };
+  if (warehouse.type === 'engineer_station' && warehouse.ownerUserId === session.id) {
+    return { error: "You can't requisition stock from your own station - it's already yours.", success: null };
+  }
   if (!existing) {
     const elsewhere = await stockElsewhere(productId, warehouseId);
     return {
@@ -117,6 +121,26 @@ export interface RequisitionActionState {
   success: string | null;
 }
 
+/**
+ * Approving a requisition means releasing/reserving stock the approver
+ * controls. For a store-sourced requisition that's still Stores/Admin
+ * (`manage_sales_orders`) — unchanged. For one sourced from another
+ * Engineer's own station, it's that Engineer confirming the release
+ * themselves (per the peer-pickup workflow — see Warehouse's doc comment
+ * in src/lib/domain/inventory.ts) - Stores has no say over stock sitting on
+ * someone's personal shelf.
+ */
+async function requireApprovalRight(session: User, warehouseId: string): Promise<void> {
+  const warehouse = await warehouseRepository.getById(warehouseId);
+  if (warehouse?.type === 'engineer_station') {
+    if (warehouse.ownerUserId !== session.id) {
+      throw new Error(`Only ${warehouse.name.replace(/'s station$/, '')} can approve a pickup from their own station.`);
+    }
+    return;
+  }
+  await requirePermission(session, 'manage_sales_orders');
+}
+
 export async function confirmSalesOrderAction(
   orderId: string,
   _prevState: RequisitionActionState,
@@ -125,7 +149,9 @@ export async function confirmSalesOrderAction(
   'use server';
   try {
     const session = await requireSession();
-    await requirePermission(session, 'manage_sales_orders');
+    const before = await salesOrderRepository.getById(orderId);
+    if (!before) throw new Error('Requisition not found.');
+    await requireApprovalRight(session, before.warehouseId);
     const order = await salesOrderRepository.confirm(orderId);
     revalidatePath('/dashboard/sales');
     revalidatePath('/dashboard');
@@ -143,7 +169,17 @@ export async function dispatchSalesOrderAction(
   'use server';
   try {
     const session = await requireSession();
-    await requirePermission(session, 'manage_sales_orders');
+    // Stores/Admin can always issue (the original path). The requisition's
+    // own requester can also accept it themselves - this is the "Engineer
+    // scans to pick up stock" step, and it's the same underlying action:
+    // whoever clicks it, the stock lands at the requester's own station
+    // (see salesOrderRepository.dispatch), never just in the person who
+    // clicked.
+    const before = await salesOrderRepository.getById(orderId);
+    if (!before) throw new Error('Requisition not found.');
+    if (before.createdBy !== session.id) {
+      await requirePermission(session, 'manage_sales_orders');
+    }
     const order = await salesOrderRepository.dispatch(orderId, session.id);
     await auditLogRepository.write({
       tableName: 'sales_orders',
@@ -154,9 +190,15 @@ export async function dispatchSalesOrderAction(
     });
     revalidatePath('/dashboard/sales');
     revalidatePath('/dashboard');
-    return { error: null, success: `${order.orderNumber} issued - stock has left the store.` };
+    return {
+      error: null,
+      success:
+        before.createdBy === session.id
+          ? `${order.orderNumber} accepted - it's now at your station.`
+          : `${order.orderNumber} issued.`,
+    };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Could not issue that requisition.', success: null };
+    return { error: err instanceof Error ? err.message : 'Could not accept/issue that requisition.', success: null };
   }
 }
 
@@ -168,7 +210,15 @@ export async function cancelSalesOrderAction(
   'use server';
   try {
     const session = await requireSession();
-    await requirePermission(session, 'manage_sales_orders');
+    const before = await salesOrderRepository.getById(orderId);
+    if (!before) throw new Error('Requisition not found.');
+    // The requester can cancel their own request while it's still a draft
+    // (nothing reserved yet) - correcting a mistake before Stores/the
+    // source engineer has even looked at it. Once it's reserved, cancelling
+    // releases someone else's stock, so it goes back to Stores/Admin only.
+    if (!(before.createdBy === session.id && before.status === 'draft')) {
+      await requirePermission(session, 'manage_sales_orders');
+    }
     const order = await salesOrderRepository.cancel(orderId);
     revalidatePath('/dashboard/sales');
     revalidatePath('/dashboard');

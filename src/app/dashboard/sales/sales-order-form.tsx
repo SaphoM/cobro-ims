@@ -1,10 +1,10 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import { createSalesOrderAction, type SalesOrderFormState } from '@/app/dashboard/sales/actions';
 import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
-import type { Customer, Product, Warehouse } from '@/lib/domain/inventory';
+import type { Customer, Product, StockLedgerEntry, Warehouse } from '@/lib/domain/inventory';
 
 const initialState: SalesOrderFormState = { error: null, success: null };
 
@@ -12,11 +12,18 @@ export function SalesOrderForm({
   customers,
   warehouses,
   products,
+  ledger,
   initialBarcode,
 }: {
   customers: Customer[];
   warehouses: Warehouse[];
   products: Product[];
+  /** On-hand per product/warehouse, to drive the "available" counter below
+   *  Product/Store - re-derives live as either selection changes, the same
+   *  way the Overview's "Record a stock movement" and Quick requisition
+   *  counters do. Optional so this form still compiles for any caller that
+   *  doesn't have ledger data handy; the counter just doesn't render. */
+  ledger?: StockLedgerEntry[];
   initialBarcode?: string;
 }) {
   const [state, formAction, pending] = useActionState(createSalesOrderAction, initialState);
@@ -39,6 +46,20 @@ export function SalesOrderForm({
   const [productId, setProductId] = useState(products[0]?.id ?? '');
   const [quantity, setQuantity] = useState('');
   const [unitPrice, setUnitPrice] = useState('');
+
+  // Keyed by "productId::warehouseId" so the counter below re-derives
+  // instantly as either Product or Store changes, instead of needing its
+  // own fetch - same pattern as the Overview forms use.
+  const onHandByKey = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const entry of ledger ?? []) {
+      map.set(`${entry.productId}::${entry.warehouseId}`, entry.quantityOnHand);
+    }
+    return map;
+  }, [ledger]);
+  const selectedProduct = products.find((p) => p.id === productId);
+  const selectedWarehouse = warehouses.find((w) => w.id === warehouseId);
+  const availableQty = onHandByKey.get(`${productId}::${warehouseId}`) ?? 0;
 
   /*
     React 19 resets a <form action={fn}>'s fields via the browser's native
@@ -182,7 +203,7 @@ export function SalesOrderForm({
           >
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.code}
+                {w.type === 'engineer_station' ? w.name : w.code}
               </option>
             ))}
           </select>
@@ -205,6 +226,16 @@ export function SalesOrderForm({
             ))}
           </select>
         </label>
+
+        {ledger && (
+          <p
+            className={`lg:col-span-6 text-[0.82rem] font-bold ${availableQty === 0 ? 'text-danger' : 'text-accent-strong'}`}
+          >
+            {availableQty.toLocaleString()} {selectedProduct?.unitOfMeasure ?? ''} available at{' '}
+            {selectedWarehouse ? (selectedWarehouse.type === 'engineer_station' ? selectedWarehouse.name : selectedWarehouse.code) : '—'}
+            {availableQty === 0 && ' - none on hand here'}
+          </p>
+        )}
 
         <label className="flex flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">Quantity</span>
