@@ -4,6 +4,18 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.18.1 — 2026-09-06
+
+**Fix: grant purchase-order permission to both Stores roles, not Admin-only.**
+- `manage_purchase_orders` was left Admin-only by oversight in v0.18.0's role rebuild — Cobro's actual
+  workflow has Stores placing orders directly with external suppliers, not routing every reorder through
+  Admin. Added it to both `stores_manager` and `stores_clerk`; Engineer / Requester still doesn't hold it
+- Verified live: signed in as Demo Stores Clerk, created PO-1001 as a draft against Natal Cement
+  Distributors — the server accepted it, not just the button rendering
+- `npx tsc --noEmit` and `npm run lint` both clean (only the pre-existing, deferred `static-version/`
+  issues remain)
+- Files changed: `src/lib/permissions.ts`, `docs/ARCHITECTURE.md`, `README.md`
+
 ## v0.18.0 — 2026-09-06
 
 **User roles & access model update — 4 roles matching Cobro's real operating structure, plus an
