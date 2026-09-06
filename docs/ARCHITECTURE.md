@@ -189,6 +189,15 @@ resulting WAC math checked by hand):
     `manage_purchase_orders`). Asked directly; the client confirmed the earlier instruction stands, so
     Stores Manager and Stores Clerk keep full purchase-order authority. The route gate still exists
     (`manage_purchase_orders`), it just isn't Admin-exclusive.
+  - **Follow-up correction:** `manage_catalogue` (create a product, edit a BOM) was initially left on
+    Stores Manager, matching the "operational edit only where appropriate" wording in the brief's Product
+    Catalogue section. The client corrected this directly: Stores shouldn't be able to add any product to
+    the system at all — that's master-data ownership, Admin's alone. `manage_catalogue` is now Admin-only
+    (`src/lib/permissions.ts`, `src/lib/data/mock/seed.ts`); Stores Manager and Stores Clerk are both
+    view-only on `/dashboard/products` and `/dashboard/bom` — the add-product form, bulk-import section,
+    and BOM add/remove-component controls no longer render for either. Verified live: Stores Manager on
+    `/dashboard/products` now shows the product list with no "Bulk data import" section and no "Add a
+    product" form; `/dashboard/bom` shows no "Add a component" form; Admin still sees both, unchanged.
   - **Verified live** for every role (Admin, Stores Manager, Stores Clerk, Engineer): nav items match the
     brief's per-role menu list exactly; direct-URL attempts at `/dashboard/users`, `/dashboard/purchase-
     orders`, `/dashboard/suppliers`, `/dashboard/receiving`, `/dashboard/transfers`, `/dashboard/
@@ -465,8 +474,9 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
    current four roles (Admin, Stores Manager, Stores Clerk, Engineer / Requester — see §1) — but the exact
    grants are still a reasonable placeholder built from the discovery meeting's conceptual matrix, not
    something Cobro has signed off line-by-line. Notably strict today: only `admin` can approve/reject
-   adjustments or manage users; catalogue/threshold management is `admin` and `stores_manager` only.
-   Confirm real assignments before Production.
+   adjustments, manage users, or manage the product catalogue/BOM — Stores (both roles) is view-only on
+   the catalogue and BOM, since adding a product or component is master-data ownership, not a store
+   operation. Confirm real assignments before Production.
 3. **BOM structure.** Flat one-level (parent → component) BOM is built and working (`/dashboard/bom`).
    Confirm whether Cobro needs nested/multi-level BOM (e.g. a palletised product built from
    sub-assemblies) — that would be a schema change, not a UI one.

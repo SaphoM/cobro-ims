@@ -4,6 +4,20 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.19.2 — 2026-09-06
+
+**Fix: product catalogue and BOM editing are Admin-only, not Stores Manager too.**
+- `manage_catalogue` (create a product, add/remove a BOM component) was left on Stores Manager, matching
+  the "operational edit only where appropriate" wording from an earlier brief. Corrected: Stores shouldn't
+  add any product to the system at all - that's master-data ownership, Admin's alone
+- Stores Manager and Stores Clerk are now both view-only on `/dashboard/products` and `/dashboard/bom` -
+  the "Add a product" form, "Bulk data import" section, and "Add a component"/"Remove" BOM controls no
+  longer render for either role. Admin unaffected
+- Verified live: Stores Manager on Product catalogue shows the list only, no add form, no bulk-import
+  section; BOM page shows no add-component form; Admin still sees both, unchanged
+- Files changed: `src/lib/permissions.ts`, `src/lib/data/mock/seed.ts`, `README.md`,
+  `docs/ARCHITECTURE.md`
+
 ## v0.19.1 — 2026-09-06
 
 **Overview: live available-stock counter on the "Record a stock movement" form.**

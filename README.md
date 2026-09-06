@@ -269,10 +269,12 @@ full per-page breakdown.
 - **Product catalogue** (`/dashboard/products`) — list + add SKUs, unit of measure, barcode, reorder
   point/quantity. Also hosts **bulk data import templates** — downloadable CSVs for product master data and
   opening stock (§6 below), matching the real domain fields exactly. The upload/import screen itself isn't
-  built yet — see §11.
+  built yet — see §11. **Admin-only to add or edit** — Stores Manager, Stores Clerk and Engineer / Requester
+  all get view/search only; adding a product to the system is master-data ownership, not a store operation.
 - **Bill of materials** (`/dashboard/bom`) — flat parent → component BOM management (add/remove
   components with a quantity-per-unit) plus a BOM explosion calculator: given a build quantity, total
   component requirements. Nested/multi-level BOM is still an open decision (§9.3); this is the flat model.
+  Same Admin-only edit rule as the catalogue above — every other role sees it, only Admin changes it.
 - **Goods receiving** (`/dashboard/receiving`) — "quick receive": creates a PO + PO line + GRN + GRN line
   and posts the stock movement in one step, for genuine ad-hoc receipts with no formal PO raised.
 - **Purchase orders** (`/dashboard/purchase-orders`) — the formal lifecycle: draft → issue → receive one
@@ -387,8 +389,8 @@ the RFQ / SoW does not define them. Confirm with Cobro before further engineerin
    6-month post-delivery support window — the full RFQ scope is a lot for this budget/timeline.
 2. **Permission matrix per role.** `src/lib/permissions.ts` now *enforces* a real matrix, but it's a
    placeholder built from plausible role responsibilities, not one the RFQ defines or Cobro confirmed —
-   e.g. only `admin` can approve/reject adjustments or manage users today; catalogue/threshold management
-   is `admin` and `stores_manager` only.
+   e.g. only `admin` can approve/reject adjustments, manage users, or manage the product catalogue/BOM;
+   Stores (both roles) is view-only on the catalogue and BOM.
 3. **BOM structure.** Flat one-level (parent → component) is built and working (`/dashboard/bom`, with a
    BOM explosion calculator). Does Cobro need nested/multi-level BOM instead — a schema change, not a UI one?
 4. **Adjustment reason codes.** Seeded with plausible defaults (`BREAKAGE`, `CYCLE_COUNT`, `THEFT_LOSS`,

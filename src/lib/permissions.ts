@@ -51,14 +51,16 @@ export type Permission =
  *                         thresholds, reporting, management visibility. Consolidates what used to
  *                         be separate Procurement and Viewer roles. Multiple Admins are expected
  *                         and fully supported — nothing here or in the user model treats Admin as
- *                         a singleton.
+ *                         a singleton. Admin is also the ONLY role that can add a product to the
+ *                         catalogue or edit a BOM (`manage_catalogue`) — Stores requested/received/
+ *                         moves what Admin has already defined, it doesn't define new master data.
  *   stores_manager     — the operational store/inventory function: order stock from external
  *                         suppliers (purchase orders), receive, scan in, reserve, process
- *                         requisitions, issue, scan out, transfer, catalogue upkeep. Not system
+ *                         requisitions, issue, scan out, transfer. View-only on the product
+ *                         catalogue and BOM — see `manage_catalogue` above. Not system
  *                         administration — creating users/Admins stays Admin-only.
  *   stores_clerk       — day-to-day store transactions: the same physical stock actions and
- *                         supplier purchase orders as Stores Manager, minus catalogue/threshold
- *                         management and — unlike Stores Manager — minus `request_adjustments`.
+ *                         supplier purchase orders as Stores Manager, minus `request_adjustments`.
  *                         A Clerk must not be able to raise a write-off/adjustment on their own
  *                         authority; that stays Stores Manager and Admin.
  *   engineer_requester — factory-floor staff who request MRO stock on behalf of their section
@@ -68,7 +70,6 @@ export type Permission =
 const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
   admin: '*',
   stores_manager: [
-    'manage_catalogue',
     'manage_purchase_orders',
     'manage_receiving',
     'manage_transfers',
