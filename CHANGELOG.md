@@ -4,6 +4,35 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.21.0 — 2026-09-06
+
+**Admin no longer requisitions stock — a confirmed business rule, enforced end to end.**
+- Admin purchases (Purchase Orders against a supplier); Engineer/Requester (and Stores) requisitions
+  (internal requests against Stores). These were two conflated processes: Admin held `create_requisitions`
+  via its `'*'` catch-all, so both the Overview Quick requisition icon and the full `/dashboard/sales`
+  create form silently worked for Admin
+- Fixed at the single enforcement point every path already called through
+  (`hasPermission`/`checkPermission`/`requirePermission` in `src/lib/permissions.ts`), not by hiding UI: a
+  new `ROLE_EXCLUSIONS` map carves `create_requisitions` out of Admin's `'*'`, so the Overview icon, the
+  `/dashboard/sales` form, the `createSalesOrderAction` Server Action, and the sidebar nav filter are all
+  covered automatically, with no separate/duplicate check to keep in sync
+- Admin's read/oversight access is preserved and made explicit: a new `view_requisitions` permission
+  (held by Stores Manager, Stores Clerk, Engineer/Requester, and Admin) now gates the "Requisitions" nav
+  link and the page, decoupled from `create_requisitions`
+- `/dashboard/sales` no longer renders a create form Admin can fill in only to be refused on submit -
+  Admin instead sees an explanation ("Admin does not requisition stock from Stores… raise a Purchase Order
+  instead") linking to Purchase Orders, with the full requisitions list and existing Approve/Cancel rights
+  unchanged below it
+- `createSalesOrderAction`'s denial message is Admin-specific rather than a generic "no permission" string
+- Audited the rest of the app for other requisition-creation entry points (product catalogue, mobile,
+  quick actions, routes): none exist beyond the two above. The orphaned `/dashboard/scan` scan-station
+  component's "Requisition this product" link is dead code - its page was already removed in v0.20.0 and
+  nothing imports it
+- `npx tsc --noEmit` and `npm run lint` both clean (only the pre-existing, deferred `static-version/`
+  issues remain)
+- Files changed: `src/lib/permissions.ts`, `src/lib/nav-items.ts`, `src/app/dashboard/sales/actions.ts`,
+  `src/app/dashboard/sales/page.tsx`
+
 ## v0.20.0 — 2026-09-06
 
 **Scan station consolidated onto Overview; single-store demo data; Quick requisition shortcut.**

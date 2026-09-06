@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth';
 import {
   auditLogRepository,
   productRepository,
+  roleRepository,
   salesOrderRepository,
   stockLedgerRepository,
   warehouseRepository,
@@ -37,6 +38,17 @@ export async function createSalesOrderAction(
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
   if (!(await hasPermission(session, 'create_requisitions'))) {
+    // Admin specifically (not just "no permission") - Admin does replenish
+    // stock, just not through this module. A generic denial reads like a
+    // bug to someone who has `'*'` for everything else in the app.
+    const role = await roleRepository.getById(session.roleId);
+    if (role?.name === 'admin') {
+      return {
+        error:
+          'Admin does not requisition stock from Stores. To replenish stock, raise a Purchase Order against a supplier instead.',
+        success: null,
+      };
+    }
     return { error: 'Your role does not have permission to create requisitions.', success: null };
   }
 

@@ -33,7 +33,11 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/suppliers', label: 'Suppliers', permission: 'manage_receiving' },
   { href: '/dashboard/transfers', label: 'Transfers', permission: 'manage_transfers' },
   { href: '/dashboard/adjustments', label: 'Write-offs & adjustments', permission: 'request_adjustments' },
-  { href: '/dashboard/sales', label: 'Requisitions', permission: 'create_requisitions' },
+  // `view_requisitions`, not `create_requisitions` - Admin can see this
+  // module for oversight without holding the (deliberately Admin-excluded)
+  // ability to originate a requisition itself. See permissions.ts's
+  // ROLE_EXCLUSIONS.
+  { href: '/dashboard/sales', label: 'Requisitions', permission: 'view_requisitions' },
   { href: '/dashboard/customers', label: 'Departments', permission: null },
   { href: '/dashboard/reports', label: 'Dashboards & reports', permission: 'view_reports' },
   { href: '/dashboard/labels', label: 'Product labels', permission: 'manage_receiving' },

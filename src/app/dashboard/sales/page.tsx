@@ -31,6 +31,13 @@ export default async function SalesPage({
 
   const role = session ? await roleRepository.getById(session.roleId) : null;
   const isEngineer = role?.name === 'engineer_requester';
+  const isAdmin = role?.name === 'admin';
+  // Admin does not requisition stock - see permissions.ts's ROLE_EXCLUSIONS.
+  // The server action already refuses this regardless of what's rendered
+  // here, but a form Admin can fill in and only then be told no is a dead
+  // control, not a real one - so it's replaced with an explanation instead
+  // of just vanishing.
+  const canCreate = session ? await hasPermission(session, 'create_requisitions') : false;
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
   // Engineer / Requester sees requisitions they raised themselves, PLUS any
   // peer requisition sourced from their own station (see Warehouse's doc
@@ -68,13 +75,29 @@ export default async function SalesPage({
         </p>
       </div>
 
-      <SalesOrderForm
-        customers={customers}
-        warehouses={requestableWarehouses}
-        products={products}
-        ledger={ledger}
-        initialBarcode={barcode}
-      />
+      {canCreate ? (
+        <SalesOrderForm
+          customers={customers}
+          warehouses={requestableWarehouses}
+          products={products}
+          ledger={ledger}
+          initialBarcode={barcode}
+        />
+      ) : (
+        isAdmin && (
+          <div className="rounded-2xl border border-accent/[0.14] bg-surface p-5">
+            <h2 className="mb-1 font-display text-[1.05rem] font-medium text-text">New requisition</h2>
+            <p className="text-[0.83rem] text-text-muted">
+              Admin does not requisition stock from Stores - that&apos;s Engineer/Requester&apos;s
+              process. To replenish stock, raise a{' '}
+              <a href="/dashboard/purchase-orders" className="font-semibold text-accent-strong hover:underline">
+                Purchase Order
+              </a>{' '}
+              against a supplier instead. You can still track every requisition below.
+            </p>
+          </div>
+        )
+      )}
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">
