@@ -62,116 +62,158 @@ export function RecordMovementForm({
   return (
     <div className="rounded-2xl border border-accent/[0.14] bg-surface p-5">
       <h2 className="mb-1 font-display text-[1.05rem] font-medium text-text">Record a stock movement</h2>
-      <p className="mb-4 text-[0.83rem] text-text-muted">
-        Set the store, type and cost, then scan. The scan identifies the product from the catalogue,
-        confirms the quantity, and posts it - re-deriving on-hand and weighted-average cost through the
-        same engine goods receiving, requisitions, transfers and write-offs all use.
-      </p>
 
       {/*
-        Same five-column layout the form has always had, with Scan taking the
-        place the submit button used to occupy. `lg:col-start-3` is what pins
-        Scan directly beneath Store: grid auto-placement would otherwise drop
-        it into whatever cell fell free next, and the alignment would drift
-        the moment a field moved. The blank label row above the button matches
-        the label height on the controls beside it, so its top edge lines up
-        with them instead of riding high.
+        Mobile only (below `sm`, the same breakpoint the fields grid collapses
+        to one column at): Scan leads, ahead of the explanation and the
+        fields, because on a phone this is a Stores Clerk standing at a
+        shelf with a scanner in hand, not someone reading the form top to
+        bottom first. Desktop/tablet keep Scan where it's always been - in
+        line with the other fields below - so this is hidden there instead
+        of duplicating a second, redundant control. Same lifted state and
+        handlers as the in-grid instance beneath; only one is ever visible or
+        clickable at a given width, so there's no way to drive it from two
+        places at once.
       */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <label className="flex flex-col gap-1.5 lg:col-span-2">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Product</span>
-          <select
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-            className={selectClass}
-          >
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.sku} - {p.name}
-              </option>
-            ))}
-          </select>
-          {ledger && (
-            <span className={`text-[0.82rem] font-bold ${availableQty === 0 ? 'text-danger' : 'text-accent-strong'}`}>
-              {availableQty.toLocaleString()} {selectedProduct?.unitOfMeasure ?? ''} available
-              {selectedWarehouse
-                ? ` at ${selectedWarehouse.type === 'engineer_station' ? selectedWarehouse.name : selectedWarehouse.code}`
-                : ''}
-              {availableQty === 0 && ' - none on hand here'}
+      <div className="mb-4 sm:hidden">
+        <ScanMovement
+          warehouseId={warehouseId}
+          movementType={movementType}
+          quantity={quantity}
+          unitCost={unitCost}
+          onQuantityChange={setQuantity}
+          onUnitCostChange={setUnitCost}
+          onProductIdentified={setProductId}
+          onPosted={setPosted}
+          triggerHeightClassName="min-h-[45px]"
+        />
+      </div>
+
+      {/*
+        Explanation + the Product/Store/Type/Quantity/Unit cost fields are
+        desktop/tablet only (`hidden sm:block`). Mobile is Scan-only by
+        design: Store has one real option since the single-store
+        consolidation (plus each Engineer's own station), Quantity comes
+        from the scan count and Unit cost has its own field inside the scan
+        dialog (see scan-movement.tsx) - so the one thing a mobile operator
+        genuinely loses the ability to set here is movement Type, which has
+        no in-dialog picker and defaults to Receipt (GRN). That's a real,
+        deliberate trade-off for a phone-first "just scan" flow, not an
+        oversight - a mobile operator needing Dispatch/Transfer/Adjustment/
+        Write-off still has the full form on a wider screen.
+      */}
+      <div className="hidden sm:block">
+        <p className="mb-4 text-[0.83rem] text-text-muted">
+          Set the store, type and cost, then scan. The scan identifies the product from the catalogue,
+          confirms the quantity, and posts it - re-deriving on-hand and weighted-average cost through the
+          same engine goods receiving, requisitions, transfers and write-offs all use.
+        </p>
+
+        {/*
+          Same five-column layout the form has always had, with Scan taking the
+          place the submit button used to occupy. `lg:col-start-3` is what pins
+          Scan directly beneath Store: grid auto-placement would otherwise drop
+          it into whatever cell fell free next, and the alignment would drift
+          the moment a field moved. The blank label row above the button matches
+          the label height on the controls beside it, so its top edge lines up
+          with them instead of riding high.
+        */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <label className="flex flex-col gap-1.5 lg:col-span-2">
+            <span className="text-[0.75rem] font-semibold text-text-muted">Product</span>
+            <select
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+              className={selectClass}
+            >
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.sku} - {p.name}
+                </option>
+              ))}
+            </select>
+            {ledger && (
+              <span className={`text-[0.82rem] font-bold ${availableQty === 0 ? 'text-danger' : 'text-accent-strong'}`}>
+                {availableQty.toLocaleString()} {selectedProduct?.unitOfMeasure ?? ''} available
+                {selectedWarehouse
+                  ? ` at ${selectedWarehouse.type === 'engineer_station' ? selectedWarehouse.name : selectedWarehouse.code}`
+                  : ''}
+                {availableQty === 0 && ' - none on hand here'}
+              </span>
+            )}
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[0.75rem] font-semibold text-text-muted">Store</span>
+            <select
+              value={warehouseId}
+              onChange={(e) => setWarehouseId(e.target.value)}
+              className={selectClass}
+            >
+              {warehouses.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.type === 'engineer_station' ? w.name : `${w.code} - ${w.name}`}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[0.75rem] font-semibold text-text-muted">Type</span>
+            <select
+              value={movementType}
+              onChange={(e) => setMovementType(e.target.value)}
+              className={selectClass}
+            >
+              {Object.entries(MOVEMENT_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[0.75rem] font-semibold text-text-muted">Quantity</span>
+            <input
+              type="number"
+              min="0.001"
+              step="0.001"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              placeholder="0"
+              className={inputClass}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5 lg:col-start-1">
+            <span className="text-[0.75rem] font-semibold text-text-muted">Unit cost (R)</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={unitCost}
+              onChange={(e) => setUnitCost(e.target.value)}
+              placeholder="0.00"
+              className={inputClass}
+            />
+          </label>
+
+          <div className="flex flex-col gap-1.5 lg:col-start-3">
+            <span aria-hidden="true" className="text-[0.75rem] font-semibold text-text-muted">
+              &nbsp;
             </span>
-          )}
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Store</span>
-          <select
-            value={warehouseId}
-            onChange={(e) => setWarehouseId(e.target.value)}
-            className={selectClass}
-          >
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.type === 'engineer_station' ? w.name : `${w.code} - ${w.name}`}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Type</span>
-          <select
-            value={movementType}
-            onChange={(e) => setMovementType(e.target.value)}
-            className={selectClass}
-          >
-            {Object.entries(MOVEMENT_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Quantity</span>
-          <input
-            type="number"
-            min="0.001"
-            step="0.001"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            placeholder="0"
-            className={inputClass}
-          />
-        </label>
-
-        <label className="flex flex-col gap-1.5 lg:col-start-1">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Unit cost (R)</span>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={unitCost}
-            onChange={(e) => setUnitCost(e.target.value)}
-            placeholder="0.00"
-            className={inputClass}
-          />
-        </label>
-
-        <div className="flex flex-col gap-1.5 lg:col-start-3">
-          <span aria-hidden="true" className="text-[0.75rem] font-semibold text-text-muted">
-            &nbsp;
-          </span>
-          <ScanMovement
-            warehouseId={warehouseId}
-            movementType={movementType}
-            quantity={quantity}
-            unitCost={unitCost}
-            onQuantityChange={setQuantity}
-            onUnitCostChange={setUnitCost}
-            onProductIdentified={setProductId}
-            onPosted={setPosted}
-          />
+            <ScanMovement
+              warehouseId={warehouseId}
+              movementType={movementType}
+              quantity={quantity}
+              unitCost={unitCost}
+              onQuantityChange={setQuantity}
+              onUnitCostChange={setUnitCost}
+              onProductIdentified={setProductId}
+              onPosted={setPosted}
+            />
+          </div>
         </div>
       </div>
 

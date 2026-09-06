@@ -75,6 +75,7 @@ export function ScanMovement({
   onUnitCostChange,
   onProductIdentified,
   onPosted,
+  triggerHeightClassName = 'h-9',
 }: {
   warehouseId: string;
   movementType: string;
@@ -84,6 +85,13 @@ export function ScanMovement({
   onUnitCostChange: (value: string) => void;
   onProductIdentified: (productId: string) => void;
   onPosted: (message: string) => void;
+  /** Height utility class for the trigger button - defaults to the 36px
+   *  (`h-9`) standard every other control on this form uses, so it lines up
+   *  with Store/Type/Quantity/Unit cost when rendered inline with them.
+   *  Overridable because the mobile-only, full-width instance on
+   *  record-movement-form.tsx is a standalone CTA with nothing beside it to
+   *  align to, and wants a taller, easier tap target instead. */
+  triggerHeightClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<'scan' | 'count'>('scan');
@@ -826,7 +834,7 @@ export function ScanMovement({
           setLastPosted(null);
           setOpen(true);
         }}
-        className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-[0.85rem] font-bold text-ink transition-colors hover:bg-accent-hover"
+        className={`flex ${triggerHeightClassName} w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-[0.85rem] font-bold text-ink transition-colors hover:bg-accent-hover`}
       >
         <BarcodeIcon />
         Scan

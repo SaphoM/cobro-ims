@@ -4,6 +4,26 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.23.0 — 2026-09-06
+
+**Mobile-only Scan-first layout for "Record a stock movement".**
+- Below the `sm` breakpoint (the same width the fields grid already collapses to one column at), the
+  Overview's "Record a stock movement" card now shows just the heading and a prominent, full-width Scan
+  button - the explanation paragraph and the Product/Store/Type/Quantity/Unit cost fields are hidden.
+  Desktop/tablet are unchanged: same explanation, same five-field grid, Scan inline with the rest at its
+  usual 36px control height
+- This is a deliberate phone-first trade-off, not an oversight: Store has one real option since the
+  single-store consolidation (plus each Engineer's own station), Quantity comes from the scan count, and
+  Unit cost has its own field inside the scan dialog - so the only thing a mobile operator can't set here
+  is movement Type, which has no in-dialog picker and defaults to Receipt (GRN). Dispatch/Transfer/
+  Adjustment/Write-off still need the full form on a wider screen
+- `ScanMovement` gained an optional `triggerHeightClassName` prop (defaults to `h-9`, the 36px standard)
+  so the mobile-only instance can render a taller, easier tap target (`min-h-[45px]`) without duplicating
+  any of the component's scan/dialog logic - both the mobile and desktop/tablet instances share the same
+  lifted state and handlers; only one is ever visible or clickable at a given width
+- `npx tsc --noEmit` and `npm run lint` both clean
+- Files changed: `src/app/dashboard/record-movement-form.tsx`, `src/app/dashboard/scan-movement.tsx`
+
 ## v0.22.0 — 2026-09-06
 
 **Removed `static-version` — the browser-only static-site twin of the app.**
