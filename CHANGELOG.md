@@ -4,6 +4,28 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.22.0 — 2026-09-06
+
+**Removed `static-version` — the browser-only static-site twin of the app.**
+- A full audit found `static-version/` (a Vite/Zustand/localStorage twin, originally built to deploy the
+  demo to a static host with no server) had forked its own RBAC and data model since creation: 3 roles
+  (admin/engineer/store) instead of the current 4, Admin locked OUT of purchasing (contradicting the
+  confirmed "Admin purchases" business rule), Requisitions and Transfers merged into one workflow, and a
+  generic "Asset" location concept replacing the Engineer's-station model - none of it ever reconciled back
+  into the real app
+- Decision: there is no separate mobile app in this project - "mobile" is the main Next.js app's own
+  responsive breakpoints (a 992px CSS-only drawer, verified down to 375px - see docs/ARCHITECTURE.md).
+  `static-version` was a demo artifact, not a maintained second product, so it's removed rather than
+  reconciled - one app, one RBAC model, one data model, one source of truth
+- Removed: the entire `static-version/` directory, its nested `package.json`/`package-lock.json`, and the
+  `cobro-ims-static-preview` entry in `.claude/launch.json`
+- Cleaned up: `tsconfig.json`'s now-meaningless `static-version` exclude entry
+- This also removes the two pre-existing, previously-flagged `static-version/` lint errors
+  (`react-hooks/set-state-in-effect` in `Labels.tsx`, `react-hooks/purity` in `Reports.tsx`) - `npm run lint`
+  is now warning-only, zero errors
+- `npx tsc --noEmit` and `npm run lint` both clean
+- Files changed: `.claude/launch.json`, `tsconfig.json`. Removed: `static-version/` (entire directory)
+
 ## v0.21.0 — 2026-09-06
 
 **Admin no longer requisitions stock — a confirmed business rule, enforced end to end.**

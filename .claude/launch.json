@@ -6,13 +6,6 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
-    },
-    {
-      "name": "cobro-ims-static-preview",
-      "cwd": "static-version",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "preview", "--port", "4173", "--strictPort"],
-      "port": 4173
     }
   ]
 }
