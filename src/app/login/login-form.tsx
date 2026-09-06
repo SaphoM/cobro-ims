@@ -11,6 +11,9 @@ export function LoginForm() {
   const [state, formAction, pending] = useActionState(signInAction, initialState);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(0);
+  // Collapsed by default - this is a testing aid for demoing RBAC, not
+  // something a real Cobro user should see open on every visit to /login.
+  const [demoAccountsOpen, setDemoAccountsOpen] = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
@@ -39,38 +42,52 @@ export function LoginForm() {
       </div>
       <p className="mb-6 text-center text-[0.92rem] text-text-muted">Sign in to manage your inventory.</p>
 
-      <div className="mb-5 flex flex-col gap-2.5 rounded-xl border border-accent/[0.14] bg-surface-2 px-3.5 py-3">
-        <span className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-text-faint">
-          Demo accounts - pick a role to test RBAC
-        </span>
-        <div className="flex flex-wrap gap-1.5">
-          {DEMO_ACCOUNTS.map((account, i) => (
-            <button
-              key={account.email}
-              type="button"
-              onClick={() => autofillDemo(i)}
-              className={`rounded-full border px-2.5 py-1 text-[0.74rem] font-semibold transition-colors ${
-                selectedAccount === i
-                  ? 'border-accent bg-accent/15 text-accent-strong'
-                  : 'border-accent/20 text-text-muted hover:border-accent/40 hover:text-text'
-              }`}
-            >
-              {account.roleLabel}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-baseline justify-between gap-3 text-[0.82rem] text-text-muted">
-          <span>Email</span>
-          <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono-brand text-[0.76rem] text-text">
-            {DEMO_ACCOUNTS[selectedAccount].email}
-          </code>
-        </div>
-        <div className="flex items-baseline justify-between gap-3 text-[0.82rem] text-text-muted">
-          <span>Password</span>
-          <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono-brand text-[0.76rem] text-text">
-            {DEMO_ACCOUNTS[selectedAccount].password}
-          </code>
-        </div>
+      <div className="mb-5 rounded-xl border border-accent/[0.14] bg-surface-2">
+        <button
+          type="button"
+          onClick={() => setDemoAccountsOpen((v) => !v)}
+          aria-expanded={demoAccountsOpen}
+          className="flex w-full items-center justify-between gap-3 px-3.5 py-3 text-left"
+        >
+          <span className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-text-faint">
+            Demo accounts - pick a role to test RBAC
+          </span>
+          <ChevronDownIcon
+            className={`h-4 w-4 flex-none text-text-faint transition-transform duration-200 ${demoAccountsOpen ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {demoAccountsOpen && (
+          <div className="flex flex-col gap-2.5 px-3.5 pb-3">
+            <div className="flex flex-wrap gap-1.5">
+              {DEMO_ACCOUNTS.map((account, i) => (
+                <button
+                  key={account.email}
+                  type="button"
+                  onClick={() => autofillDemo(i)}
+                  className={`rounded-full border px-2.5 py-1 text-[0.74rem] font-semibold transition-colors ${
+                    selectedAccount === i
+                      ? 'border-accent bg-accent/15 text-accent-strong'
+                      : 'border-accent/20 text-text-muted hover:border-accent/40 hover:text-text'
+                  }`}
+                >
+                  {account.roleLabel}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-baseline justify-between gap-3 text-[0.82rem] text-text-muted">
+              <span>Email</span>
+              <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono-brand text-[0.76rem] text-text">
+                {DEMO_ACCOUNTS[selectedAccount].email}
+              </code>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 text-[0.82rem] text-text-muted">
+              <span>Password</span>
+              <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono-brand text-[0.76rem] text-text">
+                {DEMO_ACCOUNTS[selectedAccount].password}
+              </code>
+            </div>
+          </div>
+        )}
       </div>
 
       {state.error && (
@@ -142,6 +159,14 @@ export function LoginForm() {
         Need access? <a href="#" className="font-semibold text-accent-strong hover:underline">Contact your administrator</a>
       </p>
     </main>
+  );
+}
+
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
   );
 }
 
