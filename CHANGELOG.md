@@ -4,6 +4,16 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.19.1 — 2026-09-06
+
+**Overview: live available-stock counter on the "Record a stock movement" form.**
+- A bold counter under the Product field now shows on-hand quantity at the currently selected Store
+  ("1,835 bag available at DBN-FAC"), updating immediately when either Product or Store changes - no
+  extra fetch, derived from the same ledger data the page already loads for the Store table below
+- Zero on hand renders in red with an explicit "- none on hand here", everything else in bold orange
+  (`text-accent-strong`) so it's not missed before the operator scans
+- Files changed: `src/app/dashboard/page.tsx`, `src/app/dashboard/record-movement-form.tsx`
+
 ## v0.19.0 — 2026-09-06
 
 **RBAC completion: menu, route, and action-level access control on top of the existing permission model.**

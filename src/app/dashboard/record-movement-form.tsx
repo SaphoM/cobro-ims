@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScanMovement } from '@/app/dashboard/scan-movement';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
-import type { Product, Warehouse } from '@/lib/domain/inventory';
+import type { Product, StockLedgerEntry, Warehouse } from '@/lib/domain/inventory';
 
 const MOVEMENT_LABELS: Record<string, string> = {
   receipt: 'Receipt (GRN)',
@@ -25,13 +25,39 @@ const MOVEMENT_LABELS: Record<string, string> = {
  * fields stay visible and editable so the operator can see and adjust the
  * whole movement before the scan commits it.
  */
-export function RecordMovementForm({ products, warehouses }: { products: Product[]; warehouses: Warehouse[] }) {
+export function RecordMovementForm({
+  products,
+  warehouses,
+  ledger,
+}: {
+  products: Product[];
+  warehouses: Warehouse[];
+  /** On-hand quantities to drive the "available" counter below Product -
+   *  optional so any existing caller that doesn't pass it still compiles;
+   *  the counter just doesn't render without it. */
+  ledger?: StockLedgerEntry[];
+}) {
   const [productId, setProductId] = useState(products[0]?.id ?? '');
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? '');
   const [movementType, setMovementType] = useState('receipt');
   const [quantity, setQuantity] = useState('1');
   const [unitCost, setUnitCost] = useState('0');
   const [posted, setPosted] = useState<string | null>(null);
+
+  // Keyed by "productId::warehouseId" so looking up the count for whatever
+  // is currently selected is O(1) and re-derives on every render rather
+  // than needing its own effect - selecting a different product or store
+  // is exactly what should make this number change.
+  const onHandByKey = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const entry of ledger ?? []) {
+      map.set(`${entry.productId}::${entry.warehouseId}`, entry.quantityOnHand);
+    }
+    return map;
+  }, [ledger]);
+  const selectedProduct = products.find((p) => p.id === productId);
+  const selectedWarehouse = warehouses.find((w) => w.id === warehouseId);
+  const availableQty = onHandByKey.get(`${productId}::${warehouseId}`) ?? 0;
 
   return (
     <div className="rounded-2xl border border-accent/[0.14] bg-surface p-5">
@@ -65,6 +91,13 @@ export function RecordMovementForm({ products, warehouses }: { products: Product
               </option>
             ))}
           </select>
+          {ledger && (
+            <span className={`text-[0.82rem] font-bold ${availableQty === 0 ? 'text-danger' : 'text-accent-strong'}`}>
+              {availableQty.toLocaleString()} {selectedProduct?.unitOfMeasure ?? ''} available
+              {selectedWarehouse ? ` at ${selectedWarehouse.code}` : ''}
+              {availableQty === 0 && ' - none on hand here'}
+            </span>
+          )}
         </label>
 
         <label className="flex flex-col gap-1.5">

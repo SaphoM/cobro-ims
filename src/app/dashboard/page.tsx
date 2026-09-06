@@ -64,7 +64,9 @@ export default async function DashboardOverviewPage() {
         />
       </section>
 
-      {!isEngineer && <RecordMovementForm products={products} warehouses={warehouses} />}
+      {!isEngineer && (
+        <RecordMovementForm products={products} warehouses={warehouses} ledger={ledgerEntries} />
+      )}
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">
