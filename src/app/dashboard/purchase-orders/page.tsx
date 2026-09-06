@@ -4,12 +4,31 @@ import {
   supplierRepository,
   warehouseRepository,
 } from '@/lib/data';
+import { getSession } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
+import { AccessDenied } from '@/components/access-denied';
 import { PurchaseOrderForm } from '@/app/dashboard/purchase-orders/po-form';
 import { ReceiveLine } from '@/app/dashboard/purchase-orders/receive-line';
 import { issuePurchaseOrderAction } from '@/app/dashboard/purchase-orders/actions';
 import type { PoStatus } from '@/lib/domain/inventory';
 
 export default async function PurchaseOrdersPage() {
+  const session = await getSession();
+  if (!session) {
+    return <AccessDenied title="Purchase orders" message="Your session has expired. Please sign in again." />;
+  }
+  // Engineers request stock internally; they don't buy from external
+  // suppliers. Route-level gate, not just a hidden nav link - see
+  // src/lib/nav-items.ts and src/components/access-denied.tsx.
+  if (!(await hasPermission(session, 'manage_purchase_orders'))) {
+    return (
+      <AccessDenied
+        title="Purchase orders"
+        message="Ordering stock from external suppliers is a Stores/Admin function. Your role does not have access to this page."
+      />
+    );
+  }
+
   const [suppliers, warehouses, products, orders] = await Promise.all([
     supplierRepository.list(),
     warehouseRepository.list(),

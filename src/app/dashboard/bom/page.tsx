@@ -1,4 +1,6 @@
 import { productRepository } from '@/lib/data';
+import { getSession } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 import { AddComponentForm } from '@/app/dashboard/bom/add-component-form';
 import { removeBomLineAction } from '@/app/dashboard/bom/actions';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
@@ -8,6 +10,12 @@ export default async function BomPage({
 }: {
   searchParams: Promise<{ productId?: string; buildQty?: string }>;
 }) {
+  const session = await getSession();
+  // View-only for everyone except Admin/Stores Manager - no Engineer or
+  // Stores Clerk should modify a BOM definition. The action itself already
+  // requires `manage_catalogue`; this just stops the form/button from
+  // showing to someone the server would reject anyway.
+  const canManageBom = session ? await hasPermission(session, 'manage_catalogue') : false;
   const { productId, buildQty } = await searchParams;
   const products = await productRepository.list();
   const sortedProducts = [...products].sort((a, b) => a.name.localeCompare(b.name));
@@ -68,6 +76,7 @@ export default async function BomPage({
 
       {selected && (
         <>
+          {canManageBom && (
           <section className="rounded-2xl border border-accent/[0.14] bg-surface p-5">
             <h2 className="mb-1 font-display text-[1.05rem] font-medium text-text">
               Add a component to {selected.sku}
@@ -84,6 +93,7 @@ export default async function BomPage({
               <AddComponentForm parentProductId={selected.id} componentOptions={componentOptions} />
             )}
           </section>
+          )}
 
           <section className="rounded-2xl border border-accent/[0.14] bg-surface">
             <div className="border-b border-accent/[0.14] px-5 py-4">
@@ -117,11 +127,13 @@ export default async function BomPage({
                             {line.quantity.toLocaleString()} {component?.unitOfMeasure}
                           </td>
                           <td className="px-5 py-3 text-right">
-                            <form action={removeBomLineAction.bind(null, line.id)}>
-                              <button type="submit" className="text-[0.8rem] font-semibold text-text-faint hover:text-danger">
-                                Remove
-                              </button>
-                            </form>
+                            {canManageBom && (
+                              <form action={removeBomLineAction.bind(null, line.id)}>
+                                <button type="submit" className="text-[0.8rem] font-semibold text-text-faint hover:text-danger">
+                                  Remove
+                                </button>
+                              </form>
+                            )}
                           </td>
                         </tr>
                       );

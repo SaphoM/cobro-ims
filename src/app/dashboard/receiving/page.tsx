@@ -1,4 +1,7 @@
 import { productRepository, receivingRepository, supplierRepository, warehouseRepository } from '@/lib/data';
+import { getSession } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
+import { AccessDenied } from '@/components/access-denied';
 import { ReceiveForm } from '@/app/dashboard/receiving/receive-form';
 
 export default async function ReceivingPage({
@@ -6,6 +9,22 @@ export default async function ReceivingPage({
 }: {
   searchParams: Promise<{ barcode?: string }>;
 }) {
+  const session = await getSession();
+  if (!session) {
+    return <AccessDenied title="Goods receiving" message="Your session has expired. Please sign in again." />;
+  }
+  // Receiving is a Stores function - an Engineer requests stock, they don't
+  // receive it in. Route-level gate; the receive action itself already
+  // requires `manage_receiving` too.
+  if (!(await hasPermission(session, 'manage_receiving'))) {
+    return (
+      <AccessDenied
+        title="Goods receiving"
+        message="Receiving stock is a Stores function. Your role does not have access to this page."
+      />
+    );
+  }
+
   const { barcode } = await searchParams;
   const [suppliers, warehouses, products, receipts] = await Promise.all([
     supplierRepository.list(),

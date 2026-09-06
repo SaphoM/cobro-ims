@@ -1,7 +1,15 @@
 import { customerRepository } from '@/lib/data';
+import { getSession } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 import { CustomerForm } from '@/app/dashboard/customers/customer-form';
 
 export default async function CustomersPage() {
+  const session = await getSession();
+  // Every role can view Departments (an Engineer needs the picker to raise
+  // a requisition against their own department) - only creating one is
+  // restricted, so this page is never route-blocked, only the form is
+  // conditionally shown.
+  const canManageCustomers = session ? await hasPermission(session, 'manage_customers') : false;
   const customers = await customerRepository.list();
   const sorted = [...customers].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -15,7 +23,7 @@ export default async function CustomersPage() {
         </p>
       </div>
 
-      <CustomerForm />
+      {canManageCustomers && <CustomerForm />}
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">

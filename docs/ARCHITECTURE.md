@@ -147,6 +147,59 @@ resulting WAC math checked by hand):
   requisition approval hierarchy exists (Approve is still a single gate); an Admin can't yet edit a user's
   name/email after creation, only role/area/active status; the factory Area list is a fixed constant, not
   something Cobro has confirmed as complete or asked to manage themselves.
+- **RBAC completion pass — menu, route, and action-level access control** (client follow-up brief:
+  "not every user should see every page", "not every user who can see a page should execute every action
+  on it"). The role model and server-side permission checks above were already real; what this pass added
+  was the two layers around them the brief called out as missing:
+  - **Menu visibility** (`src/lib/nav-items.ts`) — the sidebar was one static list shown to every role.
+    Now each item names the one existing `Permission` that separates "sees this" from "doesn't"
+    (reusing `manage_purchase_orders`, `manage_receiving`, `manage_transfers`, `request_adjustments`,
+    `create_requisitions`, `view_reports`, `manage_users`, and a new `view_audit_log` — nothing invented
+    purely for the menu), computed once in `dashboard/layout.tsx` and filtered before render.
+  - **Route protection** — most view pages had never checked a permission at all (a deliberate earlier
+    pattern: "mutating actions are gated, viewing isn't"). The brief explicitly requires the opposite for
+    pages an Engineer has no business opening at all, so Purchase orders, Goods receiving, Suppliers,
+    Transfers, Write-offs & adjustments, Product labels, Audit log, and Users (already gated) now render
+    an `AccessDenied` message (`src/components/access-denied.tsx`) instead of their content for a role
+    without the matching permission — typing the URL directly is rejected exactly like clicking a hidden
+    nav link would have been.
+  - **Action-level trims within a still-visible page**: Product catalogue and Bill of materials hide their
+    add/edit forms (not just disable them) for anyone without `manage_catalogue`; Departments hides its
+    create form for anyone without `manage_customers`; Suppliers shows the list to Admin and both Stores
+    roles but the create form to Admin only; Requisitions hides Approve/Issue/Cancel entirely for an
+    Engineer (they only ever see their own request's read-only status); Overview drops the "Record a
+    stock movement" panel for an Engineer since none of its six movement types are a permission they hold.
+  - **`request_adjustments` removed from Stores Clerk.** The brief is explicit that "a Stores Clerk must
+    not be able to arbitrarily change inventory quantities" — Stores Clerk previously held the same
+    request-an-adjustment permission as Stores Manager. Now only Admin and Stores Manager can request or
+    approve a write-off/adjustment at all; Stores Clerk and Engineer get `AccessDenied` on that page.
+  - **Audit log narrowed per role**, not just gated — Admin sees every entry; Stores Manager/Clerk see
+    everything except `users` and `app_settings` rows (user administration and system config stay
+    Admin's own business); Engineer has no access at all (their own activity is already fully visible on
+    `/dashboard/sales`, which the brief allows as the substitute for "their own activity" audit access).
+  - **Dashboards & reports narrowed per role**, using the same fetched data rather than new report
+    functions: Stores Clerk loses the three purchasing/supplier-facing sections (Purchase order summary,
+    Supplier summary, Open purchase orders); Engineer sees only two — Low stock and Requisition summary,
+    the latter pre-filtered to their own orders before `buildSalesSummary` ever runs, the same rule
+    `/dashboard/sales` already applies.
+  - **One deliberate deviation from the brief, confirmed with the client first:** the brief's Purchase
+    Orders section describes Admin-only create/issue with Stores as view-only for receiving purposes.
+    That directly contradicts an explicit instruction the client gave earlier in the same engagement
+    ("only Stores and admin can order from external suppliers" — both Stores roles granted full
+    `manage_purchase_orders`). Asked directly; the client confirmed the earlier instruction stands, so
+    Stores Manager and Stores Clerk keep full purchase-order authority. The route gate still exists
+    (`manage_purchase_orders`), it just isn't Admin-exclusive.
+  - **Verified live** for every role (Admin, Stores Manager, Stores Clerk, Engineer): nav items match the
+    brief's per-role menu list exactly; direct-URL attempts at `/dashboard/users`, `/dashboard/purchase-
+    orders`, `/dashboard/suppliers`, `/dashboard/receiving`, `/dashboard/transfers`, `/dashboard/
+    adjustments`, `/dashboard/labels`, and `/dashboard/audit-log` as Engineer all returned `AccessDenied`;
+    `/dashboard/adjustments` as Stores Clerk returned `AccessDenied`; Reports as Engineer showed only Low
+    stock + their own requisition (REQ-1001, Mechanical); Reports as Stores Clerk hid the three purchasing
+    sections while Admin saw all fourteen; Suppliers as Stores Clerk showed the list with no create form,
+    same page as Admin showed both.
+  - Not touched: authentication architecture, database schema, the WAC inventory engine, dashboard visual
+    design, the scanner engine (its existing per-mode permission checks already matched the brief), the
+    36px control standard (unchanged), and accounting/customer-sales scope.
 - **Product catalogue** (`/dashboard/products`) — list + add product.
 - **Goods receiving** (`/dashboard/receiving`) — a "quick receive" flow that creates the PO, PO line, GRN
   and GRN line, then posts the stock movement. Deliberately skips a separate PO-issuing step since full
@@ -375,9 +428,12 @@ layer rather than provisioning a live Supabase project immediately. Reasons:
 | Auth | Mock — one hardcoded demo user/password in `src/lib/auth.ts`, cookie session. **Deferred by
   direction**, not the Authentication phase deliverable. No password hashing, no MFA (RFQ requires 2FA
   for privileged users), no real Supabase Auth yet. |
-| RBAC | **Real enforcement** in every mutating Server Action (`src/lib/permissions.ts`), four roles
-  (Admin/Stores Manager/Stores Clerk/Engineer-Requester) matching Cobro's actual structure, four demo
-  accounts to test with. The exact permission grants are still a placeholder pending Cobro sign-off — §5.2 |
+| RBAC | **Real enforcement** at three layers: action (every mutating Server Action, `src/lib/
+  permissions.ts`), route (a role without the matching permission gets `AccessDenied`, not the page,
+  on Purchase orders/Receiving/Suppliers/Transfers/Adjustments/Labels/Audit log/Users), and menu
+  (`src/lib/nav-items.ts` filters the sidebar to what a role can actually use). Four roles (Admin/Stores
+  Manager/Stores Clerk/Engineer-Requester), four demo accounts. The exact permission grants are still a
+  placeholder pending Cobro sign-off — §5.2 |
 | User management (`/dashboard/users`) | **Real** — Admin-only create/edit-role/edit-area/activate-
   deactivate, audited. Multiple Admins verified live. See §1 |
 | Audit log | **Real** — every audited action writes an append-only entry, viewable at `/dashboard/audit-log`.

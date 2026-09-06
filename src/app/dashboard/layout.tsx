@@ -6,30 +6,22 @@ import { isUsingMockData, roleRepository } from '@/lib/data';
 import { signOutAction } from '@/app/dashboard/actions';
 import { NavLink } from '@/app/dashboard/nav-link';
 import { ThemeToggle } from '@/components/theme-toggle';
-
-const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Overview' },
-  { href: '/dashboard/products', label: 'Product catalogue' },
-  { href: '/dashboard/bom', label: 'Bill of materials' },
-  { href: '/dashboard/purchase-orders', label: 'Purchase orders' },
-  { href: '/dashboard/receiving', label: 'Goods receiving' },
-  { href: '/dashboard/suppliers', label: 'Suppliers' },
-  { href: '/dashboard/transfers', label: 'Transfers' },
-  { href: '/dashboard/adjustments', label: 'Write-offs & adjustments' },
-  { href: '/dashboard/sales', label: 'Requisitions' },
-  { href: '/dashboard/customers', label: 'Departments' },
-  { href: '/dashboard/reports', label: 'Dashboards & reports' },
-  { href: '/dashboard/scan', label: 'Barcode / QR scan' },
-  { href: '/dashboard/labels', label: 'Product labels' },
-  { href: '/dashboard/audit-log', label: 'Audit log' },
-  { href: '/dashboard/security', label: 'Security (2FA)' },
-  { href: '/dashboard/users', label: 'Users' },
-];
+import { NAV_ITEMS } from '@/lib/nav-items';
+import { hasPermission } from '@/lib/permissions';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect('/login');
   const role = await roleRepository.getById(session.roleId);
+  // Menu visibility is the first of three separate RBAC layers (menu, route,
+  // action/API) - hiding a link here is never the actual security boundary,
+  // every route below independently re-checks the same permission. See
+  // src/lib/nav-items.ts.
+  const visibleNavItems = (
+    await Promise.all(
+      NAV_ITEMS.map(async (item) => ((item.permission === null || (await hasPermission(session, item.permission))) ? item : null))
+    )
+  ).filter((item): item is (typeof NAV_ITEMS)[number] => item !== null);
 
   return (
     <div className="flex min-h-screen">
@@ -84,7 +76,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <ThemeToggle className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-accent/50 bg-surface-2 px-3 py-2.5 text-[0.86rem] font-bold text-accent-strong transition-colors hover:border-accent hover:bg-accent/10" />
 
         <nav className="flex flex-1 flex-col gap-0.5">
-          {NAV_ITEMS.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink key={item.href} href={item.href}>
               {item.label}
             </NavLink>

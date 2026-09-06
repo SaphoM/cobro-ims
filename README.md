@@ -255,6 +255,13 @@ gates every write. Every audited action then writes to an append-only `AuditLogR
 for a caller to call, even if a real database's own immutability trigger is still just written, not
 applied (see `supabase/migrations/20260816100000_audit_log_immutability.sql`).
 
+**Three RBAC layers, not one.** Action-level checks above are the security boundary, but a role also
+never sees a link it can't use (`src/lib/nav-items.ts` filters the sidebar) or reaches a page it can't
+use by typing the URL directly (`src/components/access-denied.tsx` — Purchase orders, Goods receiving,
+Suppliers, Transfers, Write-offs & adjustments, Product labels, Audit log and Users all reject a role
+without the matching permission before rendering any content). See `docs/ARCHITECTURE.md` §1 for the
+full per-page breakdown.
+
 ---
 
 ## 7. What each module actually does
@@ -354,7 +361,7 @@ correct — with the resulting quantities/costs/VAT amounts hand-verified agains
 | Every module in §7 | Real logic and UI, running against the mock data layer |
 | Database schema | Written (`supabase/migrations/`), **not applied anywhere yet** |
 | Auth | Mock — 4 hardcoded demo user/password pairs, plus a shared `NEW_USER_DEFAULT_PASSWORD` any user created via `/dashboard/users` can sign in with, cookie session. **Deferred by direction.** No password hashing, no real Supabase Auth. |
-| RBAC | **Real enforcement** — every mutating Server Action checks a permission via `src/lib/permissions.ts`; 4 roles (Admin, Stores Manager, Stores Clerk, Engineer / Requester), one demo account per role. The matrix itself is still a placeholder pending Cobro sign-off |
+| RBAC | **Real enforcement at three layers** — action (every mutating Server Action, `src/lib/permissions.ts`), route (`AccessDenied` on 8 restricted pages instead of the page itself), and menu (`src/lib/nav-items.ts` filters the sidebar). 4 roles (Admin, Stores Manager, Stores Clerk, Engineer / Requester), one demo account per role. The matrix itself is still a placeholder pending Cobro sign-off |
 | User management (`/dashboard/users`) | **Real** — Admin-only create user + edit role/area/active-status, fully audited. Multiple Admins verified live. Editing name/email after creation isn't built yet, §11 |
 | Audit log | **Real** — every audited action writes an append-only entry, viewable at `/dashboard/audit-log`. DB-level immutability trigger written, not applied (no live project) |
 | Accounting integration (Sage/QuickBooks/Xero) | Not started — **explicitly deferred by client decision**, not just unchosen (§7.5) |
@@ -425,6 +432,9 @@ supabase/migrations/            Postgres schema, schema-as-code, not yet applied
 
 src/lib/domain/inventory.ts     TypeScript types mirroring the schema, by hand, kept in sync manually
 src/lib/permissions.ts          RBAC: Permission type, ROLE_PERMISSIONS matrix, hasPermission/requirePermission
+src/lib/nav-items.ts            Sidebar menu-visibility layer - which Permission gates which nav item
+src/components/access-denied.tsx  Route-protection layer - shown instead of a page's content when the
+                                 signed-in role lacks the permission that page requires
 src/lib/areas.ts                Fixed factory Area list (Mechanical, Electrical, Workshop, ...) for the
                                  Engineer / Requester role — not an Admin-managed table, see §9.10
 src/lib/data/

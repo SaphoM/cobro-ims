@@ -41,8 +41,8 @@ export default async function ScanPage({
         </a>
         , then scan them straight back in here. The demo dataset seeds barcodes on the product catalogue -
         try <code className="font-mono-brand">6001240912345</code> (Cement 42.5N, 50kg bag). Scanning IN
-        requires the receiving permission and scanning OUT the requisition-issuing permission, so a viewer
-        can look codes up but cannot move stock.
+        requires the receiving permission and scanning OUT the requisition-issuing permission, so an
+        Engineer / Requester can look codes up but cannot move stock.
       </p>
     </div>
   );

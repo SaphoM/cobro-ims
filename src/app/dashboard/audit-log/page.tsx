@@ -1,7 +1,33 @@
-import { auditLogRepository, userRepository } from '@/lib/data';
+import { auditLogRepository, roleRepository, userRepository } from '@/lib/data';
+import { getSession } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
+import { AccessDenied } from '@/components/access-denied';
+
+// User-management changes and system settings are Admin's own business - a
+// Stores Manager/Clerk sees everything else (receiving, requisitions,
+// adjustments, transfers, catalogue). "Relevant operational history", not
+// the full trail. See src/lib/permissions.ts (`view_audit_log`).
+const ADMIN_ONLY_TABLES = new Set(['users', 'app_settings']);
 
 export default async function AuditLogPage() {
-  const [entries, users] = await Promise.all([auditLogRepository.list(200), userRepository.list()]);
+  const session = await getSession();
+  if (!session) {
+    return <AccessDenied title="Audit log" message="Your session has expired. Please sign in again." />;
+  }
+  // An Engineer sees only their own requisitions (on /dashboard/sales), not
+  // the system-wide audit trail - see docs/ARCHITECTURE.md §1.
+  if (!(await hasPermission(session, 'view_audit_log'))) {
+    return (
+      <AccessDenied
+        title="Audit log"
+        message="The system audit trail is a Stores/Admin function. Your role does not have access to this page."
+      />
+    );
+  }
+  const isAdmin = (await roleRepository.getById(session.roleId))?.name === 'admin';
+
+  const [allEntries, users] = await Promise.all([auditLogRepository.list(200), userRepository.list()]);
+  const entries = isAdmin ? allEntries : allEntries.filter((e) => !ADMIN_ONLY_TABLES.has(e.tableName));
   const userById = new Map(users.map((u) => [u.id, u]));
 
   return (
@@ -9,8 +35,10 @@ export default async function AuditLogPage() {
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Audit log</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Every approval, issue, receipt, dispatch, invoice and product-catalogue change writes an entry
-          here. Append-only by construction today - see the note below on what &quot;immutable&quot; means
+          {isAdmin
+            ? 'Every approval, issue, receipt, dispatch, invoice and product-catalogue change writes an entry here.'
+            : 'Store-relevant activity - receiving, transfers, requisitions, adjustments and catalogue changes. User-administration and system-settings entries are Admin-only.'}{' '}
+          Append-only by construction today - see the note below on what &quot;immutable&quot; means
           before a real database exists.
         </p>
       </div>

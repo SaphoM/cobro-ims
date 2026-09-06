@@ -1,5 +1,6 @@
 import { customerRepository, productRepository, roleRepository, salesOrderRepository, userRepository, warehouseRepository } from '@/lib/data';
 import { getSession } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 import { SalesOrderForm } from '@/app/dashboard/sales/sales-order-form';
 import { RequisitionActionsCell } from '@/app/dashboard/sales/requisition-actions-cell';
 import type { SalesOrderStatus } from '@/lib/domain/inventory';
@@ -26,6 +27,11 @@ export default async function SalesPage({
   // same as before this role model existed.
   const isEngineer = role?.name === 'engineer_requester';
   const orders = isEngineer && session ? allOrders.filter((o) => o.createdBy === session.id) : allOrders;
+  // Engineers request; they never approve, issue or cancel - their own
+  // request included. Hiding the action buttons here is on top of the
+  // server-side `manage_sales_orders` check the actions themselves make,
+  // not instead of it.
+  const canProcess = session ? await hasPermission(session, 'manage_sales_orders') : false;
 
   const customerById = new Map(customers.map((c) => [c.id, c]));
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
@@ -100,7 +106,7 @@ export default async function SalesPage({
                         <StatusPill status={o.status} />
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <RequisitionActionsCell orderId={o.id} status={o.status} />
+                        {canProcess && <RequisitionActionsCell orderId={o.id} status={o.status} />}
                       </td>
                     </tr>
                   );

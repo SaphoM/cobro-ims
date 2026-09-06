@@ -1,4 +1,4 @@
-import { productRepository, stockLedgerRepository, warehouseRepository } from '@/lib/data';
+import { productRepository, stockLedgerRepository, warehouseRepository, roleRepository } from '@/lib/data';
 import { getSession } from '@/lib/auth';
 import { canSeeCosts } from '@/lib/costs';
 import { HIDDEN_COST } from '@/lib/ui/cost-display';
@@ -15,6 +15,12 @@ export default async function DashboardOverviewPage() {
     getSession(),
   ]);
   const showCosts = await canSeeCosts(session);
+  const role = session ? await roleRepository.getById(session.roleId) : null;
+  // None of the six movement types this form can post are permissions an
+  // Engineer / Requester holds - every attempt would be rejected
+  // server-side, so showing it here is just a dead form. See
+  // src/app/dashboard/actions.ts (PERMISSION_BY_TYPE).
+  const isEngineer = role?.name === 'engineer_requester';
 
   const productById = new Map(products.map((p) => [p.id, p]));
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
@@ -58,7 +64,7 @@ export default async function DashboardOverviewPage() {
         />
       </section>
 
-      <RecordMovementForm products={products} warehouses={warehouses} />
+      {!isEngineer && <RecordMovementForm products={products} warehouses={warehouses} />}
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">

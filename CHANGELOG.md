@@ -4,6 +4,40 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.19.0 — 2026-09-06
+
+**RBAC completion: menu, route, and action-level access control on top of the existing permission model.**
+- Menu visibility (`src/lib/nav-items.ts`): the sidebar was one static list shown to every role; each
+  item now names the one existing `Permission` that separates "sees this" from "doesn't" (reusing
+  `manage_purchase_orders`, `manage_receiving`, `manage_transfers`, `request_adjustments`,
+  `create_requisitions`, `view_reports`, `manage_users`, and a new `view_audit_log`), filtered in
+  `dashboard/layout.tsx` before render
+- Route protection (`src/components/access-denied.tsx`): Purchase orders, Goods receiving, Suppliers,
+  Transfers, Write-offs & adjustments, Product labels, and Audit log now reject a role without the
+  matching permission before rendering any content — typing the URL directly is blocked exactly like a
+  hidden nav link would be, not just visually absent
+- Action-level trims within still-visible pages: Product catalogue/BOM hide add/edit forms (not disable
+  them) for non-catalogue-managers; Departments/Suppliers hide their create forms for non-managers;
+  Requisitions hides Approve/Issue/Cancel entirely for an Engineer; Overview drops the "Record a stock
+  movement" panel for an Engineer, none of whose permissions apply to any of its six movement types
+- `request_adjustments` removed from Stores Clerk — a Clerk can no longer request or approve a
+  write-off/adjustment on their own authority; only Admin and Stores Manager can
+- Audit log narrowed per role (not just gated): Admin sees every entry; Stores Manager/Clerk see
+  everything except `users`/`app_settings` rows; Engineer has no access (their own activity is already
+  visible on Requisitions)
+- Dashboards & reports narrowed per role using the same fetched data: Stores Clerk loses the three
+  purchasing/supplier-facing sections; Engineer sees only Low stock and their own Requisition summary
+- One deliberate deviation from the originating brief, confirmed with the client first: Purchase Orders
+  stayed full-authority for both Stores roles (per the client's earlier explicit instruction) rather than
+  switching to the brief's Admin-only/Stores-view-only model
+- Verified live for all four roles: nav-item lists match spec exactly; 8 direct-URL access attempts as
+  Engineer and 1 as Stores Clerk all correctly denied; Reports content correctly scoped per role; Suppliers
+  view-vs-edit split confirmed for Stores Clerk vs. Admin
+- `npx tsc --noEmit` and `npm run lint` both clean (only the pre-existing, deferred `static-version/`
+  issues remain)
+- Files changed: `src/lib/permissions.ts` and 17 page components under `src/app/dashboard/`, plus
+  `README.md` and `docs/ARCHITECTURE.md`. New: `src/lib/nav-items.ts`, `src/components/access-denied.tsx`
+
 ## v0.18.2 — 2026-09-06
 
 **UI: collapse the demo-accounts card on `/login` behind a chevron toggle.**

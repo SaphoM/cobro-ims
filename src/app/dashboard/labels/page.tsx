@@ -1,4 +1,7 @@
 import { productRepository } from '@/lib/data';
+import { getSession } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
+import { AccessDenied } from '@/components/access-denied';
 import { PrintButton } from '@/app/dashboard/labels/print-button';
 import { generateQrDataUrl } from '@/lib/services/qrcode';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
@@ -10,6 +13,21 @@ export default async function LabelsPage({
 }: {
   searchParams: Promise<{ productId?: string; qty?: string }>;
 }) {
+  const session = await getSession();
+  if (!session) {
+    return <AccessDenied title="Product labels" message="Your session has expired. Please sign in again." />;
+  }
+  // Labels are part of Stores/inventory operations - an Engineer never
+  // prints a shelf label.
+  if (!(await hasPermission(session, 'manage_receiving'))) {
+    return (
+      <AccessDenied
+        title="Product labels"
+        message="Printing product labels is a Stores function. Your role does not have access to this page."
+      />
+    );
+  }
+
   const { productId, qty } = await searchParams;
   const products = await productRepository.list();
   const sortedProducts = [...products].sort((a, b) => a.name.localeCompare(b.name));

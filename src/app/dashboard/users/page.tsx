@@ -1,31 +1,23 @@
 import { getSession } from '@/lib/auth';
 import { roleRepository, userRepository } from '@/lib/data';
 import { hasPermission } from '@/lib/permissions';
+import { AccessDenied } from '@/components/access-denied';
 import { UserForm } from '@/app/dashboard/users/user-form';
 import { UserRowActions } from '@/app/dashboard/users/user-row-actions';
 
 export default async function UsersPage() {
   const session = await getSession();
   if (!session) {
-    return (
-      <p className="rounded-2xl border border-danger/40 bg-danger/10 px-5 py-4 text-[0.86rem] text-danger-text">
-        Your session has expired. Please sign in again.
-      </p>
-    );
+    return <AccessDenied title="Users" message="Your session has expired. Please sign in again." />;
   }
 
   const canManageUsers = await hasPermission(session, 'manage_users');
   if (!canManageUsers) {
     return (
-      <div className="flex flex-col gap-6">
-        <div>
-          <h1 className="font-display text-[1.3rem] font-medium text-text">Users</h1>
-          <p className="text-[0.86rem] text-text-muted">User administration is an Admin-only function.</p>
-        </div>
-        <p className="rounded-2xl border border-danger/40 bg-danger/10 px-5 py-4 text-[0.86rem] text-danger-text">
-          Your role does not have permission to manage users.
-        </p>
-      </div>
+      <AccessDenied
+        title="Users"
+        message="User administration is an Admin-only function. Your role does not have permission to manage users."
+      />
     );
   }
 

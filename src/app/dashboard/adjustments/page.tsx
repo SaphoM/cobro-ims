@@ -5,6 +5,8 @@ import {
   warehouseRepository,
 } from '@/lib/data';
 import { getSession } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
+import { AccessDenied } from '@/components/access-denied';
 import { AdjustmentForm } from '@/app/dashboard/adjustments/adjustment-form';
 import { decideAdjustmentAction } from '@/app/dashboard/adjustments/actions';
 
@@ -13,9 +15,24 @@ export default async function AdjustmentsPage({
 }: {
   searchParams: Promise<{ barcode?: string }>;
 }) {
+  const session = await getSession();
+  if (!session) {
+    return <AccessDenied title="Write-offs & adjustments" message="Your session has expired. Please sign in again." />;
+  }
+  // A Stores Clerk must not be able to arbitrarily change inventory
+  // quantities - only Admin and Stores Manager hold `request_adjustments`
+  // now (see src/lib/permissions.ts). Engineers never had it.
+  if (!(await hasPermission(session, 'request_adjustments'))) {
+    return (
+      <AccessDenied
+        title="Write-offs & adjustments"
+        message="Requesting or approving a stock adjustment is restricted to Admin and Stores Manager. Your role does not have access to this page."
+      />
+    );
+  }
+
   const { barcode } = await searchParams;
-  const [session, products, warehouses, reasonCodes, adjustments] = await Promise.all([
-    getSession(),
+  const [products, warehouses, reasonCodes, adjustments] = await Promise.all([
     productRepository.list(),
     warehouseRepository.list(),
     adjustmentReasonRepository.list(),

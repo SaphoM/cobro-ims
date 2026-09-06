@@ -1,8 +1,25 @@
 import { productRepository, transferRepository, warehouseRepository } from '@/lib/data';
+import { getSession } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
+import { AccessDenied } from '@/components/access-denied';
 import { TransferForm } from '@/app/dashboard/transfers/transfer-form';
 import { completeTransferAction } from '@/app/dashboard/transfers/actions';
 
 export default async function TransfersPage() {
+  const session = await getSession();
+  if (!session) {
+    return <AccessDenied title="Inter-store transfers" message="Your session has expired. Please sign in again." />;
+  }
+  // Engineers don't move inventory between stores - that's Stores' job.
+  if (!(await hasPermission(session, 'manage_transfers'))) {
+    return (
+      <AccessDenied
+        title="Inter-store transfers"
+        message="Moving stock between stores is a Stores function. Your role does not have access to this page."
+      />
+    );
+  }
+
   const [products, warehouses, transfers] = await Promise.all([
     productRepository.list(),
     warehouseRepository.list(),

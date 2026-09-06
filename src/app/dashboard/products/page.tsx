@@ -10,6 +10,11 @@ export default async function ProductsPage() {
   const session = await getSession();
   const canEditPrice = session ? await hasPermission(session, 'manage_pricing') : false;
   const costsVisible = await canSeeCosts(session);
+  // Engineer / Requester (and any signed-out visitor) gets view/search only -
+  // no add-product form, no bulk-import section, no link into Product
+  // labels (a page they can't open anyway - see /dashboard/labels).
+  const canManageCatalogue = session ? await hasPermission(session, 'manage_catalogue') : false;
+  const canPrintLabels = session ? await hasPermission(session, 'manage_receiving') : false;
   const sorted = [...products].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
@@ -26,6 +31,7 @@ export default async function ProductsPage() {
         </p>
       </div>
 
+      {canManageCatalogue && (
       <section className="rounded-2xl border border-accent/[0.14] bg-surface p-5">
         <h2 className="mb-1 font-display text-[1.05rem] font-medium text-text">Bulk data import</h2>
         <p className="mb-4 text-[0.83rem] text-text-muted">
@@ -60,8 +66,9 @@ export default async function ProductsPage() {
           </a>
         </div>
       </section>
+      )}
 
-      <NewProductForm />
+      {canManageCatalogue && <NewProductForm />}
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">
@@ -104,7 +111,7 @@ export default async function ProductsPage() {
                       <a href={`/dashboard/bom?productId=${p.id}`} className="text-[0.78rem] font-semibold text-accent-strong hover:underline">
                         BOM
                       </a>
-                      {p.barcode && (
+                      {p.barcode && canPrintLabels && (
                         <a href={`/dashboard/labels?productId=${p.id}`} className="text-[0.78rem] font-semibold text-accent-strong hover:underline">
                           Print labels
                         </a>

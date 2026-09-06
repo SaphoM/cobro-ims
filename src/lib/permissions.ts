@@ -35,7 +35,12 @@ export type Permission =
   | 'manage_pricing'
   /** Create/edit users and change roles — Admin only. See docs/ARCHITECTURE.md §1 (user/role model). */
   | 'manage_users'
-  | 'view_reports';
+  | 'view_reports'
+  /** See the full Audit Log page. Admin and both Stores roles hold it; Engineer / Requester
+   *  doesn't — they see only their own activity there instead (see the page itself). A
+   *  narrower cut than `view_reports` because the audit trail names who changed what, which
+   *  is a different sensitivity than an aggregate report. */
+  | 'view_audit_log';
 
 /**
  * Four roles, matching Cobro's actual operating structure — not a generic
@@ -53,7 +58,9 @@ export type Permission =
  *                         administration — creating users/Admins stays Admin-only.
  *   stores_clerk       — day-to-day store transactions: the same physical stock actions and
  *                         supplier purchase orders as Stores Manager, minus catalogue/threshold
- *                         management.
+ *                         management and — unlike Stores Manager — minus `request_adjustments`.
+ *                         A Clerk must not be able to raise a write-off/adjustment on their own
+ *                         authority; that stays Stores Manager and Admin.
  *   engineer_requester — factory-floor staff who request MRO stock on behalf of their section
  *                         (see `area` on User). Can create and track their own requisitions;
  *                         cannot approve, issue, or otherwise touch the inventory ledger.
@@ -69,17 +76,22 @@ const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
     'create_requisitions',
     'manage_sales_orders',
     'view_reports',
+    'view_audit_log',
   ],
   stores_clerk: [
     'manage_purchase_orders',
     'manage_receiving',
     'manage_transfers',
-    'request_adjustments',
     'create_requisitions',
     'manage_sales_orders',
     'view_reports',
+    'view_audit_log',
   ],
-  engineer_requester: ['create_requisitions'],
+  // Deliberately narrow: create_requisitions is the only inventory-adjacent
+  // permission this role holds. `view_reports` is granted too, but the
+  // Reports page itself cuts what an Engineer sees down to their own
+  // requisitions and stock-availability info — see /dashboard/reports.
+  engineer_requester: ['create_requisitions', 'view_reports'],
 };
 
 // Approving an adjustment is the one action in the whole app that posts a
