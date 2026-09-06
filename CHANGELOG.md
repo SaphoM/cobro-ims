@@ -4,6 +4,47 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.24.0 — 2026-09-06
+
+**New: RBAC-scoped notification bell.**
+- A bell icon (desktop sidebar and mobile sticky header, same dual-placement pattern ThemeToggle already
+  uses) with a red count badge and a dropdown of clickable action items - "what needs my attention right
+  now", scoped to what each role actually does in the confirmed Cobro workflow, not to everything a
+  permission technically allows:
+  - **Admin**: items below reorder point (their purchasing trigger) and store-sourced requisitions
+    awaiting approval
+  - **Stores Manager / Stores Clerk**: requisitions awaiting approval and purchase orders awaiting
+    receiving
+  - **Engineer / Requester**: their own requisitions approved and ready to collect, and any pickup
+    requests sourced from their own station awaiting their approval
+- Deliberately NOT a persisted notification feed - no `notifications` table, no read/unread state, no
+  timestamps. There's no backend to persist or push them yet, and inventing one would be a second,
+  competing source of truth for state this app already derives live everywhere else (the ledger view, the
+  Reserved-cell popover, the Overview stat tiles). `src/lib/notifications.ts` recomputes a small snapshot
+  from the existing repositories on every render instead
+- The clearest case for scoping by job, not by permission: Admin holds `manage_receiving` via `'*'`, but
+  receiving is Stores' physical job (Admin purchases; Stores receives, reserves and issues) - so "purchase
+  orders awaiting receiving" is a Stores notification only, even though Admin could technically open that
+  page
+- The dropdown is portalled to `document.body` and positioned with `fixed` coordinates read off the
+  button's own rect (same technique as `ScanMovement`'s and `QuickRequisitionButton`'s dialogs) - the
+  desktop sidebar sets `overflow-y-auto`, which per the CSS overflow spec forces the x-axis to `auto` too,
+  so a plain `absolute` dropdown was silently clipped to the sidebar's own width instead of floating over
+  the main content
+- Verified live for Admin, Stores Manager, and Engineer (each shows exactly its scoped items, including
+  the correct empty "You're all caught up" state), on both desktop and mobile
+- Files added: `src/lib/notifications.ts`, `src/app/dashboard/notification-bell.tsx`. Changed:
+  `src/app/dashboard/layout.tsx`
+
+**Scan dialog copy.**
+- "Scan the item"'s subtitle changed from "Scan an item to start counting it. Nothing is posted yet." to
+  "Scan to check-in / check-out stock."
+- The code-number field's placeholder changed from "Type or scan the code number" to "Type product id code
+  or scan QR code"
+- Files changed: `src/app/dashboard/scan-movement.tsx`
+
+- `npx tsc --noEmit` and `npm run lint` both clean
+
 ## v0.23.0 — 2026-09-06
 
 **Mobile-only Scan-first layout for "Record a stock movement".**

@@ -5,14 +5,17 @@ import { getSession } from '@/lib/auth';
 import { isUsingMockData, roleRepository } from '@/lib/data';
 import { signOutAction } from '@/app/dashboard/actions';
 import { NavLink } from '@/app/dashboard/nav-link';
+import { NotificationBell } from '@/app/dashboard/notification-bell';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NAV_ITEMS } from '@/lib/nav-items';
+import { getNotifications } from '@/lib/notifications';
 import { hasPermission } from '@/lib/permissions';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect('/login');
   const role = await roleRepository.getById(session.roleId);
+  const notifications = await getNotifications(session);
   // Menu visibility is the first of three separate RBAC layers (menu, route,
   // action/API) - hiding a link here is never the actual security boundary,
   // every route below independently re-checks the same permission. See
@@ -73,7 +76,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
           alongside the icon-only copy in the mobile header for one-tap access
           without opening the drawer first.
         */}
-        <ThemeToggle className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-accent/50 bg-surface-2 px-3 py-2.5 text-[0.86rem] font-bold text-accent-strong transition-colors hover:border-accent hover:bg-accent/10" />
+        <div className="flex items-center gap-2">
+          <ThemeToggle className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-accent/50 bg-surface-2 px-3 py-2.5 text-[0.86rem] font-bold text-accent-strong transition-colors hover:border-accent hover:bg-accent/10" />
+          <NotificationBell
+            items={notifications}
+            buttonClassName="flex h-11 w-11 flex-none items-center justify-center rounded-xl border-2 border-accent/50 bg-surface-2 text-accent-strong transition-colors hover:border-accent hover:bg-accent/10"
+            menuAlign="left"
+          />
+        </div>
 
         <nav className="flex flex-1 flex-col gap-0.5">
           {visibleNavItems.map((item) => (
@@ -138,8 +148,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
             className="brand-logo h-8 w-auto"
           />
           {/* On phones the sidebar (and its toggle) is behind the drawer, so the
-              theme switch gets its own always-visible spot in the header. */}
-          <ThemeToggle className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg border-2 border-accent/50 bg-surface-2 text-accent-strong transition-colors hover:border-accent hover:bg-accent/10 [&>span:last-child]:sr-only" />
+              theme switch and the bell get their own always-visible spot in
+              the header. */}
+          <div className="ml-auto flex items-center gap-2">
+            <NotificationBell
+              items={notifications}
+              buttonClassName="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-accent/50 bg-surface-2 text-accent-strong transition-colors hover:border-accent hover:bg-accent/10"
+              menuAlign="right"
+            />
+            <ThemeToggle className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-accent/50 bg-surface-2 text-accent-strong transition-colors hover:border-accent hover:bg-accent/10 [&>span:last-child]:sr-only" />
+          </div>
         </header>
 
         {isUsingMockData && (

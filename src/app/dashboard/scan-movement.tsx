@@ -543,7 +543,7 @@ export function ScanMovement({
               </p>
             )}
             <p className="mb-3 text-[0.83rem] text-text-muted">
-              Scan an item to start counting it. Nothing is posted yet.
+              Scan to check-in / check-out stock.
             </p>
 
             {/* The scan input is the first, most prominent thing on this screen. */}
@@ -553,7 +553,7 @@ export function ScanMovement({
               onChange={setScanTyped}
               confirmed={scanConfirmed}
               disabled={busy}
-              placeholder="Type or scan the code number"
+              placeholder="Type product id code or scan QR code"
               onSubmitCode={(code) => void identify(code)}
               onOpenCamera={() => setCameraOpen(true)}
             />
