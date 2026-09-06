@@ -4,6 +4,14 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.24.1 — 2026-09-06
+
+**Scan dialog subtitle, larger.**
+- "Scan the item"'s subtitle ("Scan to check-in / check-out stock.") bumped from 0.83rem to 1.33rem
+- Confirmed the notification bell's count badge (added in v0.24.0) is already live on both desktop and
+  mobile - Admin shows "2", Engineer correctly shows none at zero - no code change needed for that
+- Files changed: `src/app/dashboard/scan-movement.tsx`
+
 ## v0.24.0 — 2026-09-06
 
 **New: RBAC-scoped notification bell.**

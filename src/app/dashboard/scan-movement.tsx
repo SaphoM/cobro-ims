@@ -542,7 +542,7 @@ export function ScanMovement({
                 <span>{lastPosted}</span>
               </p>
             )}
-            <p className="mb-3 text-[0.83rem] text-text-muted">
+            <p className="mb-3 text-[1.33rem] text-text-muted">
               Scan to check-in / check-out stock.
             </p>
 
