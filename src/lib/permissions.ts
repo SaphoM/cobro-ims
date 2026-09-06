@@ -24,18 +24,58 @@ export type Permission =
   | 'manage_transfers'
   | 'request_adjustments'
   | 'approve_adjustments'
+  /** Create a draft requisition — Stores roles and Engineer/Requester alike. Separate from
+   *  `manage_sales_orders` (approve/issue/cancel, Stores-only) so an Engineer can raise a
+   *  request without being able to process anyone's, their own included. */
+  | 'create_requisitions'
   | 'manage_sales_orders'
   | 'manage_invoices'
   | 'manage_suppliers'
   | 'manage_customers'
   | 'manage_pricing'
+  /** Create/edit users and change roles — Admin only. See docs/ARCHITECTURE.md §1 (user/role model). */
+  | 'manage_users'
   | 'view_reports';
 
+/**
+ * Four roles, matching Cobro's actual operating structure — not a generic
+ * ERP hierarchy. See docs/ARCHITECTURE.md §1 for the full rationale and the
+ * migration from the previous (admin/warehouse_clerk/procurement/viewer) set.
+ *
+ *   admin              — system administration, purchasing, supplier management, product/
+ *                         category management, thresholds, reporting, management visibility.
+ *                         Consolidates what used to be separate Procurement and Viewer roles.
+ *                         Multiple Admins are expected and fully supported — nothing here or
+ *                         in the user model treats Admin as a singleton.
+ *   stores_manager     — the operational store/inventory function: receive, scan in, reserve,
+ *                         process requisitions, issue, scan out, transfer, catalogue upkeep.
+ *                         Not system administration — creating users/Admins stays Admin-only.
+ *   stores_clerk       — day-to-day store transactions: the same physical stock actions as
+ *                         Stores Manager, minus catalogue/threshold management.
+ *   engineer_requester — factory-floor staff who request MRO stock on behalf of their section
+ *                         (see `area` on User). Can create and track their own requisitions;
+ *                         cannot approve, issue, or otherwise touch the inventory ledger.
+ */
 const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
   admin: '*',
-  warehouse_clerk: ['manage_receiving', 'manage_transfers', 'request_adjustments', 'manage_sales_orders', 'view_reports'],
-  procurement: ['manage_purchase_orders', 'manage_suppliers', 'manage_receiving', 'view_reports'],
-  viewer: ['view_reports'],
+  stores_manager: [
+    'manage_catalogue',
+    'manage_receiving',
+    'manage_transfers',
+    'request_adjustments',
+    'create_requisitions',
+    'manage_sales_orders',
+    'view_reports',
+  ],
+  stores_clerk: [
+    'manage_receiving',
+    'manage_transfers',
+    'request_adjustments',
+    'create_requisitions',
+    'manage_sales_orders',
+    'view_reports',
+  ],
+  engineer_requester: ['create_requisitions'],
 };
 
 // Approving an adjustment is the one action in the whole app that posts a

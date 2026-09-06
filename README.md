@@ -131,11 +131,14 @@ accounts, one per RBAC role, are shown on the page itself with one-click autofil
 `src/lib/demo-credentials.ts`) — pick a role to see what it can and can't do:
 
 ```
-Admin          demo@cobroconcrete.co.za         CobroDemo2026
-Warehouse clerk clerk@cobroconcrete.co.za        CobroClerk2026
-Procurement    procurement@cobroconcrete.co.za   CobroProcure2026
-Viewer         viewer@cobroconcrete.co.za        CobroViewer2026
+Admin              demo@cobroconcrete.co.za          CobroDemo2026
+Stores Manager     storesmanager@cobroconcrete.co.za CobroStoresMgr2026
+Stores Clerk       clerk@cobroconcrete.co.za         CobroClerk2026
+Engineer / Requester engineer@cobroconcrete.co.za    CobroEngineer2026
 ```
+
+Any user created via `/dashboard/users` (Admin-only) can also sign in immediately, using the documented
+mock default password — see §8.
 
 There is **no real backend**. The entire app runs on an in-memory mock data layer (`src/lib/data/mock`)
 that resets every time the dev server restarts. This is deliberate for the current phase — see §4.
@@ -280,7 +283,21 @@ applied (see `supabase/migrations/20260816100000_audit_log_immutability.sql`).
   request from a department/workshop: draft (nothing reserved) → approve (reserves stock, no ledger
   movement, no WAC change) → issue (posts the real outbound movement at the ledger's current WAC, releases
   the reservation) or cancel from draft/approved (releases any reservation, posts nothing). Order numbers
-  are `REQ-####`.
+  are `REQ-####`. Creating one only needs the `create_requisitions` permission (Stores Manager, Stores
+  Clerk, and Engineer / Requester all hold it); approving/issuing/cancelling stays on `manage_sales_orders`
+  (Stores only, not Engineer). An Engineer / Requester sees and can raise only their own requisitions here,
+  tagged with their **Area**; every other role sees the full list, each row showing who requested it and
+  from which area. See **User management** below and `docs/ARCHITECTURE.md` §1.
+- **User management** (`/dashboard/users`, Admin-only) — create users (Name, Email, Role, and an Area when
+  the role is Engineer / Requester) and change an existing user's role, area, or active status. Four roles
+  today: **Admin** (everything — system config, purchasing, suppliers, catalogue, thresholds, reporting;
+  more than one Admin is fully supported), **Stores Manager** and **Stores Clerk** (the operational store
+  function — receive, scan in/out, reserve, process and issue requisitions, transfer stock; no system
+  administration), and **Engineer / Requester** (raises and tracks their own requisitions, tied to a
+  factory Area — Mechanical, Electrical, Workshop, Maintenance, etc. — but never touches the inventory
+  ledger directly). Every user-admin action (create, role change, area change, activate/deactivate) is
+  audited. A user created here can sign in immediately with a documented default password (mock auth only,
+  see §8) — real per-user credentials are a §11 authentication-phase item.
 - **Suppliers** (`/dashboard/suppliers`) and **Departments** (`/dashboard/customers` — route unchanged) —
   list + add, feeding the pickers on receiving/purchase orders and requisitions respectively.
 - **Invoicing & billing** (`/dashboard/invoices`) — **dormant per §1.1.** Still fully functional if visited
@@ -335,8 +352,9 @@ correct — with the resulting quantities/costs/VAT amounts hand-verified agains
 | WAC costing math | Real business logic, pure functions, exercised by every workflow |
 | Every module in §7 | Real logic and UI, running against the mock data layer |
 | Database schema | Written (`supabase/migrations/`), **not applied anywhere yet** |
-| Auth | Mock — 4 hardcoded demo user/password pairs, cookie session. **Deferred by direction.** No password hashing, no real Supabase Auth. |
-| RBAC | **Real enforcement** — every mutating Server Action checks a permission via `src/lib/permissions.ts`; 4 demo accounts (one per role) to test with. The matrix itself is still a placeholder pending Cobro sign-off |
+| Auth | Mock — 4 hardcoded demo user/password pairs, plus a shared `NEW_USER_DEFAULT_PASSWORD` any user created via `/dashboard/users` can sign in with, cookie session. **Deferred by direction.** No password hashing, no real Supabase Auth. |
+| RBAC | **Real enforcement** — every mutating Server Action checks a permission via `src/lib/permissions.ts`; 4 roles (Admin, Stores Manager, Stores Clerk, Engineer / Requester), one demo account per role. The matrix itself is still a placeholder pending Cobro sign-off |
+| User management (`/dashboard/users`) | **Real** — Admin-only create user + edit role/area/active-status, fully audited. Multiple Admins verified live. Editing name/email after creation isn't built yet, §11 |
 | Audit log | **Real** — every audited action writes an append-only entry, viewable at `/dashboard/audit-log`. DB-level immutability trigger written, not applied (no live project) |
 | Accounting integration (Sage/QuickBooks/Xero) | Not started — **explicitly deferred by client decision**, not just unchosen (§7.5) |
 | Requisitions (draft → approve → issue), internal stock requests | Real logic and UI — repurposed from Sales & Dispatch, §1.1 |
@@ -361,7 +379,8 @@ the RFQ / SoW does not define them. Confirm with Cobro before further engineerin
    6-month post-delivery support window — the full RFQ scope is a lot for this budget/timeline.
 2. **Permission matrix per role.** `src/lib/permissions.ts` now *enforces* a real matrix, but it's a
    placeholder built from plausible role responsibilities, not one the RFQ defines or Cobro confirmed —
-   e.g. only `admin` can approve/reject adjustments, manage the catalogue, or manage customers today.
+   e.g. only `admin` can approve/reject adjustments or manage users today; catalogue/threshold management
+   is `admin` and `stores_manager` only.
 3. **BOM structure.** Flat one-level (parent → component) is built and working (`/dashboard/bom`, with a
    BOM explosion calculator). Does Cobro need nested/multi-level BOM instead — a schema change, not a UI one?
 4. **Adjustment reason codes.** Seeded with plausible defaults (`BREAKAGE`, `CYCLE_COUNT`, `THEFT_LOSS`,
@@ -376,10 +395,11 @@ the RFQ / SoW does not define them. Confirm with Cobro before further engineerin
    `manage_sales_orders` permission as creating and issuing — there's no distinct approver role or
    second-approver check. Does Cobro need a real approval chain (e.g. a supervisor sign-off separate from
    the person who can issue stock)?
-10. **A distinct "requesting user" / "requester" role.** The current roles (admin, warehouse_clerk,
-    procurement, viewer) don't include a role for workshop staff who should be able to *create* a
-    requisition but not manage receiving, transfers, or the catalogue. Not invented here — see §9.2 of
-    `docs/ARCHITECTURE.md`.
+10. **A distinct "requesting user" / "requester" role — now resolved.** The roles are now Admin, Stores
+    Manager, Stores Clerk, and **Engineer / Requester** — workshop/factory staff who can *create* a
+    requisition, tagged to their Area, but never manage receiving, transfers, or the catalogue directly.
+    See `docs/ARCHITECTURE.md` §1 for the implementation and what it still leaves open (editing a user's
+    name/email, and whether the Area list should become Admin-managed instead of a fixed constant).
 11. **Partial issues.** Not supported — a requisition is issued in full or not at all, the same all-or-
     nothing behaviour the underlying dispatch logic already had. Does Cobro need partial fulfilment?
 12. **Who can cancel a requisition.** Currently anyone with `manage_sales_orders` (the same permission that
@@ -404,6 +424,8 @@ supabase/migrations/            Postgres schema, schema-as-code, not yet applied
 
 src/lib/domain/inventory.ts     TypeScript types mirroring the schema, by hand, kept in sync manually
 src/lib/permissions.ts          RBAC: Permission type, ROLE_PERMISSIONS matrix, hasPermission/requirePermission
+src/lib/areas.ts                Fixed factory Area list (Mechanical, Electrical, Workshop, ...) for the
+                                 Engineer / Requester role — not an Admin-managed table, see §9.10
 src/lib/data/
   repositories.ts                 Repository INTERFACES — the seam every service/page depends on
   index.ts                        Single entry point; DATA_SOURCE switch (mock today, supabase later)
@@ -445,6 +467,7 @@ src/app/
     labels/                          Print-ready label sheets with real QR (@media print, .no-print)
     audit-log/                      Append-only audit trail viewer
     security/                       Mock 2FA enrollment, gating the most sensitive action
+    users/                          Admin-only user management: create user, edit role/area/active status
 
 docs/ARCHITECTURE.md            The running decision log — phase status, what's real/mocked, open
                                  business decisions, next steps in order. Update it as phases complete.
@@ -458,8 +481,10 @@ CHANGELOG.md                    Version-by-version build history (semver, pre-1.
 1. **Resolve §9.1 (MVP cut-line) and §9.2 (permission matrix) with the client** before committing further
    engineering time — both materially change what's built next.
 2. **Authentication phase:** real Supabase project + Supabase Auth, replacing `src/lib/auth.ts` —
-   including real password hashing; the 2FA *gate* already exists (§7), but real Supabase Auth MFA (an
-   actual authenticator app) still needs to replace the mock flag-flip in `/dashboard/security`.
+   including real per-user password hashing (retiring both the hardcoded `DEMO_ACCOUNTS` list and the
+   shared `NEW_USER_DEFAULT_PASSWORD` a `/dashboard/users`-created account signs in with today); the 2FA
+   *gate* already exists (§7), but real Supabase Auth MFA (an actual authenticator app) still needs to
+   replace the mock flag-flip in `/dashboard/security`.
 3. **Core Data phase:** apply all migrations (including the audit-log immutability trigger) to that
    project, replace the mock repositories with real Supabase-backed ones behind the same interfaces.
 4. **Accounting integration:** explicitly deferred by client decision — do not build ahead of a future,
@@ -476,4 +501,8 @@ CHANGELOG.md                    Version-by-version build history (semver, pre-1.
    duplicates, and that every opening-stock SKU exists in the product file) before that data can self-load.
    Demo/dummy data must stay clearly separate from whatever Cobro's real import produces.
 7. **PDF/Excel report export.** Only CSV export exists today; the RFQ mentions PDF and Excel too.
-8. **Phase 8:** system testing, UAT, training materials, production cutover.
+8. **User management follow-ons.** An edit-name/edit-email form on `/dashboard/users` (create + role/area/
+   active status exist today; identity fields don't), and a decision on whether the factory Area list
+   (`src/lib/areas.ts`) stays a fixed constant or becomes a repository-backed, Admin-managed list — see
+   §9.10 and `docs/ARCHITECTURE.md` §1/§5.
+9. **Phase 8:** system testing, UAT, training materials, production cutover.

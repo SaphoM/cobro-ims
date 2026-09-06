@@ -4,6 +4,49 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.18.0 — 2026-09-06
+
+**User roles & access model update — 4 roles matching Cobro's real operating structure, plus an
+Admin-only user management screen (no rebuild of auth, DB architecture, or inventory logic).**
+- Replaced the old roles (Admin, Warehouse Clerk, Procurement, Viewer) with exactly four: **Admin**
+  (consolidates system admin, purchasing, supplier/catalogue/threshold management, and reporting —
+  Procurement, Viewer, and Management are no longer separate roles), **Stores Manager** and **Stores
+  Clerk** (the operational store function: receive, scan in/out, reserve, process/issue requisitions,
+  transfer — no system administration), and **Engineer / Requester** (raises and tracks their own
+  requisitions, tied to a factory **Area**, never touches the inventory ledger directly)
+- Split the old `manage_sales_orders` permission in two: `create_requisitions` (Stores Manager, Stores
+  Clerk, Engineer / Requester) and `manage_sales_orders` kept for approve/issue/cancel (Stores only) —
+  the one substantive change to requisition permission logic, needed so an Engineer can create but never
+  approve their own or anyone else's requisition
+- New `/dashboard/users` screen (Admin-only, added `manage_users` permission): create a user (Name,
+  Email, Role, and an Area when the role is Engineer / Requester) and change an existing user's role,
+  area, or active status — every action audited. Multiple Admins are fully supported, not a singleton
+- Added `User.area: string | null` to the domain type and a fixed `FACTORY_AREAS` list
+  (`src/lib/areas.ts`); Requester/Area now show on every requisition row, derived from the existing
+  `createdBy` field — no schema change to the Requisition itself
+- Extended mock auth so a user created via the new screen can sign in immediately, with a documented
+  shared default password (`NEW_USER_DEFAULT_PASSWORD`) alongside the 4 demo accounts — still exactly as
+  much auth as before, no real per-user credentials, no password hashing; also added the deactivated-
+  account sign-in rejection this exposed as a gap
+- Migrated seed data in place (same 4 user/role IDs, remapped names/emails/roles) rather than deleting
+  and recreating — safe because this is mock/demo data with no real Cobro users yet
+- Verified live end-to-end: second Admin created and signed in independently; Engineer created a
+  requisition with an Area and was correctly refused (server-side, not just UI-hidden) when attempting to
+  approve it; Stores Clerk approved and issued it (ledger 1,840 → 1,835 at the correct WAC); audit log
+  entries confirmed for user creation, role/area changes, and the requisition actions; Stores Clerk denied
+  access to `/dashboard/users`; 36px control standard and mobile/responsive layout re-checked
+- `npx tsc --noEmit` and `npm run lint` both clean (only the pre-existing, explicitly-deferred
+  `static-version/` errors remain, untouched)
+- Explicitly untouched: authentication architecture, database schema/migrations, WAC inventory engine,
+  dashboard visual design, accounting/customer-sales scope, `static-version/`
+- Files changed: `src/lib/permissions.ts`, `src/lib/data/repositories.ts`,
+  `src/lib/data/mock/repositories.ts`, `src/lib/data/mock/seed.ts`, `src/lib/demo-credentials.ts`,
+  `src/lib/auth.ts`, `src/lib/domain/inventory.ts`, `src/app/dashboard/layout.tsx`,
+  `src/app/dashboard/sales/actions.ts`, `src/app/dashboard/sales/page.tsx`,
+  `src/app/dashboard/scan/scan-help.tsx`, `README.md`, `docs/ARCHITECTURE.md`. New:
+  `src/lib/areas.ts`, `src/app/dashboard/users/page.tsx`, `src/app/dashboard/users/actions.ts`,
+  `src/app/dashboard/users/user-form.tsx`, `src/app/dashboard/users/user-row-actions.tsx`
+
 ## v0.17.2 — 2026-08-16
 
 **Make the v0.17.1 select/input height fix hold across browser engines.**

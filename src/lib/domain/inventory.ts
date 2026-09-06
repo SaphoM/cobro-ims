@@ -23,6 +23,12 @@ export interface User {
   email: string;
   fullName: string;
   roleId: UUID;
+  /**
+   * Factory section/area — only meaningful for the Engineer / Requester
+   * role (which section they request stock on behalf of). Null for every
+   * other role. See src/lib/areas.ts for the selectable list.
+   */
+  area: string | null;
   isActive: boolean;
   mfaEnrolled: boolean;
   createdAt: ISODateTime;

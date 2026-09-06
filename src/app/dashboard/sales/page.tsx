@@ -1,4 +1,5 @@
-import { customerRepository, productRepository, salesOrderRepository, warehouseRepository } from '@/lib/data';
+import { customerRepository, productRepository, roleRepository, salesOrderRepository, userRepository, warehouseRepository } from '@/lib/data';
+import { getSession } from '@/lib/auth';
 import { SalesOrderForm } from '@/app/dashboard/sales/sales-order-form';
 import { RequisitionActionsCell } from '@/app/dashboard/sales/requisition-actions-cell';
 import type { SalesOrderStatus } from '@/lib/domain/inventory';
@@ -9,16 +10,27 @@ export default async function SalesPage({
   searchParams: Promise<{ barcode?: string }>;
 }) {
   const { barcode } = await searchParams;
-  const [customers, warehouses, products, orders] = await Promise.all([
+  const [customers, warehouses, products, allOrders, users, session] = await Promise.all([
     customerRepository.list(),
     warehouseRepository.list(),
     productRepository.list(),
     salesOrderRepository.list(),
+    userRepository.list(),
+    getSession(),
   ]);
+
+  const role = session ? await roleRepository.getById(session.roleId) : null;
+  // Engineer / Requester sees only requisitions they raised themselves -
+  // they request stock, they don't process anyone else's request (see
+  // docs/ARCHITECTURE.md §1). Every other role still sees the full list,
+  // same as before this role model existed.
+  const isEngineer = role?.name === 'engineer_requester';
+  const orders = isEngineer && session ? allOrders.filter((o) => o.createdBy === session.id) : allOrders;
 
   const customerById = new Map(customers.map((c) => [c.id, c]));
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
   const productById = new Map(products.map((p) => [p.id, p]));
+  const userById = new Map(users.map((u) => [u.id, u]));
 
   return (
     <div className="flex flex-col gap-6">
@@ -35,16 +47,22 @@ export default async function SalesPage({
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">
-          <h2 className="font-display text-[1.05rem] font-medium text-text">Requisitions</h2>
+          <h2 className="font-display text-[1.05rem] font-medium text-text">
+            {isEngineer ? 'Your requisitions' : 'Requisitions'}
+          </h2>
         </div>
         {orders.length === 0 ? (
-          <p className="px-5 py-6 text-[0.85rem] text-text-faint">No requisitions yet.</p>
+          <p className="px-5 py-6 text-[0.85rem] text-text-faint">
+            {isEngineer ? "You haven't raised any requisitions yet." : 'No requisitions yet.'}
+          </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] border-collapse text-[0.86rem]">
+            <table className="w-full min-w-[940px] border-collapse text-[0.86rem]">
               <thead>
                 <tr className="text-left text-text-faint">
                   <th className="px-5 py-2.5 font-medium">Requisition</th>
+                  <th className="px-5 py-2.5 font-medium">Requested by</th>
+                  <th className="px-5 py-2.5 font-medium">Area</th>
                   <th className="px-5 py-2.5 font-medium">Department</th>
                   <th className="px-5 py-2.5 font-medium">Product</th>
                   <th className="px-5 py-2.5 font-medium">Store</th>
@@ -57,9 +75,12 @@ export default async function SalesPage({
               <tbody>
                 {orders.map((o) => {
                   const product = productById.get(o.productId);
+                  const requester = userById.get(o.createdBy);
                   return (
                     <tr key={o.id} className="border-t border-accent/[0.08]">
                       <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{o.orderNumber}</td>
+                      <td className="px-5 py-3 text-text-muted">{requester?.fullName ?? 'Unknown'}</td>
+                      <td className="px-5 py-3 text-text-muted">{requester?.area ?? '—'}</td>
                       <td className="px-5 py-3 text-text-muted">{customerById.get(o.customerId)?.name}</td>
                       <td className="px-5 py-3 text-text-muted">
                         {product?.sku} <span className="text-text-faint">- {product?.name}</span>

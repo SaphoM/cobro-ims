@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/labels', label: 'Product labels' },
   { href: '/dashboard/audit-log', label: 'Audit log' },
   { href: '/dashboard/security', label: 'Security (2FA)' },
+  { href: '/dashboard/users', label: 'Users' },
 ];
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {

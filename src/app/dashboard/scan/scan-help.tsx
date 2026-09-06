@@ -164,17 +164,17 @@ export function ScanHelp() {
                 <ul className="space-y-2">
                   <li>
                     <strong className="text-text">Look up only</strong> - reads a code and shows stock.
-                    Posts nothing. Any signed-in role can use it, including Viewer.
+                    Posts nothing. Any signed-in role can use it, including Engineer / Requester.
                   </li>
                   <li>
                     <strong className="text-text">Scan IN</strong> - posts a receipt (stock up). Needs
-                    the receiving permission - Admin, Warehouse clerk and Procurement have it; Viewer
-                    doesn&apos;t.
+                    the receiving permission - Admin, Stores Manager and Stores Clerk have it; Engineer /
+                    Requester doesn&apos;t.
                   </li>
                   <li>
                     <strong className="text-text">Scan OUT</strong> - posts an issue (stock down). Needs
-                    the requisition-issuing permission - Admin and Warehouse clerk have it; Procurement
-                    and Viewer don&apos;t.
+                    the requisition-issuing permission - Admin, Stores Manager and Stores Clerk have it;
+                    Engineer / Requester doesn&apos;t.
                   </li>
                 </ul>
               </HelpSection>

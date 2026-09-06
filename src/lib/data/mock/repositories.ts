@@ -42,6 +42,7 @@ import type {
   CreateProductInput,
   CreateSalesOrderInput,
   CreateSupplierInput,
+  CreateUserInput,
   CustomerRepository,
   InitiateTransferInput,
   InvoiceRepository,
@@ -873,6 +874,47 @@ export const mockUserRepository: UserRepository = {
   },
   async list() {
     return state.users;
+  },
+  async create(input: CreateUserInput) {
+    const email = input.email.trim().toLowerCase();
+    if (state.users.some((u) => u.email.toLowerCase() === email)) {
+      throw new Error(`A user with the email ${email} already exists.`);
+    }
+    const now = new Date().toISOString();
+    const user: User = {
+      id: randomUUID(),
+      email,
+      fullName: input.fullName,
+      roleId: input.roleId,
+      area: input.area ?? null,
+      isActive: true,
+      mfaEnrolled: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    state.users.push(user);
+    return user;
+  },
+  async updateRole(userId, roleId) {
+    const user = state.users.find((u) => u.id === userId);
+    if (!user) throw new Error('User not found.');
+    user.roleId = roleId;
+    user.updatedAt = new Date().toISOString();
+    return user;
+  },
+  async updateArea(userId, area) {
+    const user = state.users.find((u) => u.id === userId);
+    if (!user) throw new Error('User not found.');
+    user.area = area;
+    user.updatedAt = new Date().toISOString();
+    return user;
+  },
+  async setActive(userId, active) {
+    const user = state.users.find((u) => u.id === userId);
+    if (!user) throw new Error('User not found.');
+    user.isActive = active;
+    user.updatedAt = new Date().toISOString();
+    return user;
   },
   async setMfaEnrolled(userId, enrolled) {
     const user = state.users.find((u) => u.id === userId);

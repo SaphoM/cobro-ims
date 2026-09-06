@@ -22,37 +22,77 @@ import type {
 // permissions.ts; what's stored on each role here is descriptive/seed data,
 // matching it by convention. See docs/ARCHITECTURE.md §5.2 — this whole
 // matrix is a placeholder pending Cobro confirmation, not settled policy.
+//
+// Four roles matching Cobro's real operating structure (Admin / Stores
+// Manager / Stores Clerk / Engineer-Requester) — not a generic ERP set.
+// Migrated from the previous five: Procurement and Viewer are consolidated
+// into Admin, Warehouse Clerk becomes Stores Clerk, and Stores Manager is
+// new (there was no separate "manager" tier before). See
+// docs/ARCHITECTURE.md §1 for the full rationale.
 export const roles: Role[] = [
-  { id: 'role-admin', name: 'admin', description: 'Full system access', permissions: { '*': true }, createdAt: '2026-01-01T00:00:00Z' },
+  { id: 'role-admin', name: 'admin', description: 'Admin', permissions: { '*': true }, createdAt: '2026-01-01T00:00:00Z' },
   {
-    id: 'role-warehouse',
-    name: 'warehouse_clerk',
-    description: 'Receiving, transfers, stock-take requests, sales dispatch',
-    permissions: { manage_receiving: true, manage_transfers: true, request_adjustments: true, manage_sales_orders: true, view_reports: true },
+    id: 'role-stores-manager',
+    name: 'stores_manager',
+    description: 'Stores Manager',
+    permissions: {
+      manage_catalogue: true,
+      manage_receiving: true,
+      manage_transfers: true,
+      request_adjustments: true,
+      create_requisitions: true,
+      manage_sales_orders: true,
+      view_reports: true,
+    },
     createdAt: '2026-01-01T00:00:00Z',
   },
   {
-    id: 'role-procurement',
-    name: 'procurement',
-    description: 'Purchase orders & suppliers',
-    permissions: { manage_purchase_orders: true, manage_suppliers: true, manage_receiving: true, view_reports: true },
+    id: 'role-stores-clerk',
+    name: 'stores_clerk',
+    description: 'Stores Clerk',
+    permissions: {
+      manage_receiving: true,
+      manage_transfers: true,
+      request_adjustments: true,
+      create_requisitions: true,
+      manage_sales_orders: true,
+      view_reports: true,
+    },
     createdAt: '2026-01-01T00:00:00Z',
   },
   {
-    id: 'role-viewer',
-    name: 'viewer',
-    description: 'Read-only dashboards & reports',
-    permissions: { view_reports: true },
+    id: 'role-engineer',
+    name: 'engineer_requester',
+    description: 'Engineer / Requester',
+    permissions: { create_requisitions: true },
     createdAt: '2026-01-01T00:00:00Z',
   },
 ];
 
+// Same four user IDs as before the role migration (only fullName/email/role/area
+// changed) — nothing in seed data ever referenced these by role-specific
+// meaning, so remapping in place preserves every ID any future seeded
+// audit/requisition record could point at. See docs/ARCHITECTURE.md §1 for
+// the exact old-role -> new-role mapping (Procurement/Viewer -> Admin,
+// Warehouse Clerk -> Stores Clerk).
 export const users: User[] = [
   {
     id: 'user-demo',
     email: 'demo@cobroconcrete.co.za',
     fullName: 'Demo Admin',
     roleId: 'role-admin',
+    area: null,
+    isActive: true,
+    mfaEnrolled: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'user-procurement',
+    email: 'storesmanager@cobroconcrete.co.za',
+    fullName: 'Demo Stores Manager',
+    roleId: 'role-stores-manager',
+    area: null,
     isActive: true,
     mfaEnrolled: false,
     createdAt: '2026-01-01T00:00:00Z',
@@ -61,18 +101,9 @@ export const users: User[] = [
   {
     id: 'user-clerk',
     email: 'clerk@cobroconcrete.co.za',
-    fullName: 'Demo Warehouse Clerk',
-    roleId: 'role-warehouse',
-    isActive: true,
-    mfaEnrolled: false,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-  },
-  {
-    id: 'user-procurement',
-    email: 'procurement@cobroconcrete.co.za',
-    fullName: 'Demo Procurement',
-    roleId: 'role-procurement',
+    fullName: 'Demo Stores Clerk',
+    roleId: 'role-stores-clerk',
+    area: null,
     isActive: true,
     mfaEnrolled: false,
     createdAt: '2026-01-01T00:00:00Z',
@@ -80,9 +111,10 @@ export const users: User[] = [
   },
   {
     id: 'user-viewer',
-    email: 'viewer@cobroconcrete.co.za',
-    fullName: 'Demo Viewer',
-    roleId: 'role-viewer',
+    email: 'engineer@cobroconcrete.co.za',
+    fullName: 'Demo Engineer',
+    roleId: 'role-engineer',
+    area: 'Mechanical',
     isActive: true,
     mfaEnrolled: false,
     createdAt: '2026-01-01T00:00:00Z',

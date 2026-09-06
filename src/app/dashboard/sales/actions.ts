@@ -35,7 +35,7 @@ export async function createSalesOrderAction(
 ): Promise<SalesOrderFormState> {
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
-  if (!(await hasPermission(session, 'manage_sales_orders'))) {
+  if (!(await hasPermission(session, 'create_requisitions'))) {
     return { error: 'Your role does not have permission to create requisitions.', success: null };
   }
 

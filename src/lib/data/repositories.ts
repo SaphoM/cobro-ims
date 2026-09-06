@@ -330,10 +330,22 @@ export interface SettingsRepository {
   setShowCostsToAllRoles(visible: boolean): Promise<AppSettings>;
 }
 
+export interface CreateUserInput {
+  email: string;
+  fullName: string;
+  roleId: string;
+  /** Only meaningful for the Engineer / Requester role — see User.area. */
+  area?: string | null;
+}
+
 export interface UserRepository {
   findByEmail(email: string): Promise<User | null>;
   getById(id: string): Promise<User | null>;
   list(): Promise<User[]>;
+  create(input: CreateUserInput): Promise<User>;
+  updateRole(userId: string, roleId: string): Promise<User>;
+  updateArea(userId: string, area: string | null): Promise<User>;
+  setActive(userId: string, active: boolean): Promise<User>;
   /** RFQ Phase 6: 2FA enrollment status for privileged users. Mock — no real TOTP/authenticator, just the flag a real flow would set. */
   setMfaEnrolled(userId: string, enrolled: boolean): Promise<User>;
 }
