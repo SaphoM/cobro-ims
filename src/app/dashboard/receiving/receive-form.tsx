@@ -68,33 +68,58 @@ export function ReceiveForm({
   // picker comes back on its own.
   const onlyStore = warehouses.length === 1 ? warehouses[0] : null;
 
+  /*
+    Quantity received is a live scan tally now, not a typed number - the same
+    counting pattern the Overview's Scan dialog uses. The barcode that
+    identifies the item is itself the first one counted; every further scan
+    of the SAME barcode adds one more. `expectedQuantity` comes from a
+    COBRO2+ label (see src/lib/scan-payload.ts) and is shown alongside the
+    tally as e.g. "90/100" - it is display only, never enforced, since a
+    delivery legitimately can arrive short or over.
+  */
+  const [receivedCount, setReceivedCount] = useState(0);
+  const [expectedQuantity, setExpectedQuantity] = useState<number | null>(null);
+
   // Product and Supplier now only ever come from the scan (see those fields
   // below) - so posting is blocked until the scan has actually supplied
-  // both, rather than submitting with an empty productId/supplierId the
-  // server would just reject anyway. Store isn't gated here: it's either the
-  // one real store (shown as a fact) or, if a second store ever exists, an
-  // ordinary picker that always has a valid default.
-  const canPost = Boolean(selectedProductId) && Boolean(scannedSupplierId);
-  const quantityRef = useRef<HTMLInputElement>(null);
+  // both, and at least one unit has been counted, rather than submitting an
+  // empty productId/supplierId/quantity the server would just reject anyway.
+  // Store isn't gated here: it's either the one real store (shown as a fact)
+  // or, if a second store ever exists, an ordinary picker with a valid
+  // default.
+  const canPost = Boolean(selectedProductId) && Boolean(scannedSupplierId) && receivedCount > 0;
   const scanFormRef = useRef<HTMLFormElement>(null);
   const scanBarcodeRef = useRef<HTMLInputElement>(null);
 
   function matchBarcode(scanned: string) {
-    const { barcode, supplierId } = parseScanPayload(scanned);
+    const { barcode, supplierId, expectedQuantity: scannedExpectedQuantity } = parseScanPayload(scanned);
     const match = products.find((p) => p.barcode === barcode);
-    if (match) {
-      setSelectedProductId(match.id);
-      // Only trust a supplier the scan actually carried, and only one this
-      // instance knows about - a label printed against a supplier since
-      // removed shouldn't silently select something else.
-      const known = supplierId ? suppliers.some((s) => s.id === supplierId) : false;
-      setScannedSupplierId(known ? supplierId : null);
-      setScanMessage({ text: `Matched ${match.sku} - ${match.name}.`, ok: true });
-      quantityRef.current?.focus();
-    } else {
-      setScannedSupplierId(null);
+    if (!match) {
       setScanMessage({ text: `No product with barcode "${barcode}".`, ok: false });
+      return;
     }
+
+    // Re-scanning the SAME product just tallies one more (this is the
+    // counting gesture); scanning a DIFFERENT product starts a fresh receipt
+    // - new tally, new expected quantity, new supplier - rather than mixing
+    // two deliveries into one count.
+    const isSameProduct = match.id === selectedProductId;
+    setSelectedProductId(match.id);
+    setReceivedCount((count) => (isSameProduct ? count + 1 : 1));
+
+    // Only trust a supplier the scan actually carried, and only one this
+    // instance knows about - a label printed against a supplier since
+    // removed shouldn't silently select something else. A re-scan of the
+    // same item that happens not to carry one (unlikely, but the label is
+    // read fresh every time) doesn't clobber a supplier already established.
+    const known = supplierId ? suppliers.some((s) => s.id === supplierId) : false;
+    if (known) setScannedSupplierId(supplierId);
+    else if (!isSameProduct) setScannedSupplierId(null);
+
+    if (scannedExpectedQuantity != null) setExpectedQuantity(scannedExpectedQuantity);
+    else if (!isSameProduct) setExpectedQuantity(null);
+
+    setScanMessage({ text: `Matched ${match.sku} - ${match.name}.`, ok: true });
   }
 
   function handleBarcodeSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -179,12 +204,12 @@ export function ReceiveForm({
           */}
           {scanMessage.ok && scannedSupplier && (
             <p className="text-[0.78rem] text-text-muted">
-              Supplier <span className="font-bold text-accent-strong">{scannedSupplier.name}</span>
+              From <span className="font-bold text-accent-strong">{scannedSupplier.name}</span>
             </p>
           )}
           {scanMessage.ok && onlyStore && (
             <p className="text-[0.78rem] text-text-muted">
-              Store <span className="font-bold text-accent-strong">{onlyStore.code}</span>
+              To <span className="font-bold text-accent-strong">{onlyStore.code}</span>
             </p>
           )}
         </div>
@@ -193,7 +218,7 @@ export function ReceiveForm({
       <form action={formAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <label className="flex flex-col gap-1.5 lg:col-span-2">
           <span className="text-[0.75rem] font-semibold text-text-muted">
-            Supplier
+            From Supplier
             {scannedSupplier && <span className="ml-1 font-normal text-text-faint">from the label</span>}
           </span>
           {/*
@@ -218,7 +243,7 @@ export function ReceiveForm({
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Store</span>
+          <span className="text-[0.75rem] font-semibold text-text-muted">To Location</span>
           {onlyStore ? (
             <>
               <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
@@ -256,16 +281,30 @@ export function ReceiveForm({
 
         <label className="flex flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">Quantity received</span>
-          <input
-            ref={quantityRef}
-            type="number"
-            name="quantity"
-            min="0.001"
-            step="0.001"
-            required
-            placeholder="0"
-            className={inputClass}
-          />
+          {/*
+            Text, not an input - the count comes from scanning (re-scan the
+            same barcode to add one), same as the Overview's Scan dialog.
+            Shown as "received/expected" when the label carried an expected
+            quantity, updating live as each scan lands; just the received
+            count when it didn't, since there is nothing to compare against.
+            "Remove 1" is the only way to correct a miscount.
+          */}
+          <div className="flex h-9 items-center gap-2">
+            <span className="text-[0.95rem] font-bold tabular-nums text-accent-strong">
+              {receivedCount}
+              {expectedQuantity != null && <span className="text-text-faint"> / {expectedQuantity}</span>}
+            </span>
+            {receivedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setReceivedCount((count) => Math.max(0, count - 1))}
+                className="rounded-md border border-accent/30 px-2 py-0.5 text-[0.72rem] font-semibold text-text-muted transition-colors hover:border-accent/50 hover:text-accent-strong"
+              >
+                Remove 1
+              </button>
+            )}
+          </div>
+          <input type="hidden" name="quantity" value={receivedCount} />
         </label>
 
         <label className="flex flex-col gap-1.5">
@@ -318,11 +357,6 @@ export function ReceiveForm({
           >
             {pending ? 'Posting…' : 'Post receipt'}
           </button>
-          {!canPost && !pending && (
-            <p className="text-[0.78rem] text-text-faint">
-              Scan a Cobro delivery label above to set the product and supplier.
-            </p>
-          )}
         </div>
       </form>
 

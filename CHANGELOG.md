@@ -4,6 +4,33 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.30.0 — 2026-09-06
+
+**"From Supplier" / "To Location", and Quantity received is a live scan tally against an expected count.**
+- Field labels on the GRN card: Supplier is now "From Supplier", Store is now "To Location" (the summary
+  line above the fields reads "From X … To Y" the same way). Terminology-only - the underlying Store/
+  warehouse concept is unchanged
+- Removed the "Scan a Cobro delivery label above to set the product and supplier" hint paragraph under
+  Post receipt. The button's disabled-state tooltip (hover title) still explains why, just not as
+  always-visible page text
+- **QR labels can now also carry an expected quantity** - `scan-payload.ts` gains a COBRO2 format,
+  `COBRO1|<barcode>|<supplierId>|` extended to `COBRO2|<barcode>|<supplierId>|<expectedQuantity>`.
+  Versioned rather than replacing COBRO1, so every label already printed keeps scanning correctly forever.
+  Product Labels gained an optional "Quantity expected" field alongside Supplier
+- **Quantity received is now a live scan tally, not a typed number** - re-scanning the same barcode adds
+  one more, exactly like the Overview's Scan dialog's counting step. Shown as `received/expected` (e.g.
+  "2 / 100") when the label carried an expected quantity, updating in real time as each scan lands; just
+  the received count when it didn't, since there's nothing to compare against. A "Remove 1" button is the
+  only way to correct a miscount - verified live: three scans of the same COBRO2 label produced 1/100 →
+  2/100 → 3/100, and Remove 1 took it back to 2/100
+- Post receipt's readiness gate now also requires at least one unit counted (`receivedCount > 0`), on top
+  of Product and Supplier already being known
+- A genuinely different barcode scanned mid-receipt starts a fresh tally, expected quantity and supplier
+  rather than mixing two deliveries into one count; a re-scan of the SAME item that happens to omit a
+  supplier (label misread) doesn't clobber a supplier already established for that item
+- Files changed: `src/lib/scan-payload.ts`, `src/app/dashboard/labels/page.tsx`,
+  `src/app/dashboard/receiving/receive-form.tsx`
+
 ## v0.29.0 — 2026-09-06
 
 **Receive stock (GRN) is now fully scan-driven - no dropdowns left.**

@@ -12,7 +12,7 @@ const MAX_LABELS = 60;
 export default async function LabelsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ productId?: string; qty?: string; supplierId?: string }>;
+  searchParams: Promise<{ productId?: string; qty?: string; supplierId?: string; expectedQuantity?: string }>;
 }) {
   const session = await getSession();
   if (!session) {
@@ -29,22 +29,29 @@ export default async function LabelsPage({
     );
   }
 
-  const { productId, qty, supplierId } = await searchParams;
+  const { productId, qty, supplierId, expectedQuantity } = await searchParams;
   const [products, suppliers] = await Promise.all([productRepository.list(), supplierRepository.list()]);
   const sortedProducts = [...products].sort((a, b) => a.name.localeCompare(b.name));
 
   const selected = productId ? products.find((p) => p.id === productId) : null;
   const selectedSupplier = supplierId ? suppliers.find((s) => s.id === supplierId) ?? null : null;
   const requestedQty = Math.min(Math.max(Number(qty) || 1, 1), MAX_LABELS);
+  const parsedExpectedQuantity = Number(expectedQuantity);
+  const selectedExpectedQuantity =
+    Number.isFinite(parsedExpectedQuantity) && parsedExpectedQuantity > 0 ? parsedExpectedQuantity : null;
   /*
-    A delivery label can carry WHO it came from as well as WHAT it is, so
-    receiving scans once instead of scanning and then picking the supplier by
-    hand. With no supplier chosen this encodes the bare barcode exactly as
-    before - see src/lib/scan-payload.ts.
+    A delivery label can carry WHO it came from and HOW MANY units it should
+    contain, as well as WHAT it is, so receiving scans once instead of
+    scanning and then filling in the rest by hand. With neither chosen this
+    encodes the bare barcode exactly as before - see src/lib/scan-payload.ts.
   */
   const qrDataUrl = selected?.barcode
     ? await generateQrDataUrl(
-        encodeScanPayload({ barcode: selected.barcode, supplierId: selectedSupplier?.id ?? null })
+        encodeScanPayload({
+          barcode: selected.barcode,
+          supplierId: selectedSupplier?.id ?? null,
+          expectedQuantity: selectedExpectedQuantity,
+        })
       )
     : null;
 
@@ -96,6 +103,21 @@ export default async function LabelsPage({
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[0.75rem] font-semibold text-text-muted">
+            Quantity expected <span className="font-normal text-text-faint">(optional - encodes into the QR)</span>
+          </span>
+          <input
+            type="number"
+            name="expectedQuantity"
+            min="1"
+            step="1"
+            placeholder="e.g. 100"
+            defaultValue={selectedExpectedQuantity ?? ''}
+            className={`${inputClass} w-32`}
+          />
         </label>
 
         <label className="flex flex-col gap-1.5">
