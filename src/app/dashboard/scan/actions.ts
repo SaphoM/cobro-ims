@@ -19,6 +19,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
+import { parseScanPayload } from '@/lib/scan-payload';
 import {
   auditLogRepository,
   productRepository,
@@ -104,7 +105,11 @@ export interface ScanResult {
  * scan and a typed barcode resolve identically.
  */
 function normaliseScan(raw: string): string {
-  return raw.replace(/[\r\n\t]/g, '').trim();
+  // A Cobro label may wrap the barcode with extra fields (supplier, today) -
+  // unwrap it so a delivery label looks up the same product a bare barcode
+  // does. Anything that isn't a Cobro payload comes back unchanged, which is
+  // every manufacturer barcode. See src/lib/scan-payload.ts.
+  return parseScanPayload(raw).barcode;
 }
 
 function failure(message: string, barcode = '', extra: Partial<Pick<ScanResult, 'notFound' | 'needsUnitCost'>> = {}): ScanResult {

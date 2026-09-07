@@ -1,9 +1,10 @@
-import { productRepository } from '@/lib/data';
+import { productRepository, supplierRepository } from '@/lib/data';
 import { getSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 import { AccessDenied } from '@/components/access-denied';
 import { PrintButton } from '@/app/dashboard/labels/print-button';
 import { generateQrDataUrl } from '@/lib/services/qrcode';
+import { encodeScanPayload } from '@/lib/scan-payload';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 
 const MAX_LABELS = 60;
@@ -11,7 +12,7 @@ const MAX_LABELS = 60;
 export default async function LabelsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ productId?: string; qty?: string }>;
+  searchParams: Promise<{ productId?: string; qty?: string; supplierId?: string }>;
 }) {
   const session = await getSession();
   if (!session) {
@@ -28,13 +29,24 @@ export default async function LabelsPage({
     );
   }
 
-  const { productId, qty } = await searchParams;
-  const products = await productRepository.list();
+  const { productId, qty, supplierId } = await searchParams;
+  const [products, suppliers] = await Promise.all([productRepository.list(), supplierRepository.list()]);
   const sortedProducts = [...products].sort((a, b) => a.name.localeCompare(b.name));
 
   const selected = productId ? products.find((p) => p.id === productId) : null;
+  const selectedSupplier = supplierId ? suppliers.find((s) => s.id === supplierId) ?? null : null;
   const requestedQty = Math.min(Math.max(Number(qty) || 1, 1), MAX_LABELS);
-  const qrDataUrl = selected?.barcode ? await generateQrDataUrl(selected.barcode) : null;
+  /*
+    A delivery label can carry WHO it came from as well as WHAT it is, so
+    receiving scans once instead of scanning and then picking the supplier by
+    hand. With no supplier chosen this encodes the bare barcode exactly as
+    before - see src/lib/scan-payload.ts.
+  */
+  const qrDataUrl = selected?.barcode
+    ? await generateQrDataUrl(
+        encodeScanPayload({ barcode: selected.barcode, supplierId: selectedSupplier?.id ?? null })
+      )
+    : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -67,6 +79,20 @@ export default async function LabelsPage({
               <option key={p.id} value={p.id}>
                 {p.sku} - {p.name}
                 {!p.barcode ? ' (no barcode set)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex min-w-[220px] flex-1 flex-col gap-1.5">
+          <span className="text-[0.75rem] font-semibold text-text-muted">
+            Supplier <span className="font-normal text-text-faint">(optional - encodes into the QR)</span>
+          </span>
+          <select name="supplierId" defaultValue={selectedSupplier?.id ?? ''} className={selectClass}>
+            <option value="">No supplier - plain barcode</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
               </option>
             ))}
           </select>

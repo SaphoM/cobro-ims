@@ -4,6 +4,37 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.28.0 — 2026-09-06
+
+**QR labels can now carry the supplier, so receiving scans once instead of scanning and then picking.**
+- New `src/lib/scan-payload.ts` defines the label payload and how to read it back:
+  `COBRO1|<barcode>|<supplierId>`. A delimited string rather than JSON - it stays short (QR size grows
+  with payload and these print small), survives a USB scanner typing it as keyboard input without quoting
+  trouble, and is readable by eye when something goes wrong. `COBRO1` is a format version so a later
+  format can add fields without a scanner having to guess
+- **Backwards compatible by design**: every label printed before this, and every manufacturer barcode on a
+  bag of cement, is a bare barcode with no prefix - those scan exactly as they did. Anything that isn't a
+  recognised Cobro payload is treated as a plain barcode, and a malformed payload degrades to a failed
+  lookup rather than a parser error
+- Product labels gained an optional Supplier picker; choosing one encodes it into the QR, leaving it blank
+  prints the same plain-barcode QR as before
+- On the GRN form, a scan that carries a supplier now **states** it rather than re-asking: the matched
+  line reads "Matched CEM-42.5-50KG … · Supplier Steel Supply Co. · Store DBN-FAC", and the Supplier field
+  becomes bold read-only text ("from the label") with a hidden input. A plain barcode says nothing about
+  who delivered it, so the picker stays a picker - a supplier is never guessed. A label naming a supplier
+  this instance doesn't know is ignored rather than silently selecting something else
+- Store is likewise display-only whenever there is exactly one store (there is, since the single-store
+  consolidation) - a dropdown with one option was never a choice. It reverts to a picker on its own if a
+  second store is ever added
+- `lookupBarcodeAction` unwraps the payload too, so a supplier-bearing label scanned at the Overview's
+  scan dialog still finds the same product
+- Verified: codec round-trips, plain barcodes pass through untouched, scanner whitespace/newlines are
+  stripped, malformed input degrades safely; and live in the browser - a label encoding Steel Supply Co.
+  (deliberately not the dropdown's default) produced `supplierId=sup-steel-supply` as read-only text,
+  while a plain barcode left the dropdown in place with no Supplier claim on the matched line
+- Files added: `src/lib/scan-payload.ts`. Changed: `src/app/dashboard/labels/page.tsx`,
+  `src/app/dashboard/receiving/receive-form.tsx`, `src/app/dashboard/scan/actions.ts`
+
 ## v0.27.1 — 2026-09-06
 
 **"Post receipt" centred and sized to match Scan - Stores profiles only.**

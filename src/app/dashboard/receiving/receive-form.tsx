@@ -5,6 +5,7 @@ import { receiveStockAction, type ReceiveFormState } from '@/app/dashboard/recei
 import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import { HIDDEN_COST } from '@/lib/ui/cost-display';
+import { parseScanPayload } from '@/lib/scan-payload';
 import type { Product, Supplier, Warehouse } from '@/lib/domain/inventory';
 
 const initialState: ReceiveFormState = { error: null, success: null };
@@ -49,18 +50,41 @@ export function ReceiveForm({
   */
   const [selectedProductId, setSelectedProductId] = useState(products[0]?.id ?? '');
   const selectedProduct = products.find((p) => p.id === selectedProductId);
+
+  /*
+    Supplier comes from the scan when the label carries one (see
+    src/lib/scan-payload.ts) - a Cobro delivery label encodes who it came
+    from, so receiving scans once instead of scanning and then picking the
+    supplier by hand. Null means "nothing scanned it in", and the picker is
+    shown as before: a plain manufacturer barcode says nothing about who
+    delivered it, and a supplier must never be guessed.
+  */
+  const [scannedSupplierId, setScannedSupplierId] = useState<string | null>(null);
+  const scannedSupplier = scannedSupplierId ? suppliers.find((s) => s.id === scannedSupplierId) ?? null : null;
+
+  // One store means there is nothing to choose - it is shown as a fact
+  // rather than as a dropdown with a single option. More than one and the
+  // picker comes back on its own.
+  const onlyStore = warehouses.length === 1 ? warehouses[0] : null;
   const quantityRef = useRef<HTMLInputElement>(null);
   const scanFormRef = useRef<HTMLFormElement>(null);
   const scanBarcodeRef = useRef<HTMLInputElement>(null);
 
-  function matchBarcode(barcode: string) {
+  function matchBarcode(scanned: string) {
+    const { barcode, supplierId } = parseScanPayload(scanned);
     const match = products.find((p) => p.barcode === barcode);
     if (match && productSelectRef.current) {
       productSelectRef.current.value = match.id;
       setSelectedProductId(match.id);
+      // Only trust a supplier the scan actually carried, and only one this
+      // instance knows about - a label printed against a supplier since
+      // removed shouldn't silently select something else.
+      const known = supplierId ? suppliers.some((s) => s.id === supplierId) : false;
+      setScannedSupplierId(known ? supplierId : null);
       setScanMessage({ text: `Matched ${match.sku} - ${match.name}.`, ok: true });
       quantityRef.current?.focus();
     } else {
+      setScannedSupplierId(null);
       setScanMessage({ text: `No product with barcode "${barcode}".`, ok: false });
     }
   }
@@ -126,30 +150,71 @@ export function ReceiveForm({
         </div>
       </form>
       {scanMessage && (
-        <p className={`mb-4 text-[0.78rem] ${scanMessage.ok ? 'text-accent-strong' : 'text-danger'}`}>{scanMessage.text}</p>
+        <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <p className={`text-[0.78rem] ${scanMessage.ok ? 'text-accent-strong' : 'text-danger'}`}>
+            {scanMessage.text}
+          </p>
+          {/*
+            What the scan established, stated rather than re-asked. Supplier
+            only appears when the label actually carried one; Store only when
+            there is a single store, since then there was never a choice to
+            make.
+          */}
+          {scanMessage.ok && scannedSupplier && (
+            <p className="text-[0.78rem] text-text-muted">
+              Supplier <span className="font-bold text-accent-strong">{scannedSupplier.name}</span>
+            </p>
+          )}
+          {scanMessage.ok && onlyStore && (
+            <p className="text-[0.78rem] text-text-muted">
+              Store <span className="font-bold text-accent-strong">{onlyStore.code}</span>
+            </p>
+          )}
+        </div>
       )}
 
       <form action={formAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <label className="flex flex-col gap-1.5 lg:col-span-2">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Supplier</span>
-          <select name="supplierId" required className={selectClass}>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          <span className="text-[0.75rem] font-semibold text-text-muted">
+            Supplier
+            {scannedSupplier && <span className="ml-1 font-normal text-text-faint">from the label</span>}
+          </span>
+          {scannedSupplier ? (
+            <>
+              <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+                {scannedSupplier.name}
+              </div>
+              <input type="hidden" name="supplierId" value={scannedSupplier.id} />
+            </>
+          ) : (
+            <select name="supplierId" required className={selectClass}>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
         </label>
 
         <label className="flex flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">Store</span>
-          <select name="warehouseId" required className={selectClass}>
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.code}
-              </option>
-            ))}
-          </select>
+          {onlyStore ? (
+            <>
+              <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+                {onlyStore.code}
+              </div>
+              <input type="hidden" name="warehouseId" value={onlyStore.id} />
+            </>
+          ) : (
+            <select name="warehouseId" required className={selectClass}>
+              {warehouses.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.code}
+                </option>
+              ))}
+            </select>
+          )}
         </label>
 
         <label className="flex flex-col gap-1.5 lg:col-span-2">
