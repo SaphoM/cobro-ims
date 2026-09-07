@@ -6,6 +6,7 @@ import { PrintButton } from '@/app/dashboard/labels/print-button';
 import { generateQrDataUrl } from '@/lib/services/qrcode';
 import { encodeScanPayload } from '@/lib/scan-payload';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
+import { InfoTooltip } from '@/components/info-tooltip';
 
 export default async function LabelsPage({
   searchParams,
@@ -90,8 +91,9 @@ export default async function LabelsPage({
         </label>
 
         <label className="flex min-w-[220px] flex-1 flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">
-            Supplier <span className="font-normal text-text-faint">(encodes into the QR)</span>
+          <span className="flex items-center text-[0.75rem] font-semibold text-text-muted">
+            Supplier
+            <InfoTooltip text="Encodes into the QR." />
           </span>
           <select name="supplierId" required defaultValue={selectedSupplier?.id ?? ''} className={selectClass}>
             <option value="" disabled>
@@ -106,8 +108,9 @@ export default async function LabelsPage({
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">
-            Quantity expected <span className="font-normal text-text-faint">(optional - encodes into the QR)</span>
+          <span className="flex items-center text-[0.75rem] font-semibold text-text-muted">
+            Quantity expected
+            <InfoTooltip text="Optional - encodes into the QR." />
           </span>
           <input
             type="number"

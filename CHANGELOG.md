@@ -4,6 +4,31 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.34.0 — 2026-09-07
+
+**Dev server now reachable over the LAN for real phone-scanner testing.**
+- `next.config.ts` adds `allowedDevOrigins: ["192.168.8.40"]` - without it, Next's dev-origin protection
+  403s every `_next/*` JS/HMR request that doesn't come from `localhost`. The page's HTML/CSS still loaded
+  fine over the LAN IP even without this (so it looked normal), but React never hydrated, so every button
+  on the page - notification bell included - was silently inert. Update the IP here if this machine's LAN
+  address changes (`ipconfig getifaddr en0` on macOS)
+- Confirmed live: the demo-account picker, sign-in, and notification bell all work correctly when opened
+  via `http://192.168.8.40:3020` from a second browser tab
+- **Separate, real browser limitation this doesn't (and can't) fix**: `getUserMedia` (camera access) is
+  blocked by the browser on any plain-`http://` origin that isn't `localhost` - a secure-context
+  requirement, not a bug in this app. A phone opening the LAN IP directly will still see "No camera is
+  available on this device or browser" from `<CameraScanner>`'s own fallback UI. Testing the real camera
+  scan end-to-end needs an HTTPS tunnel (`cloudflared tunnel --url http://localhost:3020`, installed this
+  session) in front of the dev server instead
+
+**Product labels: Supplier and Quantity expected captions became tooltips.**
+- New `src/components/info-tooltip.tsx` - a small "i" icon (click/tap or hover/focus) instead of inline
+  caption text, so a long explanation can't stretch a form field's label wider than the input beneath it
+  and throw off the gap to the next field (exactly what happened with "Quantity expected (optional -
+  encodes into the QR)" wrapping onto its own lines)
+- `src/app/dashboard/labels/page.tsx` - Supplier and Quantity expected both use it now; every field in that
+  row keeps a uniform 12px gap regardless of caption length
+
 ## v0.33.0 — 2026-09-07
 
 **Phone-side scan handoff no longer requires the phone to sign in.**
