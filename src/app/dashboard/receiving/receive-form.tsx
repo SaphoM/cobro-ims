@@ -318,150 +318,165 @@ export function ReceiveForm({
         </div>
       )}
 
-      <form action={formAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <label className="flex flex-col gap-1.5 lg:col-span-2">
-          <span className="text-[0.75rem] font-semibold text-text-muted">
-            From Supplier
-            {scannedSupplier && <span className="ml-1 font-normal text-text-faint">from the label</span>}
-          </span>
-          {/*
-            Scan-only, no manual picker - the delivery label's code carries
-            the supplier, so there is nothing to choose by hand any more (see
-            src/lib/scan-payload.ts). A plain manufacturer barcode carries no
-            supplier at all, so that case is a real "not yet known" rather
-            than a default to fall back to - Post receipt stays disabled
-            until a Cobro label has actually supplied one (see `canPost`
-            below).
-          */}
-          {scannedSupplier ? (
-            <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
-              {scannedSupplier.name}
-            </div>
-          ) : (
-            <div className="flex h-9 items-center text-[0.9rem] text-text-faint">
-              Scan a Cobro delivery label to set the supplier
-            </div>
-          )}
-          <input type="hidden" name="supplierId" value={scannedSupplier?.id ?? ''} />
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">To Location</span>
-          {onlyStore ? (
-            <>
-              <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
-                {onlyStore.code}
-              </div>
-              <input type="hidden" name="warehouseId" value={onlyStore.id} />
-            </>
-          ) : (
-            <select name="warehouseId" required className={selectClass}>
-              {warehouses.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.code}
-                </option>
-              ))}
-            </select>
-          )}
-        </label>
-
-        <label className="flex flex-col gap-1.5 lg:col-span-2">
-          <span className="text-[0.75rem] font-semibold text-text-muted">
-            Product
-            {selectedProduct && <span className="ml-1 font-normal text-text-faint">from the scan</span>}
-          </span>
-          {selectedProduct ? (
-            <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
-              {selectedProduct.sku} - {selectedProduct.name}
-            </div>
-          ) : (
-            <div className="flex h-9 items-center text-[0.9rem] text-text-faint">
-              Scan or type a barcode above to select a product
-            </div>
-          )}
-          <input type="hidden" name="productId" value={selectedProductId} />
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Quantity received</span>
-          {/*
-            Text, not an input - the count comes from scanning (re-scan the
-            same barcode to add one), same as the Overview's Scan dialog.
-            Shown as "received/expected" when the label carried an expected
-            quantity, updating live as each scan lands; just the received
-            count when it didn't, since there is nothing to compare against.
-            "Remove 1" is the only way to correct a miscount.
-          */}
-          <div className="flex h-9 items-center gap-2">
-            <span className="text-[0.95rem] font-bold tabular-nums text-accent-strong">
-              {receivedCount}
-              {expectedQuantity != null && <span className="text-text-faint"> / {expectedQuantity}</span>}
+      {/*
+        Collapsed to a single hint line until a scan actually has something
+        to say - before that, every field here is either a static fact
+        (Location) or an empty placeholder, which is a lot of visual weight
+        for "nothing yet". Expands back to the full grid the instant a
+        product is matched (see matchBarcode) - collapsing again once posted
+        would just make the immediate "next item" scan re-expand it, so it
+        stays open for the rest of this receipt once it's shown itself.
+      */}
+      {selectedProductId ? (
+        <form action={formAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <label className="flex flex-col gap-1.5 lg:col-span-2">
+            <span className="text-[0.75rem] font-semibold text-text-muted">
+              From Supplier
+              {scannedSupplier && <span className="ml-1 font-normal text-text-faint">from the label</span>}
             </span>
-            {receivedCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setReceivedCount((count) => Math.max(0, count - 1))}
-                className="rounded-md border border-accent/30 px-2 py-0.5 text-[0.72rem] font-semibold text-text-muted transition-colors hover:border-accent/50 hover:text-accent-strong"
-              >
-                Remove 1
-              </button>
-            )}
-          </div>
-          <input type="hidden" name="quantity" value={receivedCount} />
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">
-            Unit cost (R)
-            {!canEditPrice && showCosts && (
-              <span className="ml-1 font-normal text-text-faint">from the catalogue</span>
-            )}
-          </span>
-          {canEditPrice ? (
-            <input type="number" name="unitCost" min="0" step="0.01" required placeholder="0.00" className={inputClass} />
-          ) : (
-            <>
-              {/* Display-only for every role except Admin - plain bold text,
-                  not an input drawn to look unavailable. The figure is the
-                  selected product's catalogue price, which is what
-                  receiveStockAction will post for this user regardless of
-                  what the form sends. */}
+            {/*
+              Scan-only, no manual picker - the delivery label's code carries
+              the supplier, so there is nothing to choose by hand any more (see
+              src/lib/scan-payload.ts). A plain manufacturer barcode carries no
+              supplier at all, so that case is a real "not yet known" rather
+              than a default to fall back to - Post receipt stays disabled
+              until a Cobro label has actually supplied one (see `canPost`
+              below).
+            */}
+            {scannedSupplier ? (
               <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
-                {!showCosts
-                  ? HIDDEN_COST
-                  : selectedProduct?.unitPrice != null
-                    ? `R ${selectedProduct.unitPrice.toFixed(2)}`
-                    : 'No price set'}
+                {scannedSupplier.name}
               </div>
-              <input type="hidden" name="unitCost" value={selectedProduct?.unitPrice ?? 0} />
-            </>
-          )}
-        </label>
+            ) : (
+              <div className="flex h-9 items-center text-[0.9rem] text-text-faint">
+                Scan a Cobro delivery label to set the supplier
+              </div>
+            )}
+            <input type="hidden" name="supplierId" value={scannedSupplier?.id ?? ''} />
+          </label>
 
-        <div
-          className={
-            centerSubmit
-              ? // Middle column of the five - which is both centred under the
-                // form and exactly the width the Overview's Scan button
-                // occupies, since that button is placed the same way.
-                'flex flex-col items-end gap-1.5 lg:col-start-3 lg:flex-row lg:items-center lg:gap-3'
-              : 'flex flex-col items-start gap-1.5 lg:col-span-5 lg:flex-row lg:items-center lg:gap-3'
-          }
-        >
-          <button
-            type="submit"
-            disabled={pending || !canPost}
-            title={canPost ? undefined : 'Scan a Cobro delivery label to set the product and supplier first'}
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[0.75rem] font-semibold text-text-muted">To Location</span>
+            {onlyStore ? (
+              <>
+                <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+                  {onlyStore.code}
+                </div>
+                <input type="hidden" name="warehouseId" value={onlyStore.id} />
+              </>
+            ) : (
+              <select name="warehouseId" required className={selectClass}>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code}
+                  </option>
+                ))}
+              </select>
+            )}
+          </label>
+
+          <label className="flex flex-col gap-1.5 lg:col-span-2">
+            <span className="text-[0.75rem] font-semibold text-text-muted">
+              Product
+              {selectedProduct && <span className="ml-1 font-normal text-text-faint">from the scan</span>}
+            </span>
+            {selectedProduct ? (
+              <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+                {selectedProduct.sku} - {selectedProduct.name}
+              </div>
+            ) : (
+              <div className="flex h-9 items-center text-[0.9rem] text-text-faint">
+                Scan or type a barcode above to select a product
+              </div>
+            )}
+            <input type="hidden" name="productId" value={selectedProductId} />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[0.75rem] font-semibold text-text-muted">Quantity received</span>
+            {/*
+              Text, not an input - the count comes from scanning (re-scan the
+              same barcode to add one), same as the Overview's Scan dialog.
+              Shown as "received/expected" when the label carried an expected
+              quantity, updating live as each scan lands; just the received
+              count when it didn't, since there is nothing to compare against.
+              "Remove 1" is the only way to correct a miscount.
+            */}
+            <div className="flex h-9 items-center gap-2">
+              <span className="text-[0.95rem] font-bold tabular-nums text-accent-strong">
+                {receivedCount}
+                {expectedQuantity != null && <span className="text-text-faint"> / {expectedQuantity}</span>}
+              </span>
+              {receivedCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setReceivedCount((count) => Math.max(0, count - 1))}
+                  className="rounded-md border border-accent/30 px-2 py-0.5 text-[0.72rem] font-semibold text-text-muted transition-colors hover:border-accent/50 hover:text-accent-strong"
+                >
+                  Remove 1
+                </button>
+              )}
+            </div>
+            <input type="hidden" name="quantity" value={receivedCount} />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[0.75rem] font-semibold text-text-muted">
+              Unit cost (R)
+              {!canEditPrice && showCosts && (
+                <span className="ml-1 font-normal text-text-faint">from the catalogue</span>
+              )}
+            </span>
+            {canEditPrice ? (
+              <input type="number" name="unitCost" min="0" step="0.01" required placeholder="0.00" className={inputClass} />
+            ) : (
+              <>
+                {/* Display-only for every role except Admin - plain bold text,
+                    not an input drawn to look unavailable. The figure is the
+                    selected product's catalogue price, which is what
+                    receiveStockAction will post for this user regardless of
+                    what the form sends. */}
+                <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+                  {!showCosts
+                    ? HIDDEN_COST
+                    : selectedProduct?.unitPrice != null
+                      ? `R ${selectedProduct.unitPrice.toFixed(2)}`
+                      : 'No price set'}
+                </div>
+                <input type="hidden" name="unitCost" value={selectedProduct?.unitPrice ?? 0} />
+              </>
+            )}
+          </label>
+
+          <div
             className={
               centerSubmit
-                ? 'flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-[0.85rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50'
-                : 'rounded-lg bg-accent px-5 py-2.5 text-[0.88rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50'
+                ? // Middle column of the five - which is both centred under the
+                  // form and exactly the width the Overview's Scan button
+                  // occupies, since that button is placed the same way.
+                  'flex flex-col items-end gap-1.5 lg:col-start-3 lg:flex-row lg:items-center lg:gap-3'
+                : 'flex flex-col items-start gap-1.5 lg:col-span-5 lg:flex-row lg:items-center lg:gap-3'
             }
           >
-            {pending ? 'Posting…' : 'Post receipt'}
-          </button>
-        </div>
-      </form>
+            <button
+              type="submit"
+              disabled={pending || !canPost}
+              title={canPost ? undefined : 'Scan a Cobro delivery label to set the product and supplier first'}
+              className={
+                centerSubmit
+                  ? 'flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-[0.85rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50'
+                  : 'rounded-lg bg-accent px-5 py-2.5 text-[0.88rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50'
+              }
+            >
+              {pending ? 'Posting…' : 'Post receipt'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <p className="text-[0.85rem] text-text-faint">
+          Scan a barcode above to see supplier, location, quantity and cost.
+        </p>
+      )}
 
       {state.error && (
         <p role="alert" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.82rem] text-danger-text">

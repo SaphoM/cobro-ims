@@ -4,6 +4,26 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.36.0 — 2026-09-07
+
+**GRN receiving's field grid collapses until there's something to show.**
+- `receive-form.tsx` - From Supplier / To Location / Product / Quantity received / Unit cost / Post receipt
+  collapse to a single hint line ("Scan a barcode above to see supplier, location, quantity and cost.")
+  until a product is actually matched, instead of rendering a full grid of empty placeholders and a
+  disabled button before anything has been scanned. Expands back to the full grid the instant `matchBarcode`
+  sets a product, and stays expanded for the rest of that receipt. Applies on both pages that mount this
+  component - Goods receiving and the Overview - since it's one shared change, not two
+- Verified live on both pages: collapsed on load, expands on the first matched scan
+
+**Admin's Stock by location now defaults to Stores, not Station.**
+- `dashboard/page.tsx` - Admin opens on the same **Stores** tab Stores Manager/Clerk already default to; the
+  store itself is what Admin oversees day to day, Station (Engineers' own stock) being the secondary
+  oversight view. Engineer/Requester is unaffected - their own station is their own stock, so Station stays
+  their default
+- Verified live, signed in as Admin specifically (not Stores Manager, which already defaulted here) - the
+  Stores tab is highlighted and its "excluding anything out on an Engineer's station" description shows on
+  load
+
 ## v0.35.0 — 2026-09-07
 
 **GRN receiving's "Scan with camera" is now multi-scan.**
