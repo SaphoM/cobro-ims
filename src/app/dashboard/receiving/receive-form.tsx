@@ -91,6 +91,22 @@ export function ReceiveForm({
   const scanFormRef = useRef<HTMLFormElement>(null);
   const scanBarcodeRef = useRef<HTMLInputElement>(null);
 
+  /*
+    The camera stays open across multiple scans now, same as the Overview's
+    Scan dialog (`continuous` on <CameraScanner>) - an operator working
+    through a stack of the same delivery shouldn't have to reopen the camera
+    for every single unit. It closes itself two ways:
+      - automatically, the instant the tally reaches a known expected
+        quantity (a GRN specifically has one to reach, unlike a generic
+        stock movement - see the effect below)
+      - manually, via the camera overlay's own "Done scanning" / ✕ / Escape,
+        for a delivery with no expected quantity on the label, or one that's
+        arriving short
+    The manual barcode box + Match button below are untouched - this only
+    changes what happens when the camera is used.
+  */
+  const [cameraOpen, setCameraOpen] = useState(false);
+
   function matchBarcode(scanned: string) {
     const { barcode, supplierId, expectedQuantity: scannedExpectedQuantity } = parseScanPayload(scanned);
     const match = products.find((p) => p.barcode === barcode);
@@ -105,7 +121,8 @@ export function ReceiveForm({
     // two deliveries into one count.
     const isSameProduct = match.id === selectedProductId;
     setSelectedProductId(match.id);
-    setReceivedCount((count) => (isSameProduct ? count + 1 : 1));
+    const newCount = isSameProduct ? receivedCount + 1 : 1;
+    setReceivedCount(newCount);
 
     // Only trust a supplier the scan actually carried, and only one this
     // instance knows about - a label printed against a supplier since
@@ -116,10 +133,22 @@ export function ReceiveForm({
     if (known) setScannedSupplierId(supplierId);
     else if (!isSameProduct) setScannedSupplierId(null);
 
+    const newExpectedQuantity =
+      scannedExpectedQuantity != null ? scannedExpectedQuantity : isSameProduct ? expectedQuantity : null;
     if (scannedExpectedQuantity != null) setExpectedQuantity(scannedExpectedQuantity);
     else if (!isSameProduct) setExpectedQuantity(null);
 
     setScanMessage({ text: `Matched ${match.sku} - ${match.name}.`, ok: true });
+
+    // Auto-close the camera the instant this scan brings the tally up to a
+    // known expected quantity - set synchronously here (the event handler
+    // every scan already runs through), not in an effect, since a delivery
+    // with no expected quantity on the label never reaches this and the
+    // operator closes the camera themselves once the box is empty. Harmless
+    // no-op when the camera isn't open (e.g. a manual "Match" click).
+    if (newExpectedQuantity != null && newCount >= newExpectedQuantity) {
+      setCameraOpen(false);
+    }
   }
 
   function handleBarcodeSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -131,6 +160,56 @@ export function ReceiveForm({
     barcodeInput.value = '';
     barcodeInput.focus();
   }
+
+  /*
+    What the operator sees INSIDE the camera overlay while it stays open
+    across scans - same reasoning as the Overview's Scan dialog: the overlay
+    covers the form completely, so the match result and running tally have to
+    be drawn here or they're invisible for the entire duration of scanning.
+  */
+  const cameraStatus = (
+    <div className="flex flex-col gap-2">
+      {scanMessage && !scanMessage.ok && (
+        <p
+          role="alert"
+          className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.78rem] leading-snug text-danger-text"
+        >
+          {scanMessage.text}
+        </p>
+      )}
+      {selectedProduct && (
+        <div className="rounded-xl border-2 border-accent/50 bg-surface-3 px-3 py-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="truncate text-[0.92rem] font-bold leading-snug text-accent-strong">
+                {selectedProduct.name}
+              </div>
+              <div className="truncate font-mono-brand text-[0.68rem] text-text-faint">{selectedProduct.sku}</div>
+              <div
+                aria-live="polite"
+                aria-label={`Received: ${receivedCount}${expectedQuantity != null ? ` of ${expectedQuantity}` : ''}`}
+                className="mt-0.5 font-display text-[1.7rem] font-bold leading-tight tabular-nums text-text"
+              >
+                {receivedCount}
+                {expectedQuantity != null && (
+                  <span className="ml-1 text-[0.95rem] font-semibold text-text-faint">/ {expectedQuantity}</span>
+                )}
+              </div>
+            </div>
+            {receivedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setReceivedCount((count) => Math.max(0, count - 1))}
+                className="flex-none rounded-md border border-accent/30 px-2 py-1 text-[0.72rem] font-semibold text-text-muted transition-colors hover:border-accent/50 hover:text-accent-strong"
+              >
+                Remove 1
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   // Coming here via "Receive this product" from the Barcode / QR scan page —
   // carry that product straight into the form instead of making the user
@@ -190,16 +269,31 @@ export function ReceiveForm({
           receipt instead of just matching its width off to the left.
         */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <CameraScanner
-            buttonLabel="Scan with camera"
+          {/*
+            Plain button, not <CameraScanner>'s own trigger - the actual
+            scanner is mounted once below, controlled (open/onOpenChange),
+            because `continuous` needs ONE instance that survives across
+            scans rather than remounting per open (see scan-movement.tsx's
+            identical reasoning for its single controlled camera).
+          */}
+          <button
+            type="button"
+            onClick={() => setCameraOpen(true)}
             className="flex h-11 w-full items-center justify-center rounded-lg bg-accent px-4 text-[0.88rem] font-bold text-ink transition-colors hover:bg-accent-hover lg:col-start-3"
-            onScan={(value) => {
-              if (scanBarcodeRef.current) scanBarcodeRef.current.value = value;
-              scanFormRef.current?.requestSubmit();
-            }}
-          />
+          >
+            Scan with camera
+          </button>
         </div>
       </form>
+
+      <CameraScanner
+        open={cameraOpen}
+        onOpenChange={setCameraOpen}
+        hideTrigger
+        continuous
+        statusSlot={cameraStatus}
+        onScan={matchBarcode}
+      />
       {scanMessage && (
         <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <p className={`text-[0.78rem] ${scanMessage.ok ? 'text-accent-strong' : 'text-danger'}`}>

@@ -219,9 +219,12 @@ export default async function DashboardOverviewPage() {
 
       {/* Stores now has the GRN card above for receiving, and Issue/Transfer/
           Adjustment/Write-off happen on their own dedicated pages - this
-          generic scan-any-movement-type card is Admin (and Engineer, for
-          their own station) only, not a Stores duty any more. */}
-      {!isStoresRole && (
+          generic scan-any-movement-type card is Engineer-only now, for their
+          own station. Admin has the GRN card above and every dedicated page
+          this same generic form used to stand in for, so this stopped
+          earning its place on Admin's Overview; Engineer still needs it -
+          it's their only way to record a movement on their own station. */}
+      {role?.name !== 'admin' && !isStoresRole && (
         <RecordMovementForm
           products={products}
           warehouses={warehouses}

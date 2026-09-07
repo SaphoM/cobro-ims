@@ -4,6 +4,43 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.35.0 — 2026-09-07
+
+**GRN receiving's "Scan with camera" is now multi-scan.**
+- `src/app/dashboard/receiving/receive-form.tsx` - the camera/QR-handoff overlay now stays open across
+  scans (`continuous` on `<CameraScanner>`, same pattern the Overview's Scan dialog already uses) instead
+  of closing after the first hit, so an operator works through a whole delivery without reopening the
+  camera per item
+- Auto-closes the instant the tally reaches a label's expected quantity (e.g. `3/3`) - verified live: stays
+  open below target, closes exactly at it. A delivery with no expected quantity on the label never
+  auto-closes; the operator closes it manually (`continuous` mode's own Done scanning / ✕ / Escape),
+  unchanged from every other continuous scan station in the app
+- A status panel (matched product, SKU, running tally, "Remove 1") now renders inside the camera overlay
+  while it's open - it covers the form underneath, so that feedback has to live there or it's invisible for
+  the whole scanning session
+- The auto-close check runs synchronously inside the scan handler (not a `useEffect`), matching the fix
+  already applied to `<CameraScanner>` itself in v0.32.0 - avoids the same `react-hooks/set-state-in-effect`
+  class of issue
+
+**Dev server reachable via a Cloudflare quick tunnel too, not just the LAN.**
+- `next.config.ts`'s `allowedDevOrigins` gains `"*.trycloudflare.com"` alongside the LAN IP - a cloudflared
+  quick tunnel (`cloudflared tunnel --url http://localhost:3020`) gets a new random subdomain every time it
+  restarts, so a wildcard means this never needs updating for that case. The LAN IP entry, by contrast,
+  genuinely did need updating this session when the Mac's Wi-Fi reconnected and DHCP handed out a new
+  address (`192.168.8.40` → `192.168.0.190`) - the dev-origin check has no way to know that on its own
+- The tunnel exists to get a genuine HTTPS origin in front of the dev server: `getUserMedia` (camera access)
+  is blocked by the browser on any plain-HTTP origin that isn't `localhost`, which the LAN IP alone can
+  never satisfy - confirmed live against a real phone hitting the LAN IP directly ("No camera is available
+  on this device or browser")
+- Verified via `curl` with a spoofed `Origin` header: a `*.trycloudflare.com` origin gets the dev assets
+  (`200`), an unrelated origin still gets rejected (`403`) - the wildcard is scoped, not wide open
+
+**"Record a stock movement" removed from Admin's Overview.**
+- `src/app/dashboard/page.tsx` - Admin already has the GRN card above plus every dedicated page (Transfers,
+  Adjustments, Write-offs) this generic scan-any-movement-type card used to stand in for, so it stopped
+  earning its place there. Engineer/Requester still sees it - it remains their only way to record a
+  movement on their own station, which none of those dedicated pages cover for them
+
 ## v0.34.0 — 2026-09-07
 
 **Dev server now reachable over the LAN for real phone-scanner testing.**
