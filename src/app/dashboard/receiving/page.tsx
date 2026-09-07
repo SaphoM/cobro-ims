@@ -1,4 +1,10 @@
-import { productRepository, receivingRepository, supplierRepository, warehouseRepository } from '@/lib/data';
+import {
+  productRepository,
+  receivingRepository,
+  roleRepository,
+  supplierRepository,
+  warehouseRepository,
+} from '@/lib/data';
 import { getSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 import { canSeeCosts } from '@/lib/costs';
@@ -30,6 +36,9 @@ export default async function ReceivingPage({
   // all is the separate, Admin-controlled setting - same two rules the
   // Overview's forms follow.
   const canEditPrice = await hasPermission(session, 'manage_pricing');
+  // Stores profiles only - Admin keeps the standard left-aligned submit.
+  const role = await roleRepository.getById(session.roleId);
+  const isStoresRole = role?.name === 'stores_manager' || role?.name === 'stores_clerk';
   const showCosts = await canSeeCosts(session);
 
   const { barcode } = await searchParams;
@@ -58,6 +67,7 @@ export default async function ReceivingPage({
         initialBarcode={barcode}
         canEditPrice={canEditPrice}
         showCosts={showCosts}
+        centerSubmit={isStoresRole}
       />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">

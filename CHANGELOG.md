@@ -4,6 +4,17 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.27.1 — 2026-09-06
+
+**"Post receipt" centred and sized to match Scan - Stores profiles only.**
+- On a Stores Manager / Stores Clerk profile the GRN form's submit now takes the middle column of the
+  five-column grid, which is both centred under the form and exactly the width the Overview's Scan button
+  occupies - the two buttons are placed the same way, so they line up. Measured identical at 1400px:
+  203x36 for both, same left and right edges
+- Admin is deliberately unchanged: standard left-aligned submit, 123x41
+- Files changed: `src/app/dashboard/receiving/receive-form.tsx` (new optional `centerSubmit` prop),
+  `src/app/dashboard/page.tsx`, `src/app/dashboard/receiving/page.tsx` (both decide it by role)
+
 ## v0.27.0 — 2026-09-06
 
 **Receive stock (GRN) on the Overview, and its Unit cost is now Admin-only too.**

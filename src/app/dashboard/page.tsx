@@ -100,6 +100,9 @@ export default async function DashboardOverviewPage() {
   const role = session ? await roleRepository.getById(session.roleId) : null;
   const isAdminOrStores =
     role?.name === 'admin' || role?.name === 'stores_manager' || role?.name === 'stores_clerk';
+  // Stores profiles only - Admin keeps the standard left-aligned submit on
+  // the receive form (see ReceiveForm's `centerSubmit`).
+  const isStoresRole = role?.name === 'stores_manager' || role?.name === 'stores_clerk';
   // Only an Engineer / Requester has a personal station; Admin and Stores
   // have none, which is what splits the two shapes of Station/Stores view
   // below.
@@ -210,6 +213,7 @@ export default async function DashboardOverviewPage() {
           products={products}
           canEditPrice={canEditPrice}
           showCosts={showCosts}
+          centerSubmit={isStoresRole}
         />
       )}
 

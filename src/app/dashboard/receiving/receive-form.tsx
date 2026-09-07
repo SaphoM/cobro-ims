@@ -16,6 +16,7 @@ export function ReceiveForm({
   initialBarcode,
   canEditPrice,
   showCosts,
+  centerSubmit = false,
 }: {
   suppliers: Supplier[];
   warehouses: Warehouse[];
@@ -26,6 +27,12 @@ export function ReceiveForm({
    *  cost their form submits - see receiveStockAction. Same rule the
    *  Overview's stock-movement form follows. */
   canEditPrice: boolean;
+  /** Stores profiles get the submit centred and sized like the Overview's
+   *  Scan button - same height, same width (it takes the middle grid column,
+   *  exactly as Scan does), full width once the grid collapses. Admin keeps
+   *  the standard left-aligned submit. The role decision is made by the
+   *  pages, not here - see dashboard/page.tsx and receiving/page.tsx. */
+  centerSubmit?: boolean;
   /** The separate, Admin-controlled "show costs to all roles" setting. Off
    *  means money is withheld entirely, so the read-only display shows the
    *  withheld marker instead of a figure. */
@@ -204,11 +211,24 @@ export function ReceiveForm({
           )}
         </label>
 
-        <div className="flex items-end lg:col-span-5">
+        <div
+          className={
+            centerSubmit
+              ? // Middle column of the five - which is both centred under the
+                // form and exactly the width the Overview's Scan button
+                // occupies, since that button is placed the same way.
+                'flex items-end lg:col-start-3'
+              : 'flex items-end lg:col-span-5'
+          }
+        >
           <button
             type="submit"
             disabled={pending}
-            className="rounded-lg bg-accent px-5 py-2.5 text-[0.88rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:opacity-90"
+            className={
+              centerSubmit
+                ? 'flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-[0.85rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:opacity-90'
+                : 'rounded-lg bg-accent px-5 py-2.5 text-[0.88rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:opacity-90'
+            }
           >
             {pending ? 'Posting…' : 'Post receipt'}
           </button>
