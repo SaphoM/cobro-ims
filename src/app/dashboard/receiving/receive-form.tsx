@@ -161,29 +161,38 @@ export function ReceiveForm({
       <form
         ref={scanFormRef}
         onSubmit={handleBarcodeSubmit}
-        className="mb-4 flex flex-col items-stretch gap-2 border-b border-accent/[0.08] pb-4 sm:flex-row sm:items-end"
+        className="mb-4 flex flex-col items-stretch gap-2 border-b border-accent/[0.08] pb-4"
       >
-        <label className="flex flex-1 flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Scan barcode to select product</span>
-          <input
-            ref={scanBarcodeRef}
-            name="scanBarcode"
-            type="text"
-            autoComplete="off"
-            placeholder="Scan or type, then Enter"
-            className={`${inputClass} font-mono-brand`}
-          />
-        </label>
-        <div className="flex gap-2">
+        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-end">
+          <label className="flex flex-1 flex-col gap-1.5">
+            <span className="text-[0.75rem] font-semibold text-text-muted">Scan barcode to select product</span>
+            <input
+              ref={scanBarcodeRef}
+              name="scanBarcode"
+              type="text"
+              autoComplete="off"
+              placeholder="Scan or type, then Enter"
+              className={`${inputClass} font-mono-brand`}
+            />
+          </label>
           <button
             type="submit"
-            className="h-9 flex-1 rounded-lg border border-accent/30 bg-surface-2 px-3 py-1.5 text-[0.82rem] font-semibold text-accent-strong hover:bg-accent/10 sm:flex-none"
+            className="h-9 rounded-lg border border-accent/30 bg-surface-2 px-3 py-1.5 text-[0.82rem] font-semibold text-accent-strong hover:bg-accent/10"
           >
             Match
           </button>
+        </div>
+        {/*
+          Same grid math as the "Post receipt" column below (grid-cols-1 /
+          sm:grid-cols-2 / lg:grid-cols-5 over this same card), same
+          lg:col-start-3 placement too, so this button sits in exactly the
+          same column - same width, same horizontal position - as Post
+          receipt instead of just matching its width off to the left.
+        */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <CameraScanner
             buttonLabel="Scan with camera"
-            className="h-9 flex-1 rounded-lg border border-accent/30 bg-surface-2 px-3 py-1.5 text-[0.82rem] font-semibold text-accent-strong hover:bg-accent/10 sm:flex-none"
+            className="flex h-11 w-full items-center justify-center rounded-lg bg-accent px-4 text-[0.88rem] font-bold text-ink transition-colors hover:bg-accent-hover lg:col-start-3"
             onScan={(value) => {
               if (scanBarcodeRef.current) scanBarcodeRef.current.value = value;
               scanFormRef.current?.requestSubmit();

@@ -18,6 +18,21 @@
  * whatever the calling form does with `onScan`) still goes through its own
  * existing permission check, unchanged — a scan only ever identifies
  * something, on desktop or phone alike.
+ *
+ * ATTRIBUTION - a deliberate decision, not an oversight: the phone does NOT
+ * sign in. `resolveScanHandoffAction` accepts the token without any session
+ * of its own, and every resolved scan is recorded as done by the DESKTOP
+ * user who generated the QR (`handoff.initiatingUserId`), never by whoever
+ * physically held the phone. That is a real trade-off, weighed and chosen
+ * deliberately: security here rests on the token itself (unguessable,
+ * single-use, expires in minutes, only visible on the initiating desktop's
+ * own screen) rather than on a second login - trading "prove who's actually
+ * holding the phone" for "no login step to get through mid-scan". The
+ * audit trail is therefore honest about WHO IS ACCOUNTABLE (the signed-in
+ * desktop operator who chose to hand their camera duty to a phone) but does
+ * NOT prove who physically pressed the shutter - if that distinction ever
+ * matters for Cobro, this is the file to revisit, not something to
+ * silently assume away.
  */
 
 import { getSession } from '@/lib/auth';
@@ -73,25 +88,28 @@ export interface ScanHandoffResolveResult {
 
 /**
  * Called by the phone once its own camera has decoded a code — see
- * `/scan-session/[token]`. Requires the phone to be signed in: a camera scan
- * that can go on to trigger an inventory transaction must always come from
- * an authenticated user, never an anonymous one holding a borrowed phone.
+ * `/scan-session/[token]`. No phone login: see this file's top comment
+ * ("ATTRIBUTION") for the deliberate trade-off. The scan is recorded against
+ * the DESKTOP user who created the session, not against a phone session that
+ * doesn't exist.
  *
- * Deliberately does NOT require the phone's user to be the same person as
- * the desktop's — a named operator scanning on behalf of a shared Stores
- * terminal is the normal case here, not a suspicious one. `resolvedByUserId`
- * still records who actually scanned it, for the audit trail.
+ * This is not the same as "anonymous". `resolve()` still refuses to run
+ * without a real, still-pending, unexpired handoff record - a random or
+ * expired token gets exactly the same rejection an unauthenticated request
+ * would. The token itself, not a login form, is the credential here: it's
+ * unguessable, single-use, expires in minutes, and only ever appears on the
+ * initiating desktop's own screen.
  */
 export async function resolveScanHandoffAction(token: string, scannedValue: string): Promise<ScanHandoffResolveResult> {
-  const session = await getSession();
-  if (!session) {
-    return { ok: false, error: 'Please log in to continue scanning.' };
-  }
   if (!scannedValue.trim()) {
     return { ok: false, error: 'Nothing was scanned.' };
   }
   try {
-    await scanHandoffRepository.resolve(token, session.id, scannedValue.trim());
+    const handoff = await scanHandoffRepository.get(token);
+    if (!handoff) {
+      return { ok: false, error: 'That scanning session no longer exists.' };
+    }
+    await scanHandoffRepository.resolve(token, handoff.initiatingUserId, scannedValue.trim());
     return { ok: true, error: null };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Could not complete the scan.' };

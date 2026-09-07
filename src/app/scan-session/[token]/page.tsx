@@ -1,5 +1,3 @@
-import Link from 'next/link';
-import { getSession } from '@/lib/auth';
 import { scanHandoffRepository } from '@/lib/data';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { ScanSessionClient } from '@/app/scan-session/[token]/scan-session-client';
@@ -7,13 +5,17 @@ import { ScanSessionClient } from '@/app/scan-session/[token]/scan-session-clien
 /**
  * The phone lands here after scanning a desktop's "Scan QR with your phone"
  * handoff code (see `<CameraScanner>` and `src/lib/scan-handoff-actions.ts`).
+ *
+ * Deliberately no login gate - see scan-handoff-actions.ts's top-of-file
+ * "ATTRIBUTION" comment for the trade-off being made. The token itself is
+ * the credential here (unguessable, single-use, expires in minutes, only
+ * ever shown on the initiating desktop's own screen), not a phone-side
+ * session, so this goes straight from "does this token check out" to the
+ * camera with no account-proving step in between.
+ *
  * Every state that isn't "go ahead and scan" is handled right here, server-
  * side, before any camera code ever mounts:
  *
- *   - not signed in            -> "please log in", carrying this URL as
- *                                 `?next=` so the phone returns to the same
- *                                 session afterwards instead of the generic
- *                                 dashboard (see safeNextPath).
  *   - token doesn't exist      -> same wording as expired - a guessed or
  *                                 mistyped token must not be distinguishable
  *                                 from a real one that's simply gone.
@@ -23,25 +25,6 @@ import { ScanSessionClient } from '@/app/scan-session/[token]/scan-session-clien
  */
 export default async function ScanSessionPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const session = await getSession();
-
-  if (!session) {
-    return (
-      <Shell>
-        <h1 className="font-display text-[1.15rem] font-medium text-text">Please log in to continue</h1>
-        <p className="text-[0.88rem] text-text-muted">
-          Sign in to finish this scan - you&apos;ll come straight back here afterwards.
-        </p>
-        <Link
-          href={`/login?next=${encodeURIComponent(`/scan-session/${token}`)}`}
-          className="mt-1 flex h-11 w-full items-center justify-center rounded-xl bg-accent text-[0.95rem] font-bold text-ink transition-colors hover:bg-accent-hover"
-        >
-          Log in
-        </Link>
-      </Shell>
-    );
-  }
-
   const handoff = await scanHandoffRepository.get(token);
 
   if (!handoff || handoff.status === 'expired') {

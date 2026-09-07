@@ -7,8 +7,6 @@ import { generateQrDataUrl } from '@/lib/services/qrcode';
 import { encodeScanPayload } from '@/lib/scan-payload';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 
-const MAX_LABELS = 60;
-
 export default async function LabelsPage({
   searchParams,
 }: {
@@ -35,15 +33,15 @@ export default async function LabelsPage({
 
   const selected = productId ? products.find((p) => p.id === productId) : null;
   const selectedSupplier = supplierId ? suppliers.find((s) => s.id === supplierId) ?? null : null;
-  const requestedQty = Math.min(Math.max(Number(qty) || 1, 1), MAX_LABELS);
+  const requestedQty = Math.max(Number(qty) || 1, 1);
   const parsedExpectedQuantity = Number(expectedQuantity);
   const selectedExpectedQuantity =
     Number.isFinite(parsedExpectedQuantity) && parsedExpectedQuantity > 0 ? parsedExpectedQuantity : null;
   /*
-    A delivery label can carry WHO it came from and HOW MANY units it should
-    contain, as well as WHAT it is, so receiving scans once instead of
-    scanning and then filling in the rest by hand. With neither chosen this
-    encodes the bare barcode exactly as before - see src/lib/scan-payload.ts.
+    A delivery label carries WHO it came from and, optionally, HOW MANY units
+    it should contain, as well as WHAT it is, so receiving scans once instead
+    of scanning and then filling in the rest by hand. Supplier is required -
+    see src/lib/scan-payload.ts.
   */
   const qrDataUrl = selected?.barcode
     ? await generateQrDataUrl(
@@ -93,10 +91,12 @@ export default async function LabelsPage({
 
         <label className="flex min-w-[220px] flex-1 flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">
-            Supplier <span className="font-normal text-text-faint">(optional - encodes into the QR)</span>
+            Supplier <span className="font-normal text-text-faint">(encodes into the QR)</span>
           </span>
-          <select name="supplierId" defaultValue={selectedSupplier?.id ?? ''} className={selectClass}>
-            <option value="">No supplier - plain barcode</option>
+          <select name="supplierId" required defaultValue={selectedSupplier?.id ?? ''} className={selectClass}>
+            <option value="" disabled>
+              Choose a supplier…
+            </option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -121,12 +121,11 @@ export default async function LabelsPage({
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Copies (max {MAX_LABELS})</span>
+          <span className="text-[0.75rem] font-semibold text-text-muted">Copies</span>
           <input
             type="number"
             name="qty"
             min="1"
-            max={MAX_LABELS}
             defaultValue={requestedQty}
             className={`${inputClass} w-28`}
           />

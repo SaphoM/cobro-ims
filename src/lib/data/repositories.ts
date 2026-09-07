@@ -396,10 +396,12 @@ export interface ScanHandoffSession {
   createdAt: ISODateTime;
   expiresAt: ISODateTime;
   status: ScanHandoffStatus;
-  /** Who actually resolved it (the phone's authenticated user) - recorded
-   *  for the audit trail even though it isn't required to match the
-   *  initiator; a shared desktop and a named operator's phone is the normal
-   *  case, not a suspicious one. */
+  /** Who the resolved scan is attributed to. The phone never signs in (see
+   *  src/lib/scan-handoff-actions.ts's "ATTRIBUTION" comment), so this is
+   *  always the same as `initiatingUserId` - kept as a separate field, not
+   *  merged into it, because it names WHO THE ACTION IS RECORDED AGAINST
+   *  regardless of how that gets decided, which is a distinct question from
+   *  "who created this session" even though today they're always equal. */
   resolvedByUserId: UUID | null;
   /** The raw scanned string, once resolved - handed back to the desktop
    *  exactly as if its own camera had decoded it. Never a mutating action by

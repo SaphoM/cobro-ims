@@ -4,6 +4,38 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.33.0 — 2026-09-07
+
+**Phone-side scan handoff no longer requires the phone to sign in.**
+- `resolveScanHandoffAction` (`src/lib/scan-handoff-actions.ts`) no longer calls `getSession()` - a
+  deliberate reversal of v0.32.0's "phone auth is mandatory" rule, made after the trade-off was spelled out
+  and explicitly confirmed: attribute the scan to the desktop user who generated the QR, not to a phone
+  session that no longer exists. See the file's new **ATTRIBUTION** comment for the reasoning and what it
+  gives up (the audit trail names who's accountable - the signed-in desktop operator - not who physically
+  held the phone)
+- `/scan-session/[token]` (`src/app/scan-session/[token]/page.tsx`) drops the "not signed in → please log
+  in" branch entirely; every other gate (token not found, expired, already resolved) is unchanged. Security
+  still rests on the token itself: unguessable, single-use, expires in 3 minutes, only ever shown on the
+  initiating desktop's own screen
+- `src/app/login/page.tsx`'s optional `?next=` support and `src/lib/safe-redirect.ts` are no longer used by
+  this flow but left in place - generically useful, harmless to keep
+- Verified live: a request carrying zero cookies (`fetch(url, { credentials: 'omit' })`) still gets the
+  scanner UI, not a login prompt; `resolveScanHandoffAction` always attributes to `handoff.initiatingUserId`
+  (the desktop's session), never to the phone
+
+**Product labels: Supplier is now required; the 60-copy cap is gone.**
+- `src/app/dashboard/labels/page.tsx` - the Supplier dropdown lost its "optional" wording and the "No
+  supplier - plain barcode" bypass option; the browser now blocks "Generate sheet" until a supplier is
+  chosen (every label leaving the building should say who it came from)
+- `MAX_LABELS` (60) removed outright - no `max` attribute, no "(max 60)" copy, no clamping on `requestedQty`
+
+**Receiving's "Scan with camera" button repositioned to match "Post receipt" exactly.**
+- `src/app/dashboard/receiving/receive-form.tsx` - "Scan with camera" moved onto its own row under the
+  barcode input (previously squeezed beside "Match") and now sits in the same `lg:col-start-3` column of
+  the same `grid-cols-1 / sm:grid-cols-2 / lg:grid-cols-5` track "Post receipt" uses below it, rather than a
+  guessed pixel width - the two buttons are pixel-identical in width and horizontal position at every
+  breakpoint by construction, not by coincidence
+
 ## v0.32.0 — 2026-09-06
 
 **"Scan with camera" now hands off to a phone on desktop, instead of trying to use a desktop's own camera.**

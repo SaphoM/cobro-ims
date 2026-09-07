@@ -5,10 +5,11 @@ import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { resolveScanHandoffAction } from '@/lib/scan-handoff-actions';
 
 /**
- * The phone side of the desktop camera handoff, once a signed-in user has
- * landed on a still-pending session (see the server page for every state
- * that stops before this point: not logged in, not found, expired, already
- * used).
+ * The phone side of the desktop camera handoff, once the server page has
+ * confirmed the token is a real, still-pending session (see that page for
+ * every state that stops before this point: not found, expired, already
+ * used). No login here - see scan-handoff-actions.ts's "ATTRIBUTION"
+ * comment for why the phone never signs in and what that trades away.
  *
  * Reuses `<CameraScanner>` exactly as every other scan point in the app
  * does - same permission handling, same denied/unavailable/error states,
