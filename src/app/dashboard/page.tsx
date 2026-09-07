@@ -1,12 +1,17 @@
-import { customerRepository, productRepository, stockLedgerRepository, warehouseRepository } from '@/lib/data';
+import {
+  customerRepository,
+  productRepository,
+  roleRepository,
+  stockLedgerRepository,
+  warehouseRepository,
+} from '@/lib/data';
 import { getSession } from '@/lib/auth';
 import { canSeeCosts } from '@/lib/costs';
 import { hasPermission } from '@/lib/permissions';
 import { HIDDEN_COST } from '@/lib/ui/cost-display';
 import { stockValue } from '@/lib/services/inventory-engine';
 import { RecordMovementForm } from '@/app/dashboard/record-movement-form';
-import { ReservedCell } from '@/app/dashboard/reserved-cell';
-import { QuickRequisitionButton } from '@/app/dashboard/quick-requisition-button';
+import { StockByLocationCard, type StockView } from '@/app/dashboard/stock-by-location-card';
 import type { StockLedgerView } from '@/lib/domain/inventory';
 
 export default async function DashboardOverviewPage() {
@@ -73,6 +78,99 @@ export default async function DashboardOverviewPage() {
     list.sort((a, b) => b.qty - a.qty);
   }
 
+  /*
+    Which stock views this role may see, built HERE on the server so an
+    unentitled view never reaches the browser at all - the toggle can only
+    ever switch between what it was handed, so there is no client flag to
+    flip to reach a blocked one.
+
+    Role-name check rather than a permission: "Admin and Stores" is the rule
+    as stated, and no existing Permission means "may see stock everywhere"
+    - reusing an operational one (`manage_receiving`, say) to stand in for a
+    view right is exactly the can-vs-should conflation the notification
+    scoping already avoids. Same pattern as src/lib/notifications.ts.
+  */
+  const role = session ? await roleRepository.getById(session.roleId) : null;
+  const isAdminOrStores =
+    role?.name === 'admin' || role?.name === 'stores_manager' || role?.name === 'stores_clerk';
+  // Only an Engineer / Requester has a personal station; Admin and Stores
+  // have none, which is what splits the two shapes of Station/Stores view
+  // below.
+  const myStationId = session ? warehouses.find((w) => w.ownerUserId === session.id)?.id ?? null : null;
+
+  /*
+    Station rows cover every Engineer's station, for everyone who gets this
+    view - the station picker beside the toggle is what narrows it down.
+
+    That widening is not new exposure for an Engineer: peer stations are
+    already in their Stores rows below (and in the Requisitions "Store"
+    picker), because seeing an unused item on a peer's shelf is the whole
+    point of peer pickup. What changes is only that they can now look at one
+    directly instead of reading it out of the Stores list.
+  */
+  const stationRows = ledgerView.filter((row) => row.warehouse.type === 'engineer_station');
+
+  // The picker's options, in the order they're offered. An Engineer opens on
+  // their OWN station (what this view showed before the picker existed);
+  // Admin and Stores have no station of their own, so they open on all of
+  // them, which is the oversight view they had before.
+  const stationWarehouses = warehouses.filter((w) => w.type === 'engineer_station');
+  const stationOptions = [
+    ...(myStationId
+      ? stationWarehouses
+          .filter((w) => w.id === myStationId)
+          .map((w) => ({ id: w.id, label: `${w.name} (yours)` }))
+      : []),
+    ...stationWarehouses
+      .filter((w) => w.id !== myStationId)
+      .map((w) => ({ id: w.id, label: w.name })),
+  ];
+  const defaultStationId = myStationId ?? 'all';
+
+  // The product filter's options: the full catalogue, not just what happens
+  // to be in stock in the current view - "no rows for that product here" is
+  // itself an answer someone may be looking for, and a list that changes
+  // shape as you switch views is harder to use than one that doesn't.
+  const productOptions = products
+    .map((product) => ({ id: product.id, label: `${product.sku} - ${product.name}` }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  const storesRows = isAdminOrStores
+    ? // The physical store(s) - what is actually in the store, as opposed to
+      // what is out on stations.
+      ledgerView.filter((row) => row.warehouse.type === 'store')
+    : // What this Engineer may actually requisition from: every store PLUS
+      // every OTHER Engineer's station, never their own - the same set
+      // sales/page.tsx builds for the Requisitions "Store" picker, so peer
+      // pickup stays visible here too.
+      ledgerView.filter((row) => row.warehouse.id !== myStationId);
+
+  /*
+    Two views, for every role: Station and Stores. An "everything, everywhere"
+    view was dropped - between the two below it added no location the viewer
+    couldn't already see, so it was a third button that only made the choice
+    harder. What still differs by role is what each view CONTAINS (see the
+    filters above), not how many buttons there are.
+  */
+  const visibleViews: StockView[] = [
+    {
+      id: 'station' as const,
+      label: 'Station',
+      description: isAdminOrStores
+        ? "Stock currently sitting on Engineers' own stations - issued from the store, not yet used."
+        : 'Stock currently at your own station - accepted from the store, still yours to use.',
+      rows: stationRows,
+    },
+    {
+      id: 'stores' as const,
+      label: 'Stores',
+      description: isAdminOrStores
+        ? 'Stock held in the store itself, excluding anything out on an Engineer\'s station.'
+        : 'Stock you can requisition from - the store, plus any other Engineer\'s station holding it.',
+      rows: storesRows,
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -100,104 +198,18 @@ export default async function DashboardOverviewPage() {
         showCosts={showCosts}
       />
 
-      <section className="rounded-2xl border border-accent/[0.14] bg-surface">
-        <div className="border-b border-accent/[0.14] px-5 py-4">
-          <h2 className="font-display text-[1.05rem] font-medium text-text">Stock by location</h2>
-          <p className="text-[0.83rem] text-text-muted">
-            What is on the shelf right now, at every store and every Engineer&apos;s own station, at
-            weighted-average cost. Tap a Reserved figure to see which requisition is holding it.
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-[0.86rem]">
-            <thead>
-              <tr className="text-left text-text-faint">
-                <th className="px-5 py-2.5 font-medium">Product</th>
-                <th className="px-5 py-2.5 font-medium">Store</th>
-                {canRequest && <th className="w-10 px-2 py-2.5"><span className="sr-only">Requisition</span></th>}
-                <th className="px-5 py-2.5 text-right font-medium tabular-nums">On hand</th>
-                <th className="px-5 py-2.5 text-right font-medium tabular-nums">Reserved</th>
-                {showCosts && (
-                  <>
-                    <th className="px-5 py-2.5 text-right font-medium tabular-nums">WAC</th>
-                    <th className="px-5 py-2.5 text-right font-medium tabular-nums">Stock value</th>
-                  </>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {ledgerView.map((row) => (
-                <tr key={`${row.productId}::${row.warehouseId}`} className="border-t border-accent/[0.08]">
-                  <td className="px-5 py-3">
-                    <div className="text-text">{row.product.name}</div>
-                    <div className="font-mono-brand text-[0.72rem] text-text-faint">{row.product.sku}</div>
-                  </td>
-                  <td className="px-5 py-3 text-text-muted">
-                    {row.warehouse.type === 'engineer_station' ? (
-                      <>
-                        {row.warehouse.name}
-                        <span className="ml-1.5 rounded-full bg-neutral-soft px-1.5 py-0.5 text-[0.66rem] font-semibold text-text-faint">
-                          station
-                        </span>
-                      </>
-                    ) : (
-                      row.warehouse.code
-                    )}
-                  </td>
-                  {canRequest && (
-                    <td className="px-2 py-3">
-                      {row.warehouse.ownerUserId !== session?.id && (
-                        <QuickRequisitionButton
-                          productId={row.productId}
-                          productSku={row.product.sku}
-                          productName={row.product.name}
-                          unitOfMeasure={row.product.unitOfMeasure}
-                          availableQty={row.quantityOnHand}
-                          elsewhere={(locationsByProduct.get(row.productId) ?? []).filter(
-                            (l) => l.warehouseId !== row.warehouseId
-                          )}
-                          unitPrice={showCosts ? row.product.unitPrice : null}
-                          canEditPrice={canEditPrice}
-                          warehouseId={row.warehouseId}
-                          warehouseLabel={
-                            row.warehouse.type === 'engineer_station' ? row.warehouse.name : row.warehouse.code
-                          }
-                          customers={customers}
-                        />
-                      )}
-                    </td>
-                  )}
-                  <td className="px-5 py-3 text-right tabular-nums text-text">
-                    {row.quantityOnHand.toLocaleString()} {row.product.unitOfMeasure}
-                    {row.isBelowReorderPoint && (
-                      <span className="ml-2 rounded-full bg-danger/15 px-2 py-0.5 text-[0.68rem] font-semibold text-danger-text">
-                        Low
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3 text-right tabular-nums">
-                    <ReservedCell
-                      productId={row.productId}
-                      warehouseId={row.warehouseId}
-                      quantityReserved={row.quantityReserved}
-                    />
-                  </td>
-                  {showCosts && (
-                    <>
-                      <td className="px-5 py-3 text-right tabular-nums text-text-muted">
-                        R {row.weightedAverageCost.toFixed(2)}
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums text-text">
-                        R {row.stockValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <StockByLocationCard
+        views={visibleViews}
+        stationOptions={stationOptions}
+        defaultStationId={defaultStationId}
+        productOptions={productOptions}
+        canRequest={canRequest}
+        showCosts={showCosts}
+        canEditPrice={canEditPrice}
+        sessionUserId={session?.id ?? null}
+        customers={customers}
+        locationsByProduct={Object.fromEntries(locationsByProduct)}
+      />
     </div>
   );
 }

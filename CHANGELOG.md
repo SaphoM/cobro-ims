@@ -4,6 +4,40 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.26.0 — 2026-09-06
+
+**"Stock by location" gains role-aware views, a station picker and a product filter.**
+- The card now has a **Station / Stores** view toggle, and what each view contains is scoped to the
+  viewer's role rather than to what their permissions technically allow:
+  - **Admin / Stores** - Station shows every Engineer's station (oversight of what's out on the floor);
+    Stores shows the physical store itself
+  - **Engineer / Requester** - Station opens on their own station; Stores shows what they may actually
+    requisition from, which is every store PLUS every other Engineer's station (the peer-pickup set the
+    Requisitions "Store" picker already used), never their own
+- **Station picker** beside the toggle, shown only while the Station view is active - an Engineer's own
+  station is listed first and labelled "(yours)", so their default view is exactly what it was before the
+  picker existed, and peers are now inspectable directly rather than read out of the Stores list. This is
+  not new exposure: peer stations were already visible to them in the Stores rows and the Requisitions
+  picker
+- **Product filter** listing the full catalogue (SKU + name), applying to either view and combining with
+  the station picker
+- An "everything, everywhere" third view was built first and then dropped: between Station and Stores it
+  added no location the viewer couldn't already see, so it was a third button that only made the choice
+  harder
+- The table markup itself is unchanged - it moved into a client component purely so switching views is a
+  state change (no navigation, no refetch, nothing else on the page reset)
+- Layout: heading and the three controls share one row on wide screens with the description spanning the
+  full width beneath them (sharing a single row squeezed the description into a narrow column and wrapped
+  the heading onto two lines); on a phone the controls stack and the reading order stays heading →
+  description → controls. Verified no overflow or sideways scroll at 375px, 820px and 1400px
+- Verified live for Admin, Stores Manager, Stores Clerk and Engineer, including the empty state for a
+  station holding no stock
+- Files added: `src/app/dashboard/stock-by-location-card.tsx`. Changed: `src/app/dashboard/page.tsx`
+
+**Confirmed, not changed:** external requisition (a Purchase Order against a supplier) remains Admin +
+Stores only - `manage_purchase_orders`, enforced at nav visibility, the route gate, and the server
+actions. Engineer / Requester gets Access Denied. No change was needed; verified live for all four roles.
+
 ## v0.25.0 — 2026-09-06
 
 **Unit cost is Admin-only to set - visible to everyone, changeable by nobody else.**
