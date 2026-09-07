@@ -4,6 +4,25 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.29.0 — 2026-09-06
+
+**Receive stock (GRN) is now fully scan-driven - no dropdowns left.**
+- Supplier and Product no longer have a manual picker at all: both come only from the scan (Product from
+  the barcode, Supplier from a Cobro delivery label's payload - see v0.28.0's `scan-payload.ts`). Each
+  shows a "Scan … to select/set …" placeholder until the scan supplies it
+- **Post receipt is disabled until both are known**, with a title/hint explaining why - a real
+  consequence, not a cosmetic one: a plain manufacturer barcode carries no supplier, so a receipt can no
+  longer be posted from one on this form. The code is expected to carry the information; a barcode that
+  doesn't is now a real "not yet known" instead of a fallback to pick around
+- Store is unaffected (already display-only since v0.28.0's single-store fact)
+- Fixed a real bug surfaced while making Product state-driven instead of DOM-ref-driven: the "Receive this
+  product" arrival-from-scan effect needed the same guarded-ref, run-once pattern `sales-order-form.tsx`
+  already uses, or React's set-state-in-effect lint (correctly) flagged the new state write
+- Verified live: a fresh load shows zero `<select>` elements in the GRN form and Post receipt disabled; a
+  Cobro label (Product + Supplier) enables it; a plain barcode matches the product but leaves Supplier
+  unknown and Post receipt correctly stays disabled
+- Files changed: `src/app/dashboard/receiving/receive-form.tsx`
+
 ## v0.28.0 — 2026-09-06
 
 **QR labels can now carry the supplier, so receiving scans once instead of scanning and then picking.**

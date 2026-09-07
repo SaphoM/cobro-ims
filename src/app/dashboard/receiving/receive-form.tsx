@@ -41,14 +41,15 @@ export function ReceiveForm({
 }) {
   const [state, formAction, pending] = useActionState(receiveStockAction, initialState);
   const [scanMessage, setScanMessage] = useState<{ text: string; ok: boolean } | null>(null);
-  const productSelectRef = useRef<HTMLSelectElement>(null);
   /*
     Mirrors the (uncontrolled) Product select purely so the read-only unit
     cost below can show the right catalogue price. The DOM select stays the
     source of truth for what's submitted - and the server re-derives the cost
     from the submitted product anyway - so this only ever drives the display.
   */
-  const [selectedProductId, setSelectedProductId] = useState(products[0]?.id ?? '');
+  // Empty until a scan sets it - Product has no manual picker any more, so
+  // there is genuinely nothing selected until then.
+  const [selectedProductId, setSelectedProductId] = useState('');
   const selectedProduct = products.find((p) => p.id === selectedProductId);
 
   /*
@@ -66,6 +67,14 @@ export function ReceiveForm({
   // rather than as a dropdown with a single option. More than one and the
   // picker comes back on its own.
   const onlyStore = warehouses.length === 1 ? warehouses[0] : null;
+
+  // Product and Supplier now only ever come from the scan (see those fields
+  // below) - so posting is blocked until the scan has actually supplied
+  // both, rather than submitting with an empty productId/supplierId the
+  // server would just reject anyway. Store isn't gated here: it's either the
+  // one real store (shown as a fact) or, if a second store ever exists, an
+  // ordinary picker that always has a valid default.
+  const canPost = Boolean(selectedProductId) && Boolean(scannedSupplierId);
   const quantityRef = useRef<HTMLInputElement>(null);
   const scanFormRef = useRef<HTMLFormElement>(null);
   const scanBarcodeRef = useRef<HTMLInputElement>(null);
@@ -73,8 +82,7 @@ export function ReceiveForm({
   function matchBarcode(scanned: string) {
     const { barcode, supplierId } = parseScanPayload(scanned);
     const match = products.find((p) => p.barcode === barcode);
-    if (match && productSelectRef.current) {
-      productSelectRef.current.value = match.id;
+    if (match) {
       setSelectedProductId(match.id);
       // Only trust a supplier the scan actually carried, and only one this
       // instance knows about - a label printed against a supplier since
@@ -102,8 +110,17 @@ export function ReceiveForm({
   // Coming here via "Receive this product" from the Barcode / QR scan page —
   // carry that product straight into the form instead of making the user
   // scan/search again. Runs the exact same match the manual scan box uses.
+  // Deliberately mount-time-only (guarded by a ref, not just the `if` above):
+  // this is a one-time sync of state from a URL param on arrival, which the
+  // lint rule below can't distinguish from an effect that would re-fire on
+  // every render - it only ever runs once per navigation here because the ref
+  // makes the second run a no-op.
+  const barcodeHandled = useRef(false);
   useEffect(() => {
-    if (initialBarcode) matchBarcode(initialBarcode);
+    if (initialBarcode && !barcodeHandled.current) {
+      barcodeHandled.current = true;
+      matchBarcode(initialBarcode);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialBarcode]);
 
@@ -179,22 +196,25 @@ export function ReceiveForm({
             Supplier
             {scannedSupplier && <span className="ml-1 font-normal text-text-faint">from the label</span>}
           </span>
+          {/*
+            Scan-only, no manual picker - the delivery label's code carries
+            the supplier, so there is nothing to choose by hand any more (see
+            src/lib/scan-payload.ts). A plain manufacturer barcode carries no
+            supplier at all, so that case is a real "not yet known" rather
+            than a default to fall back to - Post receipt stays disabled
+            until a Cobro label has actually supplied one (see `canPost`
+            below).
+          */}
           {scannedSupplier ? (
-            <>
-              <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
-                {scannedSupplier.name}
-              </div>
-              <input type="hidden" name="supplierId" value={scannedSupplier.id} />
-            </>
+            <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+              {scannedSupplier.name}
+            </div>
           ) : (
-            <select name="supplierId" required className={selectClass}>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex h-9 items-center text-[0.9rem] text-text-faint">
+              Scan a Cobro delivery label to set the supplier
+            </div>
           )}
+          <input type="hidden" name="supplierId" value={scannedSupplier?.id ?? ''} />
         </label>
 
         <label className="flex flex-col gap-1.5">
@@ -218,20 +238,20 @@ export function ReceiveForm({
         </label>
 
         <label className="flex flex-col gap-1.5 lg:col-span-2">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Product</span>
-          <select
-            name="productId"
-            required
-            ref={productSelectRef}
-            onChange={(e) => setSelectedProductId(e.target.value)}
-            className={selectClass}
-          >
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.sku} - {p.name}
-              </option>
-            ))}
-          </select>
+          <span className="text-[0.75rem] font-semibold text-text-muted">
+            Product
+            {selectedProduct && <span className="ml-1 font-normal text-text-faint">from the scan</span>}
+          </span>
+          {selectedProduct ? (
+            <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+              {selectedProduct.sku} - {selectedProduct.name}
+            </div>
+          ) : (
+            <div className="flex h-9 items-center text-[0.9rem] text-text-faint">
+              Scan or type a barcode above to select a product
+            </div>
+          )}
+          <input type="hidden" name="productId" value={selectedProductId} />
         </label>
 
         <label className="flex flex-col gap-1.5">
@@ -282,21 +302,27 @@ export function ReceiveForm({
               ? // Middle column of the five - which is both centred under the
                 // form and exactly the width the Overview's Scan button
                 // occupies, since that button is placed the same way.
-                'flex items-end lg:col-start-3'
-              : 'flex items-end lg:col-span-5'
+                'flex flex-col items-end gap-1.5 lg:col-start-3 lg:flex-row lg:items-center lg:gap-3'
+              : 'flex flex-col items-start gap-1.5 lg:col-span-5 lg:flex-row lg:items-center lg:gap-3'
           }
         >
           <button
             type="submit"
-            disabled={pending}
+            disabled={pending || !canPost}
+            title={canPost ? undefined : 'Scan a Cobro delivery label to set the product and supplier first'}
             className={
               centerSubmit
-                ? 'flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-[0.85rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:opacity-90'
-                : 'rounded-lg bg-accent px-5 py-2.5 text-[0.88rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:opacity-90'
+                ? 'flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-[0.85rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50'
+                : 'rounded-lg bg-accent px-5 py-2.5 text-[0.88rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50'
             }
           >
             {pending ? 'Posting…' : 'Post receipt'}
           </button>
+          {!canPost && !pending && (
+            <p className="text-[0.78rem] text-text-faint">
+              Scan a Cobro delivery label above to set the product and supplier.
+            </p>
+          )}
         </div>
       </form>
 
