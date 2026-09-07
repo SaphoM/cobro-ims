@@ -4,6 +4,32 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.40.0 — 2026-09-07
+
+**Engineer's Overview: two distinct scan actions replace the broken generic movement form.**
+- The old "Record a stock movement" card let an Engineer pick any movement type via dropdowns
+  (Product/Store/Type/Quantity), but every type it offered was gated behind a Stores permission
+  (`manage_receiving`/`manage_sales_orders`/`manage_transfers`/`approve_adjustments`) an Engineer never
+  holds - every submission from it was already being silently rejected. Deleted `record-movement-form.tsx`
+- New `engineer-scan-card.tsx` + `engineer-checkout-actions.ts` - no dropdowns, two scan buttons wired to
+  two already-real, already-ownership-checked write paths that just weren't previously reachable from one
+  scan:
+  - **"Scan out"** - resolves a scanned barcode to one of the Engineer's own approved (confirmed)
+    requisitions, shows a confirmation (product, qty, from, to, requisition #), then calls the existing
+    `dispatchSalesOrderAction` on confirm - the same action `/dashboard/sales`'s "Accept" button already
+    used. This is docs/ARCHITECTURE.md's originally-documented "engineer comes and scans to accept stock
+    items" - real for the first time, not a new mechanism
+  - **"Scan to Use"** - calls the existing `postScanAction({direction: 'use'})` directly on a matching scan,
+    posting immediately (no confirmation gate, matching that mode's own established precedent) - the same
+    ownership-checked, negative-stock-guarded action `/dashboard/scan`'s "Use" mode already posted, just
+    previously unreachable (that page had no route/nav entry)
+  - Transaction type is never client-supplied - the server derives it from which action was called and
+    re-checks session + ownership itself either way, same as every other mutation in this app
+  - "Scan to Use" is styled as the solid/filled button, "Scan out" as the outlined one; both sized to 200px
+- Verified live end-to-end with real data: created and approved a requisition, scanned it out (confirmation
+  matched exactly, stock moved store→station carrying WAC), scanned to use one (correct decrement, correct
+  "USED" message), and scanned an item not on the station (rejected with a clear reason, no ledger change)
+
 ## v0.39.0 — 2026-09-07
 
 **Stock by location: "Reserve"/"Reserved" order swapped, "Requisition" trigger restyled.**

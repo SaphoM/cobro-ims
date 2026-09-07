@@ -13,7 +13,7 @@ import { hasPermission } from '@/lib/permissions';
 import { HIDDEN_COST } from '@/lib/ui/cost-display';
 import { stockValue } from '@/lib/services/inventory-engine';
 import { ReceiveForm } from '@/app/dashboard/receiving/receive-form';
-import { RecordMovementForm } from '@/app/dashboard/record-movement-form';
+import { EngineerScanCard } from '@/app/dashboard/engineer-scan-card';
 import { StockByLocationCard, type StockView } from '@/app/dashboard/stock-by-location-card';
 import type { StockLedgerView } from '@/lib/domain/inventory';
 
@@ -242,19 +242,18 @@ export default async function DashboardOverviewPage() {
       )}
 
       {/* Stores now has the GRN card above for receiving, and Issue/Transfer/
-          Adjustment/Write-off happen on their own dedicated pages - this
-          generic scan-any-movement-type card is Engineer-only now, for their
-          own station. Admin has the GRN card above and every dedicated page
-          this same generic form used to stand in for, so this stopped
-          earning its place on Admin's Overview; Engineer still needs it -
-          it's their only way to record a movement on their own station. */}
-      {role?.name !== 'admin' && !isStoresRole && (
-        <RecordMovementForm
-          products={products}
-          warehouses={warehouses}
-          ledger={ledgerEntries}
-          canEditPrice={canEditPrice}
-          showCosts={showCosts}
+          Adjustment/Write-off happen on their own dedicated pages - Admin
+          has that plus every dedicated page the old generic movement form
+          used to stand in for, so it stopped earning its place on either of
+          their Overviews. Engineer-only now, and no longer that generic
+          form: every movement type it offered required a Stores permission
+          Engineer never holds, so every submission from it was already
+          being silently rejected. This is the two things an Engineer can
+          actually do - see engineer-scan-card.tsx. */}
+      {myStationId && (
+        <EngineerScanCard
+          myStationId={myStationId}
+          myStationLabel={warehouses.find((w) => w.id === myStationId)?.name ?? 'your station'}
         />
       )}
 
