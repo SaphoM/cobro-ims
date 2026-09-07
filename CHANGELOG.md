@@ -4,6 +4,21 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.31.0 — 2026-09-06
+
+**"Record a stock movement" removed from Stores profiles - Admin (and Engineer) only now.**
+- Stores Manager and Stores Clerk no longer see the generic scan-any-movement-type card on the Overview.
+  Receiving is now the dedicated GRN card above it; Issue happens via Requisitions, Transfer via the
+  Transfers page, Adjustment/Write-off via the Adjustments page - so nothing this card did for Stores is
+  actually gone, it now has one dedicated home per movement type instead of one generic card doing all of
+  them
+- Admin keeps it (oversight/ad-hoc use), and so does Engineer/Requester (their own station's accept/use
+  flow, unaffected by this change - the "Stores profiles" carve-out is specifically Stores Manager and
+  Stores Clerk)
+- Verified live: Admin and Engineer both still see "Record a stock movement"; Stores Manager and Stores
+  Clerk don't - the Overview goes straight from Receive stock (GRN) to Stock by location for them
+- Files changed: `src/app/dashboard/page.tsx`
+
 ## v0.30.0 — 2026-09-06
 
 **"From Supplier" / "To Location", and Quantity received is a live scan tally against an expected count.**

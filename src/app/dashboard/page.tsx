@@ -217,13 +217,19 @@ export default async function DashboardOverviewPage() {
         />
       )}
 
-      <RecordMovementForm
-        products={products}
-        warehouses={warehouses}
-        ledger={ledgerEntries}
-        canEditPrice={canEditPrice}
-        showCosts={showCosts}
-      />
+      {/* Stores now has the GRN card above for receiving, and Issue/Transfer/
+          Adjustment/Write-off happen on their own dedicated pages - this
+          generic scan-any-movement-type card is Admin (and Engineer, for
+          their own station) only, not a Stores duty any more. */}
+      {!isStoresRole && (
+        <RecordMovementForm
+          products={products}
+          warehouses={warehouses}
+          ledger={ledgerEntries}
+          canEditPrice={canEditPrice}
+          showCosts={showCosts}
+        />
+      )}
 
       <StockByLocationCard
         views={visibleViews}
