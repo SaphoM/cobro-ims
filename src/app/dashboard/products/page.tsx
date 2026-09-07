@@ -1,5 +1,7 @@
 import { productRepository } from '@/lib/data';
 import { NewProductForm } from '@/app/dashboard/products/new-product-form';
+import { BulkImportForm } from '@/app/dashboard/products/bulk-import-form';
+import { ImportInstructionsModal } from '@/app/dashboard/products/import-instructions-modal';
 import { PriceCell } from '@/app/dashboard/products/price-cell';
 import { getSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
@@ -36,14 +38,11 @@ export default async function ProductsPage() {
         <h2 className="mb-1 font-display text-[1.05rem] font-medium text-text">Bulk data import</h2>
         <p className="mb-4 text-[0.83rem] text-text-muted">
           For loading Cobro&apos;s real inventory in one batch rather than adding items one at a time below.
-          Download both templates, fill them in (see the included instructions for exactly what each column
-          means), and send the completed files to X Spark to load. <strong className="text-text-muted">
-          Not yet automatic</strong> - there&apos;s no in-app upload screen yet, so a completed file is
-          currently loaded by X Spark on Cobro&apos;s behalf, not self-service. See{' '}
-          <span className="text-accent-strong">BUSINESS DECISION REQUIRED</span> / next steps in
-          docs/ARCHITECTURE.md.
+          Download a template, fill it in (see the instructions for exactly what each column means), and
+          upload it below - every row is checked before anything is imported, so a mistake fails the whole
+          file with a list of exactly what to fix, rather than partially loading bad data.
         </p>
-        <div className="flex flex-wrap gap-3">
+        <div className="mb-4 flex flex-wrap gap-3">
           <a
             href="/templates/product-import-template.csv"
             download
@@ -58,13 +57,9 @@ export default async function ProductsPage() {
           >
             Download opening stock template (CSV)
           </a>
-          <a
-            href="/templates/README.txt"
-            className="rounded-lg border border-accent/[0.14] px-4 py-2.5 text-[0.85rem] font-semibold text-text-muted hover:text-accent-strong"
-          >
-            Read the instructions
-          </a>
+          <ImportInstructionsModal />
         </div>
+        <BulkImportForm />
       </section>
       )}
 

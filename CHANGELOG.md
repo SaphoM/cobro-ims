@@ -4,6 +4,40 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.37.0 — 2026-09-07
+
+**Bulk data import is now self-service - upload replaces "send it to X Spark".**
+- New `src/lib/csv.ts` - small dependency-free CSV parser handling the one edge case the template's own
+  README calls out (a quoted field containing a comma), RFC 4180's `""` escape, and a stray Excel BOM
+- New `bulk-import-actions.ts` (two Server Actions) + `bulk-import-form.tsx` (two upload cards) on
+  `/dashboard/products`, gated on `manage_catalogue` same as everything else in that section:
+  - **Products** - validates required columns (sku/name/unit_of_measure), SKU uniqueness (both within the
+    file and against the existing catalogue), barcode uniqueness, and that reorder_point/reorder_quantity
+    parse as numbers
+  - **Opening stock** - validates required columns (sku/warehouse_code/quantity_on_hand/unit_cost), that
+    every sku already exists as a product, every warehouse_code matches a real store, quantities/costs
+    parse as numbers, and no (sku, warehouse) pair repeats within the file
+  - Both are all-or-nothing: every row is checked before anything is written: one bad row fails the whole
+    file, with every problem listed at once ("Row 4: sku is required.", etc.) rather than a partial import
+    someone has to notice and clean up by hand
+  - Opening stock posts through `stockMovementRepository.record` (movementType `adjustment`,
+    `referenceType: 'bulk_import'`) - the same one write path every other stock-affecting workflow already
+    goes through, not a second importer-specific one
+  - `description` is accepted in the products CSV (for the uploader's own records) but not persisted - no
+    `Product` field or UI surfaces it anywhere in the app today, on-import or otherwise
+- New `import-instructions-modal.tsx` - "Read the instructions" now opens a modal (same visual/interaction
+  pattern as the Scan station's existing help modal) instead of linking out to the raw `README.txt`
+- `docs/ARCHITECTURE.md` updated - the "upload/import screen not built" line in §4's table and the matching
+  §6 next-step are both now marked done, since this was the last of that`BUSINESS DECISION REQUIRED` gap
+- Verified live end-to-end: missing-required-column rejection, duplicate-SKU/missing-field rejection
+  (product count unchanged - nothing written), a real product import (6→7 products), a bad-warehouse-code
+  rejection, and a real opening-stock import - confirmed the exact quantity/cost/WAC landed on the
+  Overview's Stock by location afterward
+
+**"Scan" removed from the Product catalogue's Add-a-product form.**
+- `new-product-form.tsx` - dropped the `<CameraScanner>` trigger and its now-unused `barcodeRef`; barcode
+  stays a plain typed field, same as it always could be alongside the scan option
+
 ## v0.36.0 — 2026-09-07
 
 **GRN receiving's field grid collapses until there's something to show.**

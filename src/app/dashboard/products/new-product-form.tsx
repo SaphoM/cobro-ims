@@ -1,15 +1,13 @@
 'use client';
 
-import { useActionState, useRef } from 'react';
+import { useActionState } from 'react';
 import { createProductAction, type CreateProductFormState } from '@/app/dashboard/products/actions';
-import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass } from '@/lib/ui/form-control-classes';
 
 const initialState: CreateProductFormState = { error: null, success: null };
 
 export function NewProductForm() {
   const [state, formAction, pending] = useActionState(createProductAction, initialState);
-  const barcodeRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="rounded-2xl border border-accent/[0.14] bg-surface p-5">
@@ -30,7 +28,7 @@ export function NewProductForm() {
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">Barcode</span>
-          <input ref={barcodeRef} name="barcode" placeholder="Optional" className={inputClass} />
+          <input name="barcode" placeholder="Optional" className={inputClass} />
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">Reorder point</span>
@@ -54,13 +52,6 @@ export function NewProductForm() {
           >
             {pending ? 'Adding…' : 'Add product'}
           </button>
-          <CameraScanner
-            buttonLabel="Scan"
-            className="rounded-lg border border-accent/30 bg-surface-2 px-5 py-2.5 text-[0.82rem] font-semibold text-accent-strong hover:bg-accent/10"
-            onScan={(value) => {
-              if (barcodeRef.current) barcodeRef.current.value = value;
-            }}
-          />
         </div>
       </form>
 
