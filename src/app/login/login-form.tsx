@@ -7,7 +7,7 @@ import { DEMO_ACCOUNTS } from '@/lib/demo-credentials';
 
 const initialState: SignInFormState = { error: null };
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string | null }) {
   const [state, formAction, pending] = useActionState(signInAction, initialState);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(0);
@@ -100,6 +100,7 @@ export function LoginForm() {
       )}
 
       <form action={formAction} className="flex flex-col gap-[17px]">
+        {next && <input type="hidden" name="next" value={next} />}
         <label className="flex flex-col gap-2">
           <span className="text-[0.8rem] font-semibold text-text-muted">Email address</span>
           <input

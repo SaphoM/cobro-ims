@@ -33,6 +33,8 @@ import type {
   Supplier,
   TransferStatus,
   User,
+  UUID,
+  ISODateTime,
   Warehouse,
 } from '@/lib/domain/inventory';
 
@@ -364,4 +366,61 @@ export interface UserRepository {
   setActive(userId: string, active: boolean): Promise<User>;
   /** RFQ Phase 6: 2FA enrollment status for privileged users. Mock — no real TOTP/authenticator, just the flag a real flow would set. */
   setMfaEnrolled(userId: string, enrolled: boolean): Promise<User>;
+}
+
+/**
+ * Desktop-to-phone camera handoff (RFQ Phase 5: browser camera scanning).
+ *
+ * A desktop browser has no rear camera worth scanning with, so "Scan with
+ * camera" on desktop hands the job to the user's phone instead: the desktop
+ * creates one of these, shows it as a QR the phone scans, and polls until
+ * the phone has resolved it. This is NOT the inventory QR/barcode itself -
+ * it carries only an opaque token identifying this handoff, never a
+ * barcode, a credential, or any inventory data. See
+ * src/components/scanner/camera-scanner.tsx.
+ *
+ * Single-use and short-lived by construction: `status` moves
+ * pending -> resolved (or -> expired) and never back, and a resolved or
+ * expired session is never reused for a second scan - the desktop opens a
+ * fresh one every time "Scan with camera" is clicked.
+ */
+export type ScanHandoffStatus = 'pending' | 'resolved' | 'expired';
+
+export interface ScanHandoffSession {
+  /** The opaque token - the only thing that ever appears in the QR or URL. */
+  id: UUID;
+  /** Whoever's desktop session created this - resolving belongs to whatever
+   *  phone scans the QR, but reading the result back is restricted to this
+   *  same authenticated user (see ScanHandoffRepository.get). */
+  initiatingUserId: UUID;
+  createdAt: ISODateTime;
+  expiresAt: ISODateTime;
+  status: ScanHandoffStatus;
+  /** Who actually resolved it (the phone's authenticated user) - recorded
+   *  for the audit trail even though it isn't required to match the
+   *  initiator; a shared desktop and a named operator's phone is the normal
+   *  case, not a suspicious one. */
+  resolvedByUserId: UUID | null;
+  /** The raw scanned string, once resolved - handed back to the desktop
+   *  exactly as if its own camera had decoded it. Never a mutating action by
+   *  itself; whatever the desktop does with it goes through the same
+   *  permission-checked Server Action any other scan result would. */
+  result: string | null;
+}
+
+export interface ScanHandoffRepository {
+  /** Creates a new pending session for `initiatingUserId`, expiring in a few
+   *  minutes. */
+  create(initiatingUserId: UUID): Promise<ScanHandoffSession>;
+  /** Read-only status check. Returns null for an id that never existed - a
+   *  guessed/mistyped token must look identical to an expired one, not leak
+   *  which is which. Callers additionally sweep `status` to 'expired' past
+   *  `expiresAt` even though nothing has resolved it, so a stale session
+   *  reads as expired rather than perpetually pending. */
+  get(id: UUID): Promise<ScanHandoffSession | null>;
+  /** Marks a still-pending, unexpired session resolved with the scanned
+   *  value and who scanned it. Throws if the session doesn't exist, has
+   *  already been resolved (single-use), or has expired - the phone gets a
+   *  clear reason rather than a silent no-op. */
+  resolve(id: UUID, resolvedByUserId: UUID, result: string): Promise<ScanHandoffSession>;
 }

@@ -56,6 +56,8 @@ import type {
   AppSettings,
   RoleRepository,
   SalesOrderRepository,
+  ScanHandoffRepository,
+  ScanHandoffSession,
   SettingsRepository,
   StockAdjustmentRepository,
   StockLedgerRepository,
@@ -916,6 +918,57 @@ export const mockSettingsRepository: SettingsRepository = {
   async setShowCostsToAllRoles(visible: boolean) {
     settingsState.showCostsToAllRoles = visible;
     return { ...settingsState };
+  },
+};
+
+// Desktop-to-phone camera handoff sessions - see ScanHandoffRepository's doc
+// comment in repositories.ts. Kept in-memory like every other mock
+// repository; nothing here is more sensitive than an opaque token, so this
+// needs no different treatment from the rest of the mock data layer.
+const SCAN_HANDOFF_TTL_MS = 3 * 60 * 1000; // 3 minutes - long enough to unlock a phone and open the camera, short enough that a forgotten tab doesn't stay live
+const scanHandoffSessions = new Map<string, ScanHandoffSession>();
+
+function sweepExpiredHandoff(session: ScanHandoffSession): ScanHandoffSession {
+  if (session.status === 'pending' && new Date(session.expiresAt).getTime() < Date.now()) {
+    session.status = 'expired';
+  }
+  return session;
+}
+
+export const mockScanHandoffRepository: ScanHandoffRepository = {
+  async create(initiatingUserId) {
+    const now = Date.now();
+    const session: ScanHandoffSession = {
+      id: randomUUID(),
+      initiatingUserId,
+      createdAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + SCAN_HANDOFF_TTL_MS).toISOString(),
+      status: 'pending',
+      resolvedByUserId: null,
+      result: null,
+    };
+    scanHandoffSessions.set(session.id, session);
+    return { ...session };
+  },
+  async get(id) {
+    const session = scanHandoffSessions.get(id);
+    if (!session) return null;
+    return { ...sweepExpiredHandoff(session) };
+  },
+  async resolve(id, resolvedByUserId, result) {
+    const session = scanHandoffSessions.get(id);
+    if (!session) throw new Error('That scanning session no longer exists.');
+    sweepExpiredHandoff(session);
+    if (session.status === 'expired') {
+      throw new Error('This scanning session has expired. Please generate a new QR code.');
+    }
+    if (session.status === 'resolved') {
+      throw new Error('This scanning session has already been used.');
+    }
+    session.status = 'resolved';
+    session.resolvedByUserId = resolvedByUserId;
+    session.result = result;
+    return { ...session };
   },
 };
 

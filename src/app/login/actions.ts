@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { attemptSignIn } from '@/lib/auth';
+import { safeNextPath } from '@/lib/safe-redirect';
 
 export interface SignInFormState {
   error: string | null;
@@ -19,5 +20,9 @@ export async function signInAction(
     return { error: result.error };
   }
 
-  redirect('/dashboard');
+  // Returns to wherever the user was headed before being asked to log in
+  // (today: the phone side of the desktop camera handoff) rather than always
+  // landing on the dashboard - see safeNextPath's doc comment for why this
+  // isn't just `formData.get('next')` passed straight to redirect().
+  redirect(safeNextPath(formData.get('next') as string | null) ?? '/dashboard');
 }

@@ -18,6 +18,7 @@ import {
   mockReceivingRepository,
   mockRoleRepository,
   mockSalesOrderRepository,
+  mockScanHandoffRepository,
   mockStockAdjustmentRepository,
   mockStockLedgerRepository,
   mockStockMovementRepository,
@@ -54,5 +55,6 @@ export const adjustmentReasonRepository = mockAdjustmentReasonRepository;
 export const stockAdjustmentRepository = mockStockAdjustmentRepository;
 export const userRepository = mockUserRepository;
 export const settingsRepository = mockSettingsRepository;
+export const scanHandoffRepository = mockScanHandoffRepository;
 
 export const isUsingMockData = DATA_SOURCE === 'mock';

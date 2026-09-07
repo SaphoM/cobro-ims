@@ -4,6 +4,54 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.32.0 — 2026-09-06
+
+**"Scan with camera" now hands off to a phone on desktop, instead of trying to use a desktop's own camera.**
+- `<CameraScanner>` decides once per open which experience to show, based on the device that clicked it -
+  see `src/lib/device.ts` (`pointer: coarse` + `maxTouchPoints`, not a screen-width or User-Agent guess):
+  - **Phone/tablet** - opens this browser's own camera directly, exactly as before. Zero behaviour change.
+  - **Desktop/laptop** - shows "Scan QR with your phone": a real, freshly-generated QR the phone scans to
+    open `/scan-session/[token]` there, with the desktop polling until the phone resolves it and handing
+    the result to the SAME `onScan` callback the direct camera path already used
+- **Zero changes at any of the 7 existing call sites** (scan-movement, new-product-form, sales-order-form,
+  adjustment-form, transfer-form, scan-station, receive-form) - every one of them gets the desktop handoff
+  automatically, because the branching lives inside `<CameraScanner>` itself, not in each caller
+- New `ScanHandoffRepository` (in-memory, same mock-data pattern as every other repository - no second
+  database) backs the handoff: a session is an opaque token plus who created it, when it expires (3
+  minutes), its status (pending/resolved/expired), and - once resolved - the raw scanned string. **The QR
+  itself carries nothing but that token in a URL** - no barcode, no credential, no inventory data
+  (`ScanHandoffSession`'s doc comment in `repositories.ts` spells out why)
+- **Single-use and short-lived by construction**: `resolve()` throws on an already-resolved or expired
+  session; a lookup can never distinguish "never existed" from "expired" (same message, so a guessed token
+  learns nothing); `getScanHandoffStatusAction` only returns a result to the same authenticated user who
+  created the session
+- **Phone auth is mandatory, not optional**: `/scan-session/[token]` gates on `getSession()` before
+  anything else - not logged in shows a login link carrying `?next=` back to the same session (new
+  `safeNextPath` helper validates it's a same-origin relative path first, closing the obvious open-redirect
+  hole a raw `next` query param would otherwise be). A scan can never reach `resolveScanHandoffAction`
+  anonymously. The actual inventory transaction the desktop goes on to do with the scanned value still
+  goes through whatever permission check it always did - a scan only ever identifies something, never
+  posts, on either device
+- Continuous mode (scan-station's counting stations) works the same way on desktop as it always has on
+  phone: after each resolved scan, a fresh handoff session opens automatically so the same phone keeps
+  scanning the next item without the desktop clicking "Scan with camera" again
+- Verified: repository logic directly (create/get/resolve, single-use rejection, unknown-token rejection);
+  live in the browser - the desktop modal generates a real QR, decoded with the browser's own
+  `BarcodeDetector` to confirm it encodes exactly `<origin>/scan-session/<token>` and nothing else; the
+  phone route correctly gates on auth with a working `next` round-trip; a genuinely expired session (real
+  wall-clock 3-minute TTL) surfaced the exact expiry copy on both phone and desktop, live-polled; "Generate
+  new QR" produces a real new token; and a mobile-emulated visit to the SAME token opens the direct camera
+  (not a nested handoff), confirming no infinite regress
+- **Limitation**: this sandbox has no camera hardware and the Browser pane blocks camera access outright,
+  so the literal "phone camera decodes a real barcode" sub-step couldn't be exercised end-to-end here.
+  Every other link in the chain was verified live against the real running server; the decode step itself
+  is pre-existing, unmodified `CameraScanner` code, not new
+- Files added: `src/lib/device.ts`, `src/lib/safe-redirect.ts`, `src/lib/scan-handoff-actions.ts`,
+  `src/app/scan-session/[token]/page.tsx`, `src/app/scan-session/[token]/scan-session-client.tsx`. Changed:
+  `src/lib/data/repositories.ts`, `src/lib/data/mock/repositories.ts`, `src/lib/data/index.ts`,
+  `src/components/scanner/camera-scanner.tsx`, `src/app/login/page.tsx`, `src/app/login/login-form.tsx`,
+  `src/app/login/actions.ts`
+
 ## v0.31.1 — 2026-09-06
 
 **Stores profiles default to the "Stores" tab on Stock by location.**
