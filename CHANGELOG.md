@@ -4,6 +4,40 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.38.0 — 2026-09-07
+
+**"Reserve" - scan-to-approve a pending requisition straight from Stock by location.**
+- New `pending-reservation-actions.ts` + `reserve-button.tsx`: a Stores-only "Reserve" button appears on a
+  store row exactly when a draft (not-yet-approved) requisition exists against it. Clicking it lists every
+  pending requisition on that row - department, quantity, requester - one at a time, each with its own
+  "Scan to reserve"
+- The scan confirms Stores is looking at the right item, not which item (the row already fixed that): a
+  decoded code is read back to its barcode and compared to the row's product. A match calls the existing
+  `confirmSalesOrderAction` - the same action `/dashboard/sales`'s own Approve button uses, so there is one
+  reservation code path, not two. A mismatch is rejected with an error naming expected vs. scanned barcode -
+  nothing reserved
+- "Scan to reserve" sized to match the app's standard scan-button treatment (`h-11`, same as "Scan with
+  camera" elsewhere)
+- Deliberately Stores-only (`stores_manager`/`stores_clerk`), narrower than the `manage_sales_orders`
+  permission it's built on (which Admin also holds via `'*'`) - a UI-visibility choice, not a new
+  authorization rule; Admin still approves the normal way via `/dashboard/sales`
+- Verified live end-to-end: created a real requisition as Engineer, reserved it as Stores Manager via a
+  scanned barcode, confirmed the Reserved figure updated (120 → 125) and the requisition shows "Approved" on
+  `/dashboard/sales` - the real approval path, not a shortcut duplicate. Confirmed Admin sees no Reserve
+  button even with a requisition pending
+
+**Stores profiles can no longer originate a requisition.**
+- `permissions.ts` - `create_requisitions` removed from both `stores_manager` and `stores_clerk` (matching
+  the existing exclusion pattern already used for Admin). Stores is who a requisition is raised AGAINST, not
+  another requester; Stores' own restocking need is a Purchase Order, the same path Admin uses
+- Since every requisition-creation surface already gates on this one permission, this single change removes
+  the Quick Requisition icon + modal from the Overview's Stock by location table AND the inline "New
+  requisition" form on `/dashboard/sales` for Stores, consistently - not just the one UI surface. Stores
+  still approves/issues/reserves requisitions raised by others (`manage_sales_orders`, `view_requisitions`
+  untouched); Engineer/Requester is completely unaffected
+- Verified live: Stores Manager shows 0 Quick-Requisition icons and no "New requisition" section; Engineer
+  still has both
+
 ## v0.37.0 — 2026-09-07
 
 **Bulk data import is now self-service - upload replaces "send it to X Spark".**

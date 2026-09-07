@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ReservedCell } from '@/app/dashboard/reserved-cell';
 import { QuickRequisitionButton } from '@/app/dashboard/quick-requisition-button';
+import { ReserveButton } from '@/app/dashboard/reserve-button';
 import { selectClass } from '@/lib/ui/form-control-classes';
 import type { Customer, StockLedgerView } from '@/lib/domain/inventory';
 
@@ -47,6 +48,8 @@ export function StockByLocationCard({
   sessionUserId,
   customers,
   locationsByProduct,
+  canReserve,
+  pendingByRow,
 }: {
   views: StockView[];
   /** Which tab the toggle opens on, decided by role rather than by array
@@ -76,6 +79,13 @@ export function StockByLocationCard({
    *  modal's "also on hand at" line. A plain object rather than a Map
    *  because this crosses the server/client boundary. */
   locationsByProduct: Record<string, { warehouseId: string; label: string; qty: number }[]>;
+  /** Same right /dashboard/sales's own Approve button requires - gates
+   *  whether a "Reserve" button can render at all (see ReserveButton). */
+  canReserve: boolean;
+  /** `${productId}::${warehouseId}` -> how many draft requisitions are
+   *  waiting on that row, store rows only. A row with none renders no
+   *  Reserve button - there is nothing for it to do yet. */
+  pendingByRow: Record<string, number>;
 }) {
   const [activeId, setActiveId] = useState<StockViewId>(
     views.some((v) => v.id === defaultViewId) ? defaultViewId : (views[0]?.id ?? 'stores')
@@ -269,11 +279,17 @@ export function StockByLocationCard({
                     )}
                   </td>
                   <td className="px-5 py-3 text-right tabular-nums">
-                    <ReservedCell
-                      productId={row.productId}
-                      warehouseId={row.warehouseId}
-                      quantityReserved={row.quantityReserved}
-                    />
+                    <div className="flex items-center justify-end gap-2">
+                      <ReservedCell
+                        productId={row.productId}
+                        warehouseId={row.warehouseId}
+                        quantityReserved={row.quantityReserved}
+                      />
+                      {canReserve &&
+                        (pendingByRow[`${row.productId}::${row.warehouseId}`] ?? 0) > 0 && (
+                          <ReserveButton productId={row.productId} warehouseId={row.warehouseId} />
+                        )}
+                    </div>
                   </td>
                   {showCosts && (
                     <>

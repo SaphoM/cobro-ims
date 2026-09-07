@@ -24,14 +24,15 @@ export type Permission =
   | 'manage_transfers'
   | 'request_adjustments'
   | 'approve_adjustments'
-  /** Create a draft requisition — Stores roles and Engineer/Requester alike.
-   *  Deliberately NOT held by Admin, even though Admin holds `'*'` for
-   *  everything else — see ADMIN_EXCLUDED_PERMISSIONS below. Requisitioning
-   *  is "I need MRO stock from Stores"; Admin's equivalent need is met by
-   *  Purchase Orders (`manage_purchase_orders`), a different process against
-   *  a different counterparty (a supplier, not Stores). Separate from
-   *  `manage_sales_orders` (approve/issue/cancel, Stores-only) so an Engineer can raise a
-   *  request without being able to process anyone's, their own included. */
+  /** Create a draft requisition — Engineer/Requester only. Neither Admin nor
+   *  either Stores role holds it, both deliberately: Admin's equivalent need
+   *  is met by Purchase Orders (`manage_purchase_orders`) against a
+   *  supplier, not a request against Stores; Stores IS the counterparty a
+   *  requisition is raised against, so Stores originating one against
+   *  itself makes no sense - Stores' own restocking need is also a Purchase
+   *  Order, the same path Admin uses. Separate from `manage_sales_orders`
+   *  (approve/issue/cancel, Stores-only) so an Engineer can raise a request
+   *  without being able to process anyone's, their own included. */
   | 'create_requisitions'
   /** See the Requisitions module and its contents — distinct from
    *  `create_requisitions` (originate one) so Admin can retain management
@@ -71,14 +72,18 @@ export type Permission =
  *                         process belongs to Engineer/Requester (and Stores itself). Admin retains
  *                         `view_requisitions` for management oversight of the module.
  *   stores_manager     — the operational store/inventory function: order stock from external
- *                         suppliers (purchase orders), receive, scan in, reserve, process
- *                         requisitions, issue, scan out, transfer. View-only on the product
- *                         catalogue and BOM — see `manage_catalogue` above. Not system
- *                         administration — creating users/Admins stays Admin-only.
+ *                         suppliers (purchase orders), receive, scan in, reserve, approve/issue
+ *                         requisitions RAISED BY SOMEONE ELSE, scan out, transfer. Does not
+ *                         originate a requisition itself — Stores is who a requisition is raised
+ *                         AGAINST, not another requester; Stores' own restocking is a Purchase
+ *                         Order, the same path Admin uses (see `create_requisitions`). View-only
+ *                         on the product catalogue and BOM — see `manage_catalogue` above. Not
+ *                         system administration — creating users/Admins stays Admin-only.
  *   stores_clerk       — day-to-day store transactions: the same physical stock actions and
  *                         supplier purchase orders as Stores Manager, minus `request_adjustments`.
  *                         A Clerk must not be able to raise a write-off/adjustment on their own
- *                         authority; that stays Stores Manager and Admin.
+ *                         authority; that stays Stores Manager and Admin. Does not originate a
+ *                         requisition either, same reasoning as Stores Manager above.
  *   engineer_requester — factory-floor staff who request MRO stock on behalf of their section
  *                         (see `area` on User). Can create and track their own requisitions;
  *                         cannot approve, issue, or otherwise touch the inventory ledger.
@@ -90,7 +95,6 @@ const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
     'manage_receiving',
     'manage_transfers',
     'request_adjustments',
-    'create_requisitions',
     'view_requisitions',
     'manage_sales_orders',
     'view_reports',
@@ -100,7 +104,6 @@ const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
     'manage_purchase_orders',
     'manage_receiving',
     'manage_transfers',
-    'create_requisitions',
     'view_requisitions',
     'manage_sales_orders',
     'view_reports',

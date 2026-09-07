@@ -2,6 +2,7 @@ import {
   customerRepository,
   productRepository,
   roleRepository,
+  salesOrderRepository,
   stockLedgerRepository,
   supplierRepository,
   warehouseRepository,
@@ -17,12 +18,13 @@ import { StockByLocationCard, type StockView } from '@/app/dashboard/stock-by-lo
 import type { StockLedgerView } from '@/lib/domain/inventory';
 
 export default async function DashboardOverviewPage() {
-  const [products, warehouses, ledgerEntries, customers, suppliers, session] = await Promise.all([
+  const [products, warehouses, ledgerEntries, customers, suppliers, salesOrders, session] = await Promise.all([
     productRepository.list(),
     warehouseRepository.list(),
     stockLedgerRepository.listAll(),
     customerRepository.list(),
     supplierRepository.list(),
+    salesOrderRepository.list(),
     getSession(),
   ]);
   const showCosts = await canSeeCosts(session);
@@ -85,6 +87,20 @@ export default async function DashboardOverviewPage() {
     list.sort((a, b) => b.qty - a.qty);
   }
 
+  // How many pending (draft, not-yet-approved) requisitions sit against each
+  // product/store row - decides whether that row's "Reserve" button renders
+  // at all (see stock-by-location-card.tsx / reserve-button.tsx). Store rows
+  // only: a station-sourced requisition is a peer pickup the OWNING Engineer
+  // approves themselves on /dashboard/sales, not something Stores reserves.
+  const pendingByRow = new Map<string, number>();
+  const warehouseTypeById = new Map(warehouses.map((w) => [w.id, w.type]));
+  for (const order of salesOrders) {
+    if (order.status !== 'draft') continue;
+    if (warehouseTypeById.get(order.warehouseId) !== 'store') continue;
+    const key = `${order.productId}::${order.warehouseId}`;
+    pendingByRow.set(key, (pendingByRow.get(key) ?? 0) + 1);
+  }
+
   /*
     Which stock views this role may see, built HERE on the server so an
     unentitled view never reaches the browser at all - the toggle can only
@@ -103,6 +119,14 @@ export default async function DashboardOverviewPage() {
   // Stores profiles only - Admin keeps the standard left-aligned submit on
   // the receive form (see ReceiveForm's `centerSubmit`).
   const isStoresRole = role?.name === 'stores_manager' || role?.name === 'stores_clerk';
+  // Stores profiles only, deliberately narrower than `manage_sales_orders`
+  // (which Admin also holds via '*') - the "Reserve" shortcut on the table
+  // below is a Stores-floor action, same restriction as the receive form's
+  // centred submit above. Admin still approves requisitions the normal way,
+  // on /dashboard/sales - confirmSalesOrderAction itself still only checks
+  // the permission, not the role, so this is a UI-visibility choice, not a
+  // new authorization rule.
+  const canReserve = isStoresRole;
   // Only an Engineer / Requester has a personal station; Admin and Stores
   // have none, which is what splits the two shapes of Station/Stores view
   // below.
@@ -251,6 +275,8 @@ export default async function DashboardOverviewPage() {
         sessionUserId={session?.id ?? null}
         customers={customers}
         locationsByProduct={Object.fromEntries(locationsByProduct)}
+        canReserve={canReserve}
+        pendingByRow={Object.fromEntries(pendingByRow)}
       />
     </div>
   );
