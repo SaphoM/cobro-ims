@@ -4,6 +4,30 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.27.0 — 2026-09-06
+
+**Receive stock (GRN) on the Overview, and its Unit cost is now Admin-only too.**
+- The GRN quick-receive form now also sits on the Overview, directly above "Record a stock movement", so a
+  delivery can be booked in without leaving the page. It is the **same component and the same server
+  action** as `/dashboard/receiving`, not a second implementation - one permission gate, one code path
+- Gated on `manage_receiving`, the permission the receiving route and the receive action already use:
+  Admin and both Stores roles get it, Engineer / Requester does not (and never receives the markup, since
+  the check is server-side). Store pickers are limited to real stores - supplier goods land in a store,
+  never straight onto an Engineer's personal station
+- **Unit cost on the GRN form now follows the v0.25.0 rule**: `manage_pricing` (Admin) edits it, everyone
+  else sees the catalogue price as plain bold orange text with no input. Putting the two forms on one page
+  made the inconsistency obvious - an editable cost in the GRN card sitting directly above a read-only one
+  in the movement card
+- Enforced server-side in `receiveStockAction`, mirroring `recordMovementAction`: a non-Admin's submitted
+  unit cost is discarded and re-derived - catalogue price, then the location's existing WAC, and a clear
+  refusal if there is neither. Never zero, which would drag WAC down and corrupt the valuation
+- Verified live: the editable input renders only for Admin on both `/dashboard` and `/dashboard/receiving`
+  (Stores Clerk gets a hidden field and read-only text on both), and a Stores Clerk receipt posted at the
+  catalogue price - Cement 2,252 → 2,253 bags with WAC moving 92.81 → 92.82, i.e. up toward R118 rather
+  than down toward zero
+- Files changed: `src/app/dashboard/page.tsx`, `src/app/dashboard/receiving/page.tsx`,
+  `src/app/dashboard/receiving/receive-form.tsx`, `src/app/dashboard/receiving/actions.ts`
+
 ## v0.26.0 — 2026-09-06
 
 **"Stock by location" gains role-aware views, a station picker and a product filter.**

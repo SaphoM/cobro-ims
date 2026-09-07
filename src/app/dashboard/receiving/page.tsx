@@ -1,6 +1,7 @@
 import { productRepository, receivingRepository, supplierRepository, warehouseRepository } from '@/lib/data';
 import { getSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
+import { canSeeCosts } from '@/lib/costs';
 import { AccessDenied } from '@/components/access-denied';
 import { ReceiveForm } from '@/app/dashboard/receiving/receive-form';
 
@@ -24,6 +25,12 @@ export default async function ReceivingPage({
       />
     );
   }
+
+  // Unit cost is Admin-only to set (`manage_pricing`), and seeing money at
+  // all is the separate, Admin-controlled setting - same two rules the
+  // Overview's forms follow.
+  const canEditPrice = await hasPermission(session, 'manage_pricing');
+  const showCosts = await canSeeCosts(session);
 
   const { barcode } = await searchParams;
   const [suppliers, warehouses, products, receipts] = await Promise.all([
@@ -49,6 +56,8 @@ export default async function ReceivingPage({
         warehouses={warehouses.filter((w) => w.type === 'store')}
         products={products}
         initialBarcode={barcode}
+        canEditPrice={canEditPrice}
+        showCosts={showCosts}
       />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">

@@ -3,6 +3,7 @@ import {
   productRepository,
   roleRepository,
   stockLedgerRepository,
+  supplierRepository,
   warehouseRepository,
 } from '@/lib/data';
 import { getSession } from '@/lib/auth';
@@ -10,16 +11,18 @@ import { canSeeCosts } from '@/lib/costs';
 import { hasPermission } from '@/lib/permissions';
 import { HIDDEN_COST } from '@/lib/ui/cost-display';
 import { stockValue } from '@/lib/services/inventory-engine';
+import { ReceiveForm } from '@/app/dashboard/receiving/receive-form';
 import { RecordMovementForm } from '@/app/dashboard/record-movement-form';
 import { StockByLocationCard, type StockView } from '@/app/dashboard/stock-by-location-card';
 import type { StockLedgerView } from '@/lib/domain/inventory';
 
 export default async function DashboardOverviewPage() {
-  const [products, warehouses, ledgerEntries, customers, session] = await Promise.all([
+  const [products, warehouses, ledgerEntries, customers, suppliers, session] = await Promise.all([
     productRepository.list(),
     warehouseRepository.list(),
     stockLedgerRepository.listAll(),
     customerRepository.list(),
+    supplierRepository.list(),
     getSession(),
   ]);
   const showCosts = await canSeeCosts(session);
@@ -34,6 +37,10 @@ export default async function DashboardOverviewPage() {
   // price, not an editable field. Seeing the figure is a separate rule
   // (`showCosts` above) - this one is only about changing it.
   const canEditPrice = session ? await hasPermission(session, 'manage_pricing') : false;
+  // Same permission /dashboard/receiving gates its whole route on, and that
+  // the receive action re-checks for itself - receiving is a Stores function
+  // (Admin and both Stores roles), never an Engineer's.
+  const canReceive = session ? await hasPermission(session, 'manage_receiving') : false;
 
   const productById = new Map(products.map((p) => [p.id, p]));
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
@@ -189,6 +196,22 @@ export default async function DashboardOverviewPage() {
           tone={lowStockCount > 0 ? 'warning' : 'default'}
         />
       </section>
+
+      {/* The same GRN quick-receive form /dashboard/receiving hosts, surfaced
+          here above the scan card so a delivery can be booked in without
+          leaving the Overview. One component, one action, one permission -
+          not a second implementation. Real physical stores only: goods from
+          a supplier land in a store, never straight onto an Engineer's
+          personal station. */}
+      {canReceive && (
+        <ReceiveForm
+          suppliers={suppliers}
+          warehouses={warehouses.filter((w) => w.type === 'store')}
+          products={products}
+          canEditPrice={canEditPrice}
+          showCosts={showCosts}
+        />
+      )}
 
       <RecordMovementForm
         products={products}

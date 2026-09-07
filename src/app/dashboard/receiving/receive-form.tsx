@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from 'react';
 import { receiveStockAction, type ReceiveFormState } from '@/app/dashboard/receiving/actions';
 import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
+import { HIDDEN_COST } from '@/lib/ui/cost-display';
 import type { Product, Supplier, Warehouse } from '@/lib/domain/inventory';
 
 const initialState: ReceiveFormState = { error: null, success: null };
@@ -13,15 +14,34 @@ export function ReceiveForm({
   warehouses,
   products,
   initialBarcode,
+  canEditPrice,
+  showCosts,
 }: {
   suppliers: Supplier[];
   warehouses: Warehouse[];
   products: Product[];
   initialBarcode?: string;
+  /** `manage_pricing` - Admin only. Everyone else sees the cost as read-only
+   *  bold text (the catalogue price), and the server discards whatever unit
+   *  cost their form submits - see receiveStockAction. Same rule the
+   *  Overview's stock-movement form follows. */
+  canEditPrice: boolean;
+  /** The separate, Admin-controlled "show costs to all roles" setting. Off
+   *  means money is withheld entirely, so the read-only display shows the
+   *  withheld marker instead of a figure. */
+  showCosts: boolean;
 }) {
   const [state, formAction, pending] = useActionState(receiveStockAction, initialState);
   const [scanMessage, setScanMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const productSelectRef = useRef<HTMLSelectElement>(null);
+  /*
+    Mirrors the (uncontrolled) Product select purely so the read-only unit
+    cost below can show the right catalogue price. The DOM select stays the
+    source of truth for what's submitted - and the server re-derives the cost
+    from the submitted product anyway - so this only ever drives the display.
+  */
+  const [selectedProductId, setSelectedProductId] = useState(products[0]?.id ?? '');
+  const selectedProduct = products.find((p) => p.id === selectedProductId);
   const quantityRef = useRef<HTMLInputElement>(null);
   const scanFormRef = useRef<HTMLFormElement>(null);
   const scanBarcodeRef = useRef<HTMLInputElement>(null);
@@ -30,6 +50,7 @@ export function ReceiveForm({
     const match = products.find((p) => p.barcode === barcode);
     if (match && productSelectRef.current) {
       productSelectRef.current.value = match.id;
+      setSelectedProductId(match.id);
       setScanMessage({ text: `Matched ${match.sku} - ${match.name}.`, ok: true });
       quantityRef.current?.focus();
     } else {
@@ -126,7 +147,13 @@ export function ReceiveForm({
 
         <label className="flex flex-col gap-1.5 lg:col-span-2">
           <span className="text-[0.75rem] font-semibold text-text-muted">Product</span>
-          <select name="productId" required ref={productSelectRef} className={selectClass}>
+          <select
+            name="productId"
+            required
+            ref={productSelectRef}
+            onChange={(e) => setSelectedProductId(e.target.value)}
+            className={selectClass}
+          >
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.sku} - {p.name}
@@ -150,8 +177,31 @@ export function ReceiveForm({
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Unit cost (R)</span>
-          <input type="number" name="unitCost" min="0" step="0.01" required placeholder="0.00" className={inputClass} />
+          <span className="text-[0.75rem] font-semibold text-text-muted">
+            Unit cost (R)
+            {!canEditPrice && showCosts && (
+              <span className="ml-1 font-normal text-text-faint">from the catalogue</span>
+            )}
+          </span>
+          {canEditPrice ? (
+            <input type="number" name="unitCost" min="0" step="0.01" required placeholder="0.00" className={inputClass} />
+          ) : (
+            <>
+              {/* Display-only for every role except Admin - plain bold text,
+                  not an input drawn to look unavailable. The figure is the
+                  selected product's catalogue price, which is what
+                  receiveStockAction will post for this user regardless of
+                  what the form sends. */}
+              <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+                {!showCosts
+                  ? HIDDEN_COST
+                  : selectedProduct?.unitPrice != null
+                    ? `R ${selectedProduct.unitPrice.toFixed(2)}`
+                    : 'No price set'}
+              </div>
+              <input type="hidden" name="unitCost" value={selectedProduct?.unitPrice ?? 0} />
+            </>
+          )}
         </label>
 
         <div className="flex items-end lg:col-span-5">
