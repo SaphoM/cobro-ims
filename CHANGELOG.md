@@ -4,6 +4,18 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.31.1 — 2026-09-06
+
+**Stores profiles default to the "Stores" tab on Stock by location.**
+- Stores Manager and Stores Clerk now open the Stock by location toggle on **Stores** instead of Station -
+  their own stock is what's in the store, not what's on Engineers' stations (that view is oversight for
+  them, not their default). Admin and Engineer/Requester keep the existing Station default
+- `StockByLocationCard` gained an explicit `defaultViewId` prop rather than inferring the opening tab from
+  array order, decided by role in `dashboard/page.tsx` (reusing the existing `isStoresRole` flag)
+- Verified live for all four roles: Admin -> Station, Engineer -> Station, Stores Manager -> Stores,
+  Stores Clerk -> Stores
+- Files changed: `src/app/dashboard/stock-by-location-card.tsx`, `src/app/dashboard/page.tsx`
+
 ## v0.31.0 — 2026-09-06
 
 **"Record a stock movement" removed from Stores profiles - Admin (and Engineer) only now.**

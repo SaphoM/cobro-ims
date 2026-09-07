@@ -37,6 +37,7 @@ export interface StockView {
  */
 export function StockByLocationCard({
   views,
+  defaultViewId,
   stationOptions,
   defaultStationId,
   productOptions,
@@ -48,6 +49,13 @@ export function StockByLocationCard({
   locationsByProduct,
 }: {
   views: StockView[];
+  /** Which tab the toggle opens on, decided by role rather than by array
+   *  order - Stores Manager/Clerk open on "Stores" (that is their own stock,
+   *  Station is Engineers' oversight); Admin and Engineer open on "Station"
+   *  as before. Falls back to the first view if the given id isn't actually
+   *  in `views` (defensive only - every role's default is one of its own
+   *  views by construction in dashboard/page.tsx). */
+  defaultViewId: StockViewId;
   /** Every Engineer's station this viewer may inspect, in offer order - an
    *  Engineer's own comes first, labelled "(yours)". Built server-side. */
   stationOptions: { id: string; label: string }[];
@@ -69,7 +77,9 @@ export function StockByLocationCard({
    *  because this crosses the server/client boundary. */
   locationsByProduct: Record<string, { warehouseId: string; label: string; qty: number }[]>;
 }) {
-  const [activeId, setActiveId] = useState<StockViewId>(views[0]?.id ?? 'stores');
+  const [activeId, setActiveId] = useState<StockViewId>(
+    views.some((v) => v.id === defaultViewId) ? defaultViewId : (views[0]?.id ?? 'stores')
+  );
   const [stationId, setStationId] = useState(defaultStationId);
   const [productId, setProductId] = useState('all');
   const active = views.find((v) => v.id === activeId) ?? views[0];

@@ -233,6 +233,10 @@ export default async function DashboardOverviewPage() {
 
       <StockByLocationCard
         views={visibleViews}
+        // Stores Manager/Clerk open on their own stock (Stores); Station
+        // there is Engineers' oversight, not their own. Admin and Engineer
+        // keep the existing Station default.
+        defaultViewId={isStoresRole ? 'stores' : 'station'}
         stationOptions={stationOptions}
         defaultStationId={defaultStationId}
         productOptions={productOptions}
