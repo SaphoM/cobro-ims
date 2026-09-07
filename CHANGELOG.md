@@ -4,6 +4,18 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.39.0 — 2026-09-07
+
+**Stock by location: "Reserve"/"Reserved" order swapped, "Requisition" trigger restyled.**
+- `stock-by-location-card.tsx` - the Reserved cell now shows "Reserve" before the reserved count, not after
+- `quick-requisition-button.tsx` - the Engineer's "Requisition" trigger is a labelled pill button matching
+  "Reserve"'s style (border, `bg-surface-2`, `text-accent-strong`) instead of a small icon-only button; the
+  now-unused clipboard icon was removed. Opens the exact same "Quick requisition" modal, unchanged - a
+  visual/trigger change only
+- The Requisition column's fixed icon-width (`w-10`) was dropped so the wider labelled button fits properly
+- Verified live as Engineer: "Requisition" renders on every Stores-view row it always did, still opens the
+  same modal
+
 ## v0.38.0 — 2026-09-07
 
 **"Reserve" - scan-to-approve a pending requisition straight from Stock by location.**

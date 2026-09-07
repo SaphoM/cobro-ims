@@ -111,9 +111,9 @@ export function QuickRequisitionButton({
         onClick={() => setOpen(true)}
         title={`Requisition ${productSku} from ${warehouseLabel}`}
         aria-label={`Requisition ${productSku} from ${warehouseLabel}`}
-        className="flex h-7 w-7 items-center justify-center rounded-lg text-text-faint transition-colors hover:bg-accent/10 hover:text-accent-strong"
+        className="rounded-lg border border-accent/30 bg-surface-2 px-2.5 py-1 text-[0.74rem] font-semibold text-accent-strong transition-colors hover:bg-accent/10"
       >
-        <ClipboardPlusIcon />
+        Requisition
       </button>
 
       {open && (
@@ -262,16 +262,5 @@ export function QuickRequisitionButton({
         </div>
       )}
     </>
-  );
-}
-
-function ClipboardPlusIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-      <rect x="6" y="4" width="12" height="17" rx="2" />
-      <path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
-      <path d="M12 11v6" />
-      <path d="M9 14h6" />
-    </svg>
   );
 }

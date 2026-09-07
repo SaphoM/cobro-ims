@@ -217,7 +217,7 @@ export function StockByLocationCard({
               <tr className="text-left text-text-faint">
                 <th className="px-5 py-2.5 font-medium">Product</th>
                 <th className="px-5 py-2.5 font-medium">Store</th>
-                {canRequest && <th className="w-10 px-2 py-2.5"><span className="sr-only">Requisition</span></th>}
+                {canRequest && <th className="px-2 py-2.5"><span className="sr-only">Requisition</span></th>}
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">On hand</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Reserved</th>
                 {showCosts && (
@@ -280,15 +280,15 @@ export function StockByLocationCard({
                   </td>
                   <td className="px-5 py-3 text-right tabular-nums">
                     <div className="flex items-center justify-end gap-2">
+                      {canReserve &&
+                        (pendingByRow[`${row.productId}::${row.warehouseId}`] ?? 0) > 0 && (
+                          <ReserveButton productId={row.productId} warehouseId={row.warehouseId} />
+                        )}
                       <ReservedCell
                         productId={row.productId}
                         warehouseId={row.warehouseId}
                         quantityReserved={row.quantityReserved}
                       />
-                      {canReserve &&
-                        (pendingByRow[`${row.productId}::${row.warehouseId}`] ?? 0) > 0 && (
-                          <ReserveButton productId={row.productId} warehouseId={row.warehouseId} />
-                        )}
                     </div>
                   </td>
                   {showCosts && (
