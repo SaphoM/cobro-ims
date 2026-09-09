@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
         random subdomain of trycloudflare.com every time the tunnel restarts
         - so this never needs updating for that case
   */
-  allowedDevOrigins: ["192.168.0.190", "*.trycloudflare.com"],
+  allowedDevOrigins: ["192.168.8.44", "*.trycloudflare.com"],
 };
 
 export default nextConfig;

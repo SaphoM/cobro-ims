@@ -82,10 +82,20 @@ export function TransferForm({ products, warehouses }: { products: Product[]; wa
       <form action={formAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <label className="flex flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">From</span>
+          {/*
+            Includes Engineer stations, not just stores - this is also how
+            Stores initiates bringing unused Engineer-held stock back (the
+            8 September client review's return flow: Stores identifies it,
+            Stores initiates the transfer, Engineer station -> Stores,
+            Stores confirms receipt). Same `name` for a station / `code` for
+            a store label every other picker in the app already uses - a
+            station's auto-generated code (e.g. STA-A1B2C3D4) is meaningless
+            to Stores picking who they're taking stock back from.
+          */}
           <select name="fromWarehouseId" required className={selectClass}>
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.code}
+                {w.type === 'engineer_station' ? w.name : w.code}
               </option>
             ))}
           </select>
@@ -96,7 +106,7 @@ export function TransferForm({ products, warehouses }: { products: Product[]; wa
           <select name="toWarehouseId" required defaultValue={warehouses[1]?.id} className={selectClass}>
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.code}
+                {w.type === 'engineer_station' ? w.name : w.code}
               </option>
             ))}
           </select>

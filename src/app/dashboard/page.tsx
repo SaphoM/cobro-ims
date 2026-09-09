@@ -5,6 +5,7 @@ import {
   salesOrderRepository,
   stockLedgerRepository,
   supplierRepository,
+  userRepository,
   warehouseRepository,
 } from '@/lib/data';
 import { getSession } from '@/lib/auth';
@@ -18,13 +19,14 @@ import { StockByLocationCard, type StockView } from '@/app/dashboard/stock-by-lo
 import type { StockLedgerView } from '@/lib/domain/inventory';
 
 export default async function DashboardOverviewPage() {
-  const [products, warehouses, ledgerEntries, customers, suppliers, salesOrders, session] = await Promise.all([
+  const [products, warehouses, ledgerEntries, customers, suppliers, salesOrders, users, session] = await Promise.all([
     productRepository.list(),
     warehouseRepository.list(),
     stockLedgerRepository.listAll(),
     customerRepository.list(),
     supplierRepository.list(),
     salesOrderRepository.list(),
+    userRepository.list(),
     getSession(),
   ]);
   const showCosts = await canSeeCosts(session);
@@ -127,10 +129,21 @@ export default async function DashboardOverviewPage() {
   // the permission, not the role, so this is a UI-visibility choice, not a
   // new authorization rule.
   const canReserve = isStoresRole;
+  // View-only oversight, added per the 8 September client review - see
+  // permissions.ts's ROLE_PERMISSIONS comment. Neither holds a station of
+  // their own (only Engineer / Requester does), so they fall into the same
+  // "no station" branches Admin/Stores use below - `stationRows`/
+  // `storesRows` narrow what that branch actually shows them to their own
+  // team, rather than everything.
+  const isTeamLeader = role?.name === 'mechanical_team_leader' || role?.name === 'electrical_team_leader';
   // Only an Engineer / Requester has a personal station; Admin and Stores
   // have none, which is what splits the two shapes of Station/Stores view
   // below.
   const myStationId = session ? warehouses.find((w) => w.ownerUserId === session.id)?.id ?? null : null;
+  // ownerUserId -> that owner's area, for scoping a Team Leader's Station
+  // view to their own section's stock only - the same "team, not the whole
+  // business" boundary /dashboard/sales and /dashboard/reports enforce.
+  const areaByOwnerId = new Map(users.map((u) => [u.id, u.area]));
 
   /*
     Station rows cover every Engineer's station, for everyone who gets this
@@ -141,21 +154,35 @@ export default async function DashboardOverviewPage() {
     picker), because seeing an unused item on a peer's shelf is the whole
     point of peer pickup. What changes is only that they can now look at one
     directly instead of reading it out of the Stores list.
+
+    A Team Leader is the one exception: unlike an Engineer, they have no
+    peer-pickup reason to see every station, so this narrows to stations
+    owned by someone in their own `area` only.
   */
-  const stationRows = ledgerView.filter((row) => row.warehouse.type === 'engineer_station');
+  const stationRows = ledgerView.filter(
+    (row) =>
+      row.warehouse.type === 'engineer_station' &&
+      (!isTeamLeader || areaByOwnerId.get(row.warehouse.ownerUserId ?? '') === session?.area)
+  );
 
   // The picker's options, in the order they're offered. An Engineer opens on
   // their OWN station (what this view showed before the picker existed);
   // Admin and Stores have no station of their own, so they open on all of
   // them, which is the oversight view they had before.
   const stationWarehouses = warehouses.filter((w) => w.type === 'engineer_station');
+  // A Team Leader's picker only offers their own team's stations - same
+  // narrowing as `stationRows` above, so the picker can never select a
+  // station the table itself would never show.
+  const visibleStationWarehouses = isTeamLeader
+    ? stationWarehouses.filter((w) => areaByOwnerId.get(w.ownerUserId ?? '') === session?.area)
+    : stationWarehouses;
   const stationOptions = [
     ...(myStationId
-      ? stationWarehouses
+      ? visibleStationWarehouses
           .filter((w) => w.id === myStationId)
           .map((w) => ({ id: w.id, label: `${w.name} (yours)` }))
       : []),
-    ...stationWarehouses
+    ...visibleStationWarehouses
       .filter((w) => w.id !== myStationId)
       .map((w) => ({ id: w.id, label: w.name })),
   ];
@@ -169,9 +196,12 @@ export default async function DashboardOverviewPage() {
     .map((product) => ({ id: product.id, label: `${product.sku} - ${product.name}` }))
     .sort((a, b) => a.label.localeCompare(b.label));
 
-  const storesRows = isAdminOrStores
+  const storesRows = isAdminOrStores || isTeamLeader
     ? // The physical store(s) - what is actually in the store, as opposed to
-      // what is out on stations.
+      // what is out on stations. A Team Leader gets this too: knowing
+      // what's actually available at Stores is useful context for their
+      // oversight, and it carries no team-specific sensitivity the way the
+      // Station view's "who's holding what" does.
       ledgerView.filter((row) => row.warehouse.type === 'store')
     : // What this Engineer may actually requisition from: every store PLUS
       // every OTHER Engineer's station, never their own - the same set
@@ -190,15 +220,17 @@ export default async function DashboardOverviewPage() {
     {
       id: 'station' as const,
       label: 'Station',
-      description: isAdminOrStores
-        ? "Stock currently sitting on Engineers' own stations - issued from the store, not yet used."
-        : 'Stock currently at your own station - accepted from the store, still yours to use.',
+      description: isTeamLeader
+        ? "Stock currently sitting on your team's own stations - issued from the store, not yet used."
+        : isAdminOrStores
+          ? "Stock currently sitting on Engineers' own stations - issued from the store, not yet used."
+          : 'Stock currently at your own station - accepted from the store, still yours to use.',
       rows: stationRows,
     },
     {
       id: 'stores' as const,
       label: 'Stores',
-      description: isAdminOrStores
+      description: isAdminOrStores || isTeamLeader
         ? 'Stock held in the store itself, excluding anything out on an Engineer\'s station.'
         : 'Stock you can requisition from - the store, plus any other Engineer\'s station holding it.',
       rows: storesRows,

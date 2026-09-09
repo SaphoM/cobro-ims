@@ -27,7 +27,9 @@ import {
   stockLedgerRepository,
   warehouseRepository,
 } from '@/lib/data';
-import type { User } from '@/lib/domain/inventory';
+import { countHeldStockReminders, getHeldStockReminders, STOCK_HELD_REMINDER_DAYS } from '@/lib/reminders';
+import { getNowMs } from '@/lib/now';
+import type { Product, StockLedgerEntry, User } from '@/lib/domain/inventory';
 
 export interface NotificationItem {
   id: string;
@@ -55,6 +57,16 @@ export async function getNotifications(session: User): Promise<NotificationItem[
   // Engineer's own station is that Engineer's to approve instead (see
   // requireApprovalRight in sales/actions.ts), so it's counted separately
   // below rather than here.
+  // How many (product, station) pairs across EVERY Engineer are currently
+  // reminder-eligible - see src/lib/reminders.ts. `ledger`/`products` are
+  // passed in rather than fetched here since the two callers below already
+  // have them for their own low-stock/valuation checks.
+  async function countHeldStockReminderItems(ledger: StockLedgerEntry[], products: Product[]): Promise<number> {
+    const warehouses = await warehouseRepository.list();
+    const stationIds = warehouses.filter((w) => w.type === 'engineer_station').map((w) => w.id);
+    return countHeldStockReminders(stationIds, ledger, products, getNowMs());
+  }
+
   async function countStoreSourcedApprovals(): Promise<number> {
     const [orders, warehouses] = await Promise.all([salesOrderRepository.list(), warehouseRepository.list()]);
     const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
@@ -91,6 +103,16 @@ export async function getNotifications(session: User): Promise<NotificationItem[
         tone: 'default',
       });
     }
+
+    const heldStockCount = await countHeldStockReminderItems(ledger, products);
+    if (heldStockCount > 0) {
+      items.push({
+        id: 'held-stock-reminders',
+        message: `${plural(heldStockCount, 'item')} held by Engineers past ${STOCK_HELD_REMINDER_DAYS} days`,
+        href: '/dashboard',
+        tone: 'default',
+      });
+    }
   }
 
   if (roleName === 'stores_manager' || roleName === 'stores_clerk') {
@@ -113,6 +135,21 @@ export async function getNotifications(session: User): Promise<NotificationItem[
         id: 'awaiting-receiving',
         message: `${plural(awaitingReceiving, 'purchase order')} awaiting receiving`,
         href: '/dashboard/receiving',
+        tone: 'default',
+      });
+    }
+
+    // "Stores retains oversight" (§21 of the 8 September review) - Stores
+    // is who initiates a return (see docs/ARCHITECTURE.md and
+    // /dashboard/transfers), so they're who needs to know what's overdue
+    // for one, not just each Engineer individually.
+    const [ledger, products] = await Promise.all([stockLedgerRepository.listAll(), productRepository.list()]);
+    const heldStockCount = await countHeldStockReminderItems(ledger, products);
+    if (heldStockCount > 0) {
+      items.push({
+        id: 'held-stock-reminders',
+        message: `${plural(heldStockCount, 'item')} held by Engineers past ${STOCK_HELD_REMINDER_DAYS} days - use or return`,
+        href: '/dashboard',
         tone: 'default',
       });
     }
@@ -141,6 +178,21 @@ export async function getNotifications(session: User): Promise<NotificationItem[
           id: 'my-station-approvals',
           message: `${plural(awaitingMyApproval, 'pickup request')} from your station awaiting your approval`,
           href: '/dashboard/sales',
+          tone: 'default',
+        });
+      }
+
+      // §21's actual ask: prompt THIS Engineer to use or have unused stock
+      // returned once it's sat on their own shelf a while - see
+      // src/lib/reminders.ts for what "a while" means and why it's a single
+      // named constant, not settled policy.
+      const [ledger, products] = await Promise.all([stockLedgerRepository.listAll(), productRepository.list()]);
+      const held = getHeldStockReminders(myStation.id, ledger, products, getNowMs());
+      if (held.length > 0) {
+        items.push({
+          id: 'held-stock-reminder',
+          message: `${plural(held.length, 'item')} held over ${STOCK_HELD_REMINDER_DAYS} days - use it, or ask Stores to arrange a return`,
+          href: '/dashboard',
           tone: 'default',
         });
       }

@@ -55,38 +55,65 @@ export type Permission =
   | 'view_audit_log';
 
 /**
- * Four roles, matching Cobro's actual operating structure — not a generic
+ * Six roles, matching Cobro's actual operating structure — not a generic
  * ERP hierarchy. See docs/ARCHITECTURE.md §1 for the full rationale and the
  * migration from the previous (admin/warehouse_clerk/procurement/viewer) set.
  *
- *   admin              — system administration, supplier management, product/category management,
- *                         thresholds, reporting, management visibility. Consolidates what used to
- *                         be separate Procurement and Viewer roles. Multiple Admins are expected
- *                         and fully supported — nothing here or in the user model treats Admin as
- *                         a singleton. Admin is also the ONLY role that can add a product to the
- *                         catalogue or edit a BOM (`manage_catalogue`) — Stores requested/received/
- *                         moves what Admin has already defined, it doesn't define new master data.
- *                         Admin does NOT requisition stock (see `ADMIN_EXCLUDED_PERMISSIONS`
- *                         below) — replenishment is Admin's job via Purchase Orders against a
- *                         supplier; a requisition is an internal request against Stores, and that
- *                         process belongs to Engineer/Requester (and Stores itself). Admin retains
- *                         `view_requisitions` for management oversight of the module.
- *   stores_manager     — the operational store/inventory function: order stock from external
- *                         suppliers (purchase orders), receive, scan in, reserve, approve/issue
- *                         requisitions RAISED BY SOMEONE ELSE, scan out, transfer. Does not
- *                         originate a requisition itself — Stores is who a requisition is raised
- *                         AGAINST, not another requester; Stores' own restocking is a Purchase
- *                         Order, the same path Admin uses (see `create_requisitions`). View-only
- *                         on the product catalogue and BOM — see `manage_catalogue` above. Not
- *                         system administration — creating users/Admins stays Admin-only.
- *   stores_clerk       — day-to-day store transactions: the same physical stock actions and
- *                         supplier purchase orders as Stores Manager, minus `request_adjustments`.
- *                         A Clerk must not be able to raise a write-off/adjustment on their own
- *                         authority; that stays Stores Manager and Admin. Does not originate a
- *                         requisition either, same reasoning as Stores Manager above.
- *   engineer_requester — factory-floor staff who request MRO stock on behalf of their section
- *                         (see `area` on User). Can create and track their own requisitions;
- *                         cannot approve, issue, or otherwise touch the inventory ledger.
+ *   admin                    — system administration, supplier management, product/category
+ *                               management, thresholds, reporting, management visibility.
+ *                               Consolidates what used to be separate Procurement and Viewer
+ *                               roles. Multiple Admins are expected and fully supported — nothing
+ *                               here or in the user model treats Admin as a singleton. Admin is
+ *                               also the ONLY role that can add a product to the catalogue or
+ *                               edit a BOM (`manage_catalogue`) — Stores requested/received/moves
+ *                               what Admin has already defined, it doesn't define new master data.
+ *                               Admin does NOT requisition stock (see `ADMIN_EXCLUDED_PERMISSIONS`
+ *                               below) — replenishment is Admin's job via Purchase Orders against a
+ *                               supplier; a requisition is an internal request against Stores, and
+ *                               that process belongs to Engineer/Requester (and Stores itself).
+ *                               Admin retains `view_requisitions` for management oversight of the
+ *                               module.
+ *   stores_manager           — the operational store/inventory function: order stock from
+ *                               external suppliers (purchase orders), receive, scan in, reserve,
+ *                               approve/issue requisitions RAISED BY SOMEONE ELSE, scan out,
+ *                               transfer. Does not originate a requisition itself — Stores is who
+ *                               a requisition is raised AGAINST, not another requester; Stores'
+ *                               own restocking is a Purchase Order, the same path Admin uses (see
+ *                               `create_requisitions`). View-only on the product catalogue and BOM
+ *                               — see `manage_catalogue` above. Not system administration —
+ *                               creating users/Admins stays Admin-only. Also the role responsible
+ *                               for INITIATING a return of unused Engineer-held stock back to
+ *                               Stores (`manage_transfers`) — see that permission's own comment
+ *                               for why this stays Stores-only rather than self-service for an
+ *                               Engineer.
+ *   stores_clerk              — day-to-day store transactions: the same physical stock actions
+ *                               and supplier purchase orders as Stores Manager, minus
+ *                               `request_adjustments`. A Clerk must not be able to raise a
+ *                               write-off/adjustment on their own authority; that stays Stores
+ *                               Manager and Admin. Does not originate a requisition either, same
+ *                               reasoning as Stores Manager above.
+ *   engineer_requester        — factory-floor staff who request MRO stock on behalf of their
+ *                               section (see `area` on User). Can create and track their own
+ *                               requisitions; cannot approve, issue, or otherwise touch the
+ *                               inventory ledger. Does NOT hold `manage_transfers` — an Engineer
+ *                               cannot return their own held stock to Stores unilaterally; see
+ *                               that permission's comment.
+ *   mechanical_team_leader    — oversight-only role over the Mechanical section's requisitions
+ *   electrical_team_leader    — and stock, added per the 8 September client review. Confirmed by
+ *                               that meeting: the role exists. NOT confirmed: whether a Team
+ *                               Leader approves/issues their team's requisitions — so neither
+ *                               holds `create_requisitions`, `manage_sales_orders`, or any
+ *                               Stores/Admin permission. Both hold only `view_requisitions` and
+ *                               `view_reports`, scoped to their own `area` (Mechanical/Electrical
+ *                               respectively — see /dashboard/sales and /dashboard/reports's
+ *                               per-role filtering) rather than the whole business. This is
+ *                               deliberately the smallest grant that satisfies "team oversight"
+ *                               without inventing an approval authority the meeting never
+ *                               confirmed. If Cobro later confirms Team Leader approval, the
+ *                               extension point is a new `approve_team_requisitions`-style
+ *                               permission (or widening `manage_sales_orders`'s area-scoped
+ *                               check) — nothing about the shape of ROLE_PERMISSIONS needs to
+ *                               change to add it.
  */
 const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
   admin: '*',
@@ -113,7 +140,17 @@ const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
   // permission this role holds. `view_reports` is granted too, but the
   // Reports page itself cuts what an Engineer sees down to their own
   // requisitions and stock-availability info — see /dashboard/reports.
+  // No `manage_transfers` - an Engineer cannot self-service a return to
+  // Stores; that stays a Stores-initiated transfer (see `manage_transfers`
+  // above and docs/ARCHITECTURE.md).
   engineer_requester: ['create_requisitions', 'view_requisitions', 'view_reports'],
+  // View-only oversight, deliberately - see the role-list comment above for
+  // why this stops well short of approval authority. Both team-leader roles
+  // get identical permissions; what differs is the `area` on the user
+  // record (Mechanical vs Electrical), which /dashboard/sales and
+  // /dashboard/reports use to actually scope what's visible.
+  mechanical_team_leader: ['view_requisitions', 'view_reports'],
+  electrical_team_leader: ['view_requisitions', 'view_reports'],
 };
 
 /**

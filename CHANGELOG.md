@@ -4,6 +4,51 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.41.0 — 2026-09-09
+
+**8 September client review — refinement, not rebuild. Sequenced per the client's explicit decisions.**
+
+**A. Mechanical/Electrical Team Leader roles - view-only oversight, no invented approval authority.**
+- New roles in `permissions.ts`/`seed.ts`: `mechanical_team_leader`, `electrical_team_leader`, each holding only
+  `view_requisitions` + `view_reports` - no create/approve/issue/manage permission of any kind. The meeting
+  confirmed the roles exist, not that they approve requisitions, so neither is invented here; the doc comment
+  names the exact extension point (a new permission, or a scoped `manage_sales_orders` check) for when Cobro
+  confirms that
+- Scoped by the existing `area` field (Mechanical/Electrical - the same mechanism Engineer/Requester already
+  uses), via a new shared `isAreaScopedRole()` (`areas.ts`) rather than hard-coding the two role names at every
+  call site: `/dashboard/sales` (Requisitions list), `/dashboard/reports` (Requisition summary + Low stock
+  only), and the Overview's Station view (own team's stations only; Stores view shown read-only for context)
+- Two demo accounts added (`mechlead@`/`electlead@cobroconcrete.co.za`) for testability
+- Verified live: zero Stores/Admin nav items, sees only their own team's requisitions (confirmed a Mechanical
+  Team Leader sees REQ-1001 but not an Electrical REQ-1002), no action buttons render anywhere
+
+**B. Engineer -> Stores returns confirmed Stores-initiated - and a real bug fixed to make it usable.**
+- No permission change - Engineer never held `manage_transfers`, stays that way
+- The existing `/dashboard/transfers` mechanism already supported this (any warehouse, Engineer stations
+  included, can be picked as source/destination) but the From/To pickers and the transfer history table were
+  showing a station's auto-generated `code` (e.g. `STA-A1B2C3D4`) instead of its name - unusable in practice for
+  Stores to identify which Engineer they're pulling from. Fixed in `transfer-form.tsx`/`transfers/page.tsx`
+  using the same name-for-station/code-for-store convention already used everywhere else
+- Verified live, full loop: Stores initiated a real return of 3 bags from an Engineer's station to DBN-FAC,
+  `in_transit` -> "Mark received" -> `Completed`, store on-hand landed exactly right
+
+**C. Reminder foundation - lightweight, no new notification platform.**
+- New `reminders.ts`: a single named constant `STOCK_HELD_REMINDER_DAYS` (14, explicitly flagged as a
+  placeholder pending Cobro's real number) plus two pure functions reading the existing stock ledger - no new
+  table, no persisted state
+- Wired into the existing notification bell (`notifications.ts`), not a new UI surface: Engineer sees "held
+  over N days - use it, or ask Stores to arrange a return"; Stores/Admin see an oversight rollup across every
+  Engineer station
+- Verified live: bell renders correctly for every role with no false positives and no crash
+
+**D. Monthly stock reconciliation - deliberately not built.** No code written; nothing above blocks adding it
+later against the same ledger the reminders module already reads.
+
+**E. Regression - full lifecycle re-run with real numbers, not assumed.** Draft -> Approve -> Issue (DBN-FAC
+2,250 -> 2,244, station 0 -> 6) -> Scan to Use (station 6 -> 5) -> Stores-initiated return (station 5 -> 2,
+DBN-FAC 2,244 -> 2,247) - every step verified against the actual rendered numbers, not just that the actions
+succeeded.
+
 ## v0.40.0 — 2026-09-07
 
 **Engineer's Overview: two distinct scan actions replace the broken generic movement form.**

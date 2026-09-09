@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
 import { auditLogRepository, roleRepository, userRepository, warehouseRepository } from '@/lib/data';
 import { hasPermission, requirePermission } from '@/lib/permissions';
-import { FACTORY_AREAS } from '@/lib/areas';
+import { FACTORY_AREAS, isAreaScopedRole } from '@/lib/areas';
 import { NEW_USER_DEFAULT_PASSWORD } from '@/lib/demo-credentials';
 import type { User } from '@/lib/domain/inventory';
 
@@ -59,21 +59,25 @@ export async function createUserAction(
   const role = await roleRepository.getById(roleId);
   if (!role) return { error: 'That role could not be found.', success: null };
 
-  // Area is only ever meaningful for Engineer / Requester (see User.area).
-  // Silently dropped for every other role rather than rejected, so a
-  // leftover value from switching the role dropdown client-side doesn't
-  // block submission.
+  // Area is only ever meaningful for Engineer / Requester and the two Team
+  // Leader roles (see User.area, src/lib/areas.ts). Silently dropped for
+  // every other role rather than rejected, so a leftover value from
+  // switching the role dropdown client-side doesn't block submission.
   const isEngineer = role.name === 'engineer_requester';
-  if (isEngineer && !areaRaw) {
-    return { error: 'Area is required for the Engineer / Requester role.', success: null };
+  const isAreaScoped = isAreaScopedRole(role.name);
+  if (isAreaScoped && !areaRaw) {
+    return { error: `Area is required for the ${role.description ?? role.name} role.`, success: null };
   }
-  if (isEngineer && !FACTORY_AREAS.includes(areaRaw as (typeof FACTORY_AREAS)[number])) {
+  if (isAreaScoped && !FACTORY_AREAS.includes(areaRaw as (typeof FACTORY_AREAS)[number])) {
     return { error: 'Choose an area from the list.', success: null };
   }
-  const area = isEngineer ? areaRaw : null;
+  const area = isAreaScoped ? areaRaw : null;
 
   try {
     const user = await userRepository.create({ email, fullName, roleId, area });
+    // A station is an Engineer / Requester thing only - a Team Leader
+    // oversees a section, they don't hold stock of their own (see
+    // docs/ARCHITECTURE.md and permissions.ts's role-list comment).
     if (isEngineer) await ensureStation(user);
     await auditLogRepository.write({
       tableName: 'users',
@@ -127,13 +131,15 @@ export async function updateUserRoleAction(userId: string, formData: FormData) {
   if (!role) throw new Error('That role could not be found.');
 
   const before = await userRepository.getById(userId);
-  // Moving a user OUT of Engineer / Requester clears their area — it's only
-  // meaningful for that role, and an admin isn't shown an area field for
-  // any other role to consciously keep it set.
-  if (role.name !== 'engineer_requester' && before?.area) {
+  // Moving a user OUT of every area-scoped role clears their area — it's
+  // only meaningful for those roles, and an admin isn't shown an area field
+  // for any other role to consciously keep it set.
+  if (!isAreaScopedRole(role.name) && before?.area) {
     await userRepository.updateArea(userId, null);
   }
   const user = await userRepository.updateRole(userId, roleId);
+  // A station is an Engineer / Requester thing only - see the same note in
+  // createUserAction above.
   if (role.name === 'engineer_requester') await ensureStation(user);
   await auditLogRepository.write({
     tableName: 'users',

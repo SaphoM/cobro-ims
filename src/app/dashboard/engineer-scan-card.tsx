@@ -106,7 +106,7 @@ export function EngineerScanCard({
         Use</strong> records stock already on your station as used.
       </p>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap justify-center gap-3">
         <button
           type="button"
           onClick={() => setMode('checkout')}

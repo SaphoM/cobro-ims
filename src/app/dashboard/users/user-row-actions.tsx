@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { setUserActiveAction, updateUserAreaAction, updateUserRoleAction } from '@/app/dashboard/users/actions';
 import { selectClass } from '@/lib/ui/form-control-classes';
-import { FACTORY_AREAS } from '@/lib/areas';
+import { FACTORY_AREAS, isAreaScopedRole } from '@/lib/areas';
 import type { Role, User } from '@/lib/domain/inventory';
 
 /**
@@ -15,7 +15,7 @@ import type { Role, User } from '@/lib/domain/inventory';
 export function UserRowActions({ user, roles, isSelf }: { user: User; roles: Role[]; isSelf: boolean }) {
   const [roleId, setRoleId] = useState(user.roleId);
   const selectedRole = roles.find((r) => r.id === roleId);
-  const isEngineer = selectedRole?.name === 'engineer_requester';
+  const isAreaScoped = isAreaScopedRole(selectedRole?.name);
 
   return (
     <div className="flex flex-col items-end gap-2">
@@ -40,7 +40,7 @@ export function UserRowActions({ user, roles, isSelf }: { user: User; roles: Rol
         </button>
       </form>
 
-      {isEngineer && (
+      {isAreaScoped && (
         <form action={updateUserAreaAction.bind(null, user.id)} className="flex items-center gap-2">
           <select name="area" defaultValue={user.area ?? ''} className={`${selectClass} w-40`}>
             <option value="" disabled>

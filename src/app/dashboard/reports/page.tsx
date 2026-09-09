@@ -9,6 +9,7 @@ import {
   stockLedgerRepository,
   stockMovementRepository,
   supplierRepository,
+  userRepository,
   warehouseRepository,
 } from '@/lib/data';
 import {
@@ -42,7 +43,7 @@ const PURCHASING_SECTIONS = new Set(['Purchase order summary', 'Supplier summary
 const ENGINEER_VISIBLE_SECTIONS = new Set(['Requisition summary', 'Low stock / reorder suggestions']);
 
 export default async function ReportsPage() {
-  const [products, warehouses, ledger, suppliers, customers, allSalesOrders, purchaseOrders, movements, adjustments, adjustmentReasons, session] =
+  const [products, warehouses, ledger, suppliers, customers, allSalesOrders, purchaseOrders, movements, adjustments, adjustmentReasons, users, session] =
     await Promise.all([
       productRepository.list(),
       warehouseRepository.list(),
@@ -54,17 +55,33 @@ export default async function ReportsPage() {
       stockMovementRepository.listRecent(200),
       stockAdjustmentRepository.list(),
       adjustmentReasonRepository.list(),
+      userRepository.list(),
       getSession(),
     ]);
 
   const role = session ? await roleRepository.getById(session.roleId) : null;
   const isEngineer = role?.name === 'engineer_requester';
   const isStoresClerk = role?.name === 'stores_clerk';
+  // View-only oversight, added per the 8 September client review - see
+  // permissions.ts's ROLE_PERMISSIONS comment.
+  const isTeamLeader = role?.name === 'mechanical_team_leader' || role?.name === 'electrical_team_leader';
+  const userById = new Map(users.map((u) => [u.id, u]));
   // Engineers only ever see their own requisitions here, same rule as
-  // /dashboard/sales - never everyone else's, even in a read-only report.
-  const salesOrders = isEngineer && session ? allSalesOrders.filter((o) => o.createdBy === session.id) : allSalesOrders;
+  // /dashboard/sales - never everyone else's, even in a read-only report. A
+  // Team Leader sees every requisition raised by someone in their own
+  // `area` - team oversight, not the whole business (§22/§23).
+  const salesOrders =
+    isEngineer && session
+      ? allSalesOrders.filter((o) => o.createdBy === session.id)
+      : isTeamLeader && session?.area
+        ? allSalesOrders.filter((o) => userById.get(o.createdBy)?.area === session.area)
+        : allSalesOrders;
   const hideSection = (title: string) =>
-    isEngineer ? !ENGINEER_VISIBLE_SECTIONS.has(title) : isStoresClerk ? PURCHASING_SECTIONS.has(title) : false;
+    isEngineer || isTeamLeader
+      ? !ENGINEER_VISIBLE_SECTIONS.has(title)
+      : isStoresClerk
+        ? PURCHASING_SECTIONS.has(title)
+        : false;
 
   const now = getNowMs();
   const valuation = buildStockValuationReport(ledger, products, warehouses);
@@ -89,9 +106,11 @@ export default async function ReportsPage() {
         <p className="text-[0.86rem] text-text-muted">
           {isEngineer
             ? 'Your own requisitions and what’s currently below reorder point - the purchasing, supplier and warehouse-valuation reports below are a Stores/Admin function.'
-            : isStoresClerk
-              ? 'Operational store reports - stock, requisitions and movements. Purchasing and supplier detail is a Stores Manager/Admin function.'
-              : 'Fifteen of the RFQ’s "15+" standard reports - stock valuation, low stock, sales, customers, purchase orders, suppliers, invoice ageing, movement history, receiving history, movement type totals, pick list, adjustment reasons, warehouse summary, open purchase orders, and dormant stock.'}{' '}
+            : isTeamLeader
+              ? 'Your team’s requisitions and what’s currently below reorder point - purchasing, supplier and warehouse-valuation detail is a Stores/Admin function.'
+              : isStoresClerk
+                ? 'Operational store reports - stock, requisitions and movements. Purchasing and supplier detail is a Stores Manager/Admin function.'
+                : 'Fifteen of the RFQ’s "15+" standard reports - stock valuation, low stock, sales, customers, purchase orders, suppliers, invoice ageing, movement history, receiving history, movement type totals, pick list, adjustment reasons, warehouse summary, open purchase orders, and dormant stock.'}{' '}
           Every table exports to CSV (opens in Excel), per the RFQ&apos;s data-export requirement.
         </p>
       </div>

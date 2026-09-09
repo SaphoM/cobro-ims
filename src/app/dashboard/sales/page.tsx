@@ -32,6 +32,10 @@ export default async function SalesPage({
   const role = session ? await roleRepository.getById(session.roleId) : null;
   const isEngineer = role?.name === 'engineer_requester';
   const isAdmin = role?.name === 'admin';
+  // View-only oversight, added per the 8 September client review - see
+  // permissions.ts's ROLE_PERMISSIONS comment for why this stops at
+  // visibility (`view_requisitions`) rather than approval authority.
+  const isTeamLeader = role?.name === 'mechanical_team_leader' || role?.name === 'electrical_team_leader';
   // Admin does not requisition stock - see permissions.ts's ROLE_EXCLUSIONS.
   // The server action already refuses this regardless of what's rendered
   // here, but a form Admin can fill in and only then be told no is a dead
@@ -39,25 +43,32 @@ export default async function SalesPage({
   // of just vanishing.
   const canCreate = session ? await hasPermission(session, 'create_requisitions') : false;
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
+  const userById = new Map(users.map((u) => [u.id, u]));
   // Engineer / Requester sees requisitions they raised themselves, PLUS any
   // peer requisition sourced from their own station (see Warehouse's doc
   // comment in src/lib/domain/inventory.ts) - they need to see those to
-  // Approve/release them. Every other role still sees the full list, same
-  // as before this role model existed.
+  // Approve/release them. A Team Leader sees every requisition raised by
+  // someone in their own `area` (Mechanical/Electrical) - "team oversight",
+  // not the whole business, per the 8 September review; §22/§23. Every
+  // other role still sees the full list, same as before this role model
+  // existed.
   const myStationId = session ? warehouses.find((w) => w.ownerUserId === session.id)?.id : undefined;
   const orders =
     isEngineer && session
       ? allOrders.filter((o) => o.createdBy === session.id || o.warehouseId === myStationId)
-      : allOrders;
+      : isTeamLeader && session?.area
+        ? allOrders.filter((o) => userById.get(o.createdBy)?.area === session.area)
+        : allOrders;
   // Stores/Admin can process every requisition, unchanged. An Engineer
   // additionally gets two narrow, ownership-based rights the server checks
   // independently in sales/actions.ts: approving a peer pickup sourced from
-  // their own station, and accepting/cancelling their own request.
+  // their own station, and accepting/cancelling their own request. A Team
+  // Leader gets neither - `manage_sales_orders` is false for them, so
+  // RequisitionActionsCell renders no action buttons on any row they see.
   const canProcess = session ? await hasPermission(session, 'manage_sales_orders') : false;
 
   const customerById = new Map(customers.map((c) => [c.id, c]));
   const productById = new Map(products.map((p) => [p.id, p]));
-  const userById = new Map(users.map((u) => [u.id, u]));
   // Requisition sources: every store, plus every OTHER Engineer's station -
   // seeing an unused item sitting on a peer's shelf and requesting it
   // straight from there (instead of a fresh store pickup) is the point of

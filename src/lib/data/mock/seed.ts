@@ -69,6 +69,24 @@ export const roles: Role[] = [
     permissions: { create_requisitions: true, view_reports: true },
     createdAt: '2026-01-01T00:00:00Z',
   },
+  // Added per the 8 September client review - team oversight only, no
+  // approval authority (the meeting confirmed the roles exist, not that
+  // they approve requisitions). See permissions.ts's ROLE_PERMISSIONS
+  // comment for the full reasoning and the extension point if that changes.
+  {
+    id: 'role-mechanical-lead',
+    name: 'mechanical_team_leader',
+    description: 'Mechanical Team Leader',
+    permissions: { view_requisitions: true, view_reports: true },
+    createdAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'role-electrical-lead',
+    name: 'electrical_team_leader',
+    description: 'Electrical Team Leader',
+    permissions: { view_requisitions: true, view_reports: true },
+    createdAt: '2026-01-01T00:00:00Z',
+  },
 ];
 
 // Same four user IDs as before the role migration (only fullName/email/role/area
@@ -147,6 +165,33 @@ export const users: User[] = [
     fullName: 'Karabo Dlamini',
     roleId: 'role-engineer',
     area: 'Workshop',
+    isActive: true,
+    mfaEnrolled: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  // On the login page's demo-account picker (see demo-credentials.ts) since
+  // there's no existing Mechanical/Electrical team-leader-area coverage
+  // otherwise reachable without creating one live via /dashboard/users.
+  // Demo Engineer (area: Mechanical) and Sarah Naidoo (area: Electrical)
+  // above are exactly what each of these should - and shouldn't - see.
+  {
+    id: 'user-lead-mechanical',
+    email: 'mechlead@cobroconcrete.co.za',
+    fullName: 'Demo Mechanical Lead',
+    roleId: 'role-mechanical-lead',
+    area: 'Mechanical',
+    isActive: true,
+    mfaEnrolled: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'user-lead-electrical',
+    email: 'electlead@cobroconcrete.co.za',
+    fullName: 'Demo Electrical Lead',
+    roleId: 'role-electrical-lead',
+    area: 'Electrical',
     isActive: true,
     mfaEnrolled: false,
     createdAt: '2026-01-01T00:00:00Z',

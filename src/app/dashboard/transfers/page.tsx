@@ -4,6 +4,17 @@ import { hasPermission } from '@/lib/permissions';
 import { AccessDenied } from '@/components/access-denied';
 import { TransferForm } from '@/app/dashboard/transfers/transfer-form';
 import { completeTransferAction } from '@/app/dashboard/transfers/actions';
+import type { Warehouse } from '@/lib/domain/inventory';
+
+// Same name-for-a-station/code-for-a-store convention every other picker in
+// the app uses - a station's auto-generated code (e.g. STA-A1B2C3D4) means
+// nothing in a history table where a Stores-initiated Engineer-station
+// return (see TransferForm's "From" picker) is exactly what this needs to
+// show clearly.
+function warehouseLabel(w: Warehouse | undefined): string {
+  if (!w) return '-';
+  return w.type === 'engineer_station' ? w.name : w.code;
+}
 
 export default async function TransfersPage() {
   const session = await getSession();
@@ -59,8 +70,8 @@ export default async function TransfersPage() {
                 {transfers.map((t) => (
                   <tr key={t.id} className="border-t border-accent/[0.08]">
                     <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{t.transferNumber}</td>
-                    <td className="px-5 py-3 text-text-muted">{warehouseById.get(t.fromWarehouseId)?.code}</td>
-                    <td className="px-5 py-3 text-text-muted">{warehouseById.get(t.toWarehouseId)?.code}</td>
+                    <td className="px-5 py-3 text-text-muted">{warehouseLabel(warehouseById.get(t.fromWarehouseId))}</td>
+                    <td className="px-5 py-3 text-text-muted">{warehouseLabel(warehouseById.get(t.toWarehouseId))}</td>
                     <td className="px-5 py-3">
                       <span
                         className={`rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${
