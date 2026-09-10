@@ -994,6 +994,9 @@ export const mockUserRepository: UserRepository = {
       fullName: input.fullName,
       roleId: input.roleId,
       area: input.area ?? null,
+      // Every new user starts on the role default for label creation; an
+      // Admin can override per user afterwards (see setLabelPermission).
+      labelPermission: 'inherited',
       isActive: true,
       mfaEnrolled: false,
       createdAt: now,
@@ -1006,6 +1009,9 @@ export const mockUserRepository: UserRepository = {
     const user = state.users.find((u) => u.id === userId);
     if (!user) throw new Error('User not found.');
     user.roleId = roleId;
+    // Deliberately NOT touching `labelPermission` here - an explicit
+    // grant/revoke is a decision about the person and must survive a role
+    // change (contrast `area`, which updateUserRoleAction clears). §15.
     user.updatedAt = new Date().toISOString();
     return user;
   },
@@ -1013,6 +1019,13 @@ export const mockUserRepository: UserRepository = {
     const user = state.users.find((u) => u.id === userId);
     if (!user) throw new Error('User not found.');
     user.area = area;
+    user.updatedAt = new Date().toISOString();
+    return user;
+  },
+  async setLabelPermission(userId, value) {
+    const user = state.users.find((u) => u.id === userId);
+    if (!user) throw new Error('User not found.');
+    user.labelPermission = value;
     user.updatedAt = new Date().toISOString();
     return user;
   },

@@ -16,7 +16,11 @@ export default async function ProductsPage() {
   // no add-product form, no bulk-import section, no link into Product
   // labels (a page they can't open anyway - see /dashboard/labels).
   const canManageCatalogue = session ? await hasPermission(session, 'manage_catalogue') : false;
-  const canPrintLabels = session ? await hasPermission(session, 'manage_receiving') : false;
+  // Same permission /dashboard/labels itself gates on - `hasPermission`
+  // resolves the per-user override, so a Stores Clerk whose label permission
+  // was revoked also loses the "Print labels" row link here, not just the
+  // nav entry.
+  const canPrintLabels = session ? await hasPermission(session, 'create_product_labels') : false;
   const sorted = [...products].sort((a, b) => a.name.localeCompare(b.name));
 
   return (

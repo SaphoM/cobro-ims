@@ -18,6 +18,7 @@ import type {
   InterWarehouseTransfer,
   Invoice,
   InvoicePayment,
+  LabelPermission,
   PoStatus,
   Product,
   ProductBomLine,
@@ -363,6 +364,9 @@ export interface UserRepository {
   create(input: CreateUserInput): Promise<User>;
   updateRole(userId: string, roleId: string): Promise<User>;
   updateArea(userId: string, area: string | null): Promise<User>;
+  /** Admin's per-user override of `create_product_labels` — see
+   *  User.labelPermission and hasPermission. */
+  setLabelPermission(userId: string, value: LabelPermission): Promise<User>;
   setActive(userId: string, active: boolean): Promise<User>;
   /** RFQ Phase 6: 2FA enrollment status for privileged users. Mock — no real TOTP/authenticator, just the flag a real flow would set. */
   setMfaEnrolled(userId: string, enrolled: boolean): Promise<User>;

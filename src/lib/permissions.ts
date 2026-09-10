@@ -45,6 +45,18 @@ export type Permission =
   | 'manage_suppliers'
   | 'manage_customers'
   | 'manage_pricing'
+  /** Create/print Product Labels and the QR codes on them (/dashboard/labels).
+   *  One business permission covering both — the QR is generated as part of
+   *  the label, never on its own, so there is nothing to authorise
+   *  separately. Role default: Admin, Supervisor, Stores Manager and Stores
+   *  Clerk YES; Team Leaders and Engineer / Requester NO. UNLIKE every other
+   *  permission this is ALSO overridable per user: `hasPermission` below
+   *  consults `User.labelPermission` (inherited/allowed/revoked) so an Admin
+   *  can grant it to an individual who wouldn't have it by role, or revoke
+   *  it from one who would. It is a print/identify capability only — it
+   *  grants NO inventory authority (receiving, issuing, adjusting, pricing,
+   *  catalogue edits all stay on their own separate permissions). */
+  | 'create_product_labels'
   /** Create/edit users and change roles — Admin only. See docs/ARCHITECTURE.md §1 (user/role model). */
   | 'manage_users'
   | 'view_reports'
@@ -152,6 +164,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
     'manage_sales_orders',
     'view_reports',
     'view_audit_log',
+    'create_product_labels',
   ],
   stores_clerk: [
     'manage_purchase_orders',
@@ -161,6 +174,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
     'manage_sales_orders',
     'view_reports',
     'view_audit_log',
+    'create_product_labels',
   ],
   // Deliberately narrow: create_requisitions is the only inventory-adjacent
   // permission this role holds. `view_reports` is granted too, but the
@@ -176,7 +190,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
   // Supervisor's `area` is null and the pages below (/dashboard/sales,
   // /dashboard/reports, the Overview) show them EVERY team's data rather
   // than one section's.
-  supervisor: ['view_requisitions', 'view_reports'],
+  supervisor: ['view_requisitions', 'view_reports', 'create_product_labels'],
   // Both team-leader roles get identical permissions; what differs is the
   // `area` on the user record (Mechanical vs Electrical), which
   // /dashboard/sales and /dashboard/reports use to actually scope what's
@@ -215,13 +229,34 @@ const ROLE_EXCLUSIONS: Record<string, Permission[]> = {
 // most sensitive capability in the matrix, hence the one gated behind MFA.
 const PRIVILEGED_PERMISSIONS: Permission[] = ['approve_adjustments'];
 
+/**
+ * The single authoritative permission check for the whole app — every nav
+ * filter, page guard and Server Action goes through this (or `checkPermission`
+ * / `requirePermission`, which wrap it). Do not re-derive permission logic
+ * anywhere else.
+ *
+ * For every permission except `create_product_labels` this is a pure
+ * role-matrix lookup. `create_product_labels` additionally honours
+ * `User.labelPermission` — the one per-user override an Admin can set (see
+ * that field's doc comment and /dashboard/users). `revoked` beats a role
+ * that would grant it; `allowed` beats a role that wouldn't; `inherited`
+ * (the default) falls through to the role.
+ */
 export async function hasPermission(user: User, permission: Permission): Promise<boolean> {
   const role = await roleRepository.getById(user.roleId);
   if (!role) return false;
   if (ROLE_EXCLUSIONS[role.name]?.includes(permission)) return false;
   const perms = ROLE_PERMISSIONS[role.name];
   if (!perms) return false;
-  return perms === '*' || perms.includes(permission);
+  const grantedByRole = perms === '*' || perms.includes(permission);
+
+  if (permission === 'create_product_labels') {
+    if (user.labelPermission === 'allowed') return true;
+    if (user.labelPermission === 'revoked') return false;
+    // 'inherited' - fall through to the role default.
+  }
+
+  return grantedByRole;
 }
 
 export interface PermissionCheck {

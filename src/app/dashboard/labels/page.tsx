@@ -17,13 +17,18 @@ export default async function LabelsPage({
   if (!session) {
     return <AccessDenied title="Product labels" message="Your session has expired. Please sign in again." />;
   }
-  // Labels are part of Stores/inventory operations - an Engineer never
-  // prints a shelf label.
-  if (!(await hasPermission(session, 'manage_receiving'))) {
+  // The single authoritative check - `hasPermission` resolves the role
+  // default AND this user's individual override (see User.labelPermission).
+  // A revoked Stores Clerk lands here exactly as an Engineer does; a
+  // specifically-allowed Engineer gets through. This is the route guard;
+  // there is no separate label-generation POST endpoint - the "Generate
+  // sheet" form is a GET back to this same page, so reaching a rendered
+  // sheet always passes through this check.
+  if (!(await hasPermission(session, 'create_product_labels'))) {
     return (
       <AccessDenied
         title="Product labels"
-        message="Printing product labels is a Stores function. Your role does not have access to this page."
+        message="You don't have permission to create product labels. This is set by your role and can be changed per user by an administrator."
       />
     );
   }

@@ -18,6 +18,19 @@ export interface Role {
   createdAt: ISODateTime;
 }
 
+/**
+ * Per-user override for the `create_product_labels` capability, the ONE
+ * permission Admin can grant/revoke below the role level (8 September
+ * follow-up). `inherited` = follow the role default; `allowed`/`revoked` =
+ * explicit Admin decision that beats the role default either way. This is
+ * deliberately a single typed field, not a generic per-user permission bag
+ * — nothing else in the RBAC model is overridable per user, and inventing a
+ * parallel authorisation system for one capability would be more machinery
+ * than this needs. See `hasPermission` in src/lib/permissions.ts for where
+ * it's resolved (one place, so every caller gets the effective answer).
+ */
+export type LabelPermission = 'inherited' | 'allowed' | 'revoked';
+
 export interface User {
   id: UUID;
   email: string;
@@ -29,6 +42,14 @@ export interface User {
    * other role. See src/lib/areas.ts for the selectable list.
    */
   area: string | null;
+  /**
+   * Admin's per-user override of `create_product_labels`. `inherited` on
+   * every user until an Admin changes it. Deliberately NOT cleared on a
+   * role change (unlike `area`): an explicit grant/revoke is a decision
+   * about the person, not their role, and must survive them moving roles —
+   * see updateUserRoleAction and §15 of the spec.
+   */
+  labelPermission: LabelPermission;
   isActive: boolean;
   mfaEnrolled: boolean;
   createdAt: ISODateTime;

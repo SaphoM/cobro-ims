@@ -4,6 +4,40 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.43.0 — 2026-09-10
+
+**QR / product-label creation is now its own business permission, with an Admin-only per-user override.**
+Before this, the Product labels page was gated on `manage_receiving` and there was no per-user permission
+concept anywhere in the app. One capability, resolved in one place — no `create_qr` / `generate_qr` /
+`print_label` duplicates, and it grants no inventory authority.
+
+- New `create_product_labels` permission (`permissions.ts`, `seed.ts`). Role defaults: Admin (via `*`),
+  Supervisor, Stores Manager, Stores Clerk = YES; both Team Leaders and Engineer / Requester = NO
+- New per-user override `User.labelPermission: 'inherited' | 'allowed' | 'revoked'`
+  (`domain/inventory.ts`). Defaults `inherited`, so every existing user keeps their role default
+  - `allowed` forces YES even where the role says no; `revoked` forces NO even where the role says yes
+  - Deliberately **not** cleared on a role change (unlike `area`) — an explicit grant/revoke is a
+    decision about the person and must survive them moving roles (spec §15)
+- `hasPermission` itself resolves the override for `create_product_labels`, so every existing caller —
+  the sidebar nav filter, the `/dashboard/labels` route guard, the `/dashboard/products` "Print labels"
+  row links — gets the effective answer with no new logic. This is the single authoritative check
+- `UserRepository.setLabelPermission` (interface + mock impl); `create()` seeds `inherited`;
+  `updateRole()` leaves it untouched
+- New Admin-only Server Action `updateUserLabelPermissionAction` (`users/actions.ts`), gated on
+  `manage_users` — no other role, including the target user, can grant or revoke. Writes an audit
+  entry (full before/after user rows → the audit log diffs `labelPermission` old→new, who, when)
+- `/dashboard/users` — new "QR / Label creation" column: an Allowed/Denied pill computed server-side
+  by the same `hasPermission`, plus the source ("Role default" / "Admin override: allowed|revoked").
+  New inline `Role default / Allowed (override) / Revoked (override)` selector per row
+- `/dashboard/labels` route guard switched from `manage_receiving` to `create_product_labels`. There
+  is still no label-generation POST endpoint — "Generate sheet" is a GET back to the same page, so the
+  route guard is the enforcement point; a revoked user hitting the URL directly gets AccessDenied and
+  zero rendered QR codes
+- Known gap: no per-generation audit for label/bulk/reprint — generation is a GET SSR render, not a
+  discrete mutation, so auditing it would fire on every page load. The permission-change audit is done
+
+- `next.config.ts` — dev `allowedDevOrigins` LAN IP updated to 192.168.0.109
+
 ## v0.42.0 — 2026-09-10
 
 **Supervisor role - the one thing the "update organisational hierarchy" super-prompt actually needed.**

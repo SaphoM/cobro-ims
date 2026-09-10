@@ -6,7 +6,9 @@ import { auditLogRepository, roleRepository, userRepository, warehouseRepository
 import { hasPermission, requirePermission } from '@/lib/permissions';
 import { FACTORY_AREAS, isAreaScopedRole } from '@/lib/areas';
 import { NEW_USER_DEFAULT_PASSWORD } from '@/lib/demo-credentials';
-import type { User } from '@/lib/domain/inventory';
+import type { LabelPermission, User } from '@/lib/domain/inventory';
+
+const LABEL_PERMISSION_VALUES: LabelPermission[] = ['inherited', 'allowed', 'revoked'];
 
 /**
  * Every Engineer / Requester gets exactly one personal station — a
@@ -150,6 +152,48 @@ export async function updateUserRoleAction(userId: string, formData: FormData) {
     after: user,
   });
   revalidatePath('/dashboard/users');
+}
+
+/**
+ * Admin's per-user override of `create_product_labels` - the ONLY per-user
+ * permission control in the app (8 September follow-up). `manage_users`
+ * gates it, which is Admin-only, so no other role can reach this: a
+ * Supervisor / Stores Manager / Stores Clerk cannot change anyone's label
+ * permission, including their own. The effective permission is then resolved
+ * in ONE place - `hasPermission` in src/lib/permissions.ts - so every nav
+ * filter, route guard and (future) action sees the same answer.
+ */
+export async function updateUserLabelPermissionAction(userId: string, formData: FormData) {
+  'use server';
+  const session = await requireSession();
+  await requirePermission(session, 'manage_users');
+
+  const raw = String(formData.get('labelPermission') ?? '');
+  if (!LABEL_PERMISSION_VALUES.includes(raw as LabelPermission)) {
+    throw new Error('Choose inherited, allowed or revoked.');
+  }
+  const value = raw as LabelPermission;
+
+  const before = await userRepository.getById(userId);
+  const user = await userRepository.setLabelPermission(userId, value);
+  await auditLogRepository.write({
+    tableName: 'users',
+    recordId: userId,
+    action: 'update',
+    changedBy: session.id,
+    // before/after are the full user rows - the audit log page already
+    // diffs them, so the reviewer sees exactly `labelPermission` changing
+    // from e.g. "inherited" to "revoked", who did it and when. This is the
+    // QR_LABEL_PERMISSION_CHANGED record the spec (§10) asks for; the app's
+    // audit model is field-diff-based, not typed-event-based.
+    before,
+    after: user,
+  });
+  revalidatePath('/dashboard/users');
+  // The label route/nav gate reads this on the next request for the target
+  // user - revalidate the surfaces that show or hide on it.
+  revalidatePath('/dashboard/labels');
+  revalidatePath('/dashboard/products');
 }
 
 export async function updateUserAreaAction(userId: string, formData: FormData) {

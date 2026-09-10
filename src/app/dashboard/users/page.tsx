@@ -25,14 +25,25 @@ export default async function UsersPage() {
   const roleById = new Map(roles.map((r) => [r.id, r]));
   const sorted = [...users].sort((a, b) => a.fullName.localeCompare(b.fullName));
 
+  // The EFFECTIVE `create_product_labels` result per user - the role default
+  // resolved with that user's own override. Computed here (server-side,
+  // authoritative) using the SAME `hasPermission` every route guard and nav
+  // filter calls; the row control only displays it, it never re-derives it.
+  const labelEffectiveEntries = await Promise.all(
+    users.map(async (u) => [u.id, await hasPermission(u, 'create_product_labels')] as const)
+  );
+  const labelEffectiveByUser = new Map(labelEffectiveEntries);
+
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Users</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Admin, Stores Manager, Stores Clerk and Engineer / Requester — Cobro&apos;s actual operating
-          roles, not a generic access hierarchy. More than one Admin is expected and fully supported;
-          creating another Admin never replaces or demotes an existing one.
+          Admin, Supervisor, Stores Manager, Stores Clerk, the two Team Leaders and Engineer / Requester —
+          Cobro&apos;s actual operating roles, not a generic access hierarchy. More than one of any role is
+          expected and fully supported; creating another Admin never replaces or demotes an existing one.
+          &ldquo;QR / Label creation&rdquo; is the one capability an Admin can grant or revoke per user, on
+          top of the role default.
         </p>
       </div>
 
@@ -43,13 +54,14 @@ export default async function UsersPage() {
           <h2 className="font-display text-[1.05rem] font-medium text-text">{sorted.length} users</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse text-[0.86rem]">
+          <table className="w-full min-w-[940px] border-collapse text-[0.86rem]">
             <thead>
               <tr className="text-left text-text-faint">
                 <th className="px-5 py-2.5 font-medium">Name</th>
                 <th className="px-5 py-2.5 font-medium">Email</th>
                 <th className="px-5 py-2.5 font-medium">Role</th>
                 <th className="px-5 py-2.5 font-medium">Area</th>
+                <th className="px-5 py-2.5 font-medium">QR / Label creation</th>
                 <th className="px-5 py-2.5 font-medium">Status</th>
                 <th className="px-5 py-2.5 font-medium"></th>
               </tr>
@@ -66,6 +78,30 @@ export default async function UsersPage() {
                     <td className="px-5 py-3 text-text-muted">{u.email}</td>
                     <td className="px-5 py-3 text-text-muted">{role?.description ?? role?.name ?? 'Unknown role'}</td>
                     <td className="px-5 py-3 text-text-muted">{u.area ?? '—'}</td>
+                    <td className="px-5 py-3">
+                      {(() => {
+                        const effective = labelEffectiveByUser.get(u.id) ?? false;
+                        const override = u.labelPermission;
+                        return (
+                          <span className="flex flex-col gap-0.5">
+                            <span
+                              className={`w-fit rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${
+                                effective ? 'bg-accent/15 text-accent-strong' : 'bg-danger/15 text-danger-text'
+                              }`}
+                            >
+                              {effective ? 'Allowed' : 'Denied'}
+                            </span>
+                            <span className="text-[0.68rem] text-text-faint">
+                              {override === 'inherited'
+                                ? 'Role default'
+                                : override === 'allowed'
+                                  ? 'Admin override: allowed'
+                                  : 'Admin override: revoked'}
+                            </span>
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-5 py-3">
                       <span
                         className={`rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${

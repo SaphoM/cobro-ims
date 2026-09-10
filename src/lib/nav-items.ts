@@ -40,7 +40,11 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/sales', label: 'Requisitions', permission: 'view_requisitions' },
   { href: '/dashboard/customers', label: 'Departments', permission: null },
   { href: '/dashboard/reports', label: 'Dashboards & reports', permission: 'view_reports' },
-  { href: '/dashboard/labels', label: 'Product labels', permission: 'manage_receiving' },
+  // `create_product_labels`, NOT `manage_receiving` - since the 8 September
+  // follow-up this is its own business permission (Admin/Supervisor/both
+  // Stores roles by default) AND per-user overridable by an Admin, so a
+  // Stores Clerk whose permission an Admin revoked stops seeing this link.
+  { href: '/dashboard/labels', label: 'Product labels', permission: 'create_product_labels' },
   { href: '/dashboard/audit-log', label: 'Audit log', permission: 'view_audit_log' },
   { href: '/dashboard/security', label: 'Security (2FA)', permission: null },
   { href: '/dashboard/users', label: 'Users', permission: 'manage_users' },
