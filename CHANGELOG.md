@@ -4,6 +4,14 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.47.0 — 2026-09-10
+
+**Label barcode number gets breathing room from the card edge.** At the widest card (mobile, single
+column) the `1.05rem` / `0.15em` barcode run filled the whole text column and the last digit sat flush
+against the border. Reduced to `0.92rem` / `0.1em` with `px-2`, so the digits now centre with clear
+padding on both sides (~62px slack on mobile, ~39px on the 3-up desktop grid) while staying large and
+readable. Card height unchanged; nothing truncated.
+
 ## v0.46.0 — 2026-09-10
 
 **Label layout: set stamp moves to the logo row, fixing the still-too-tall card.** In v0.45.0 the set

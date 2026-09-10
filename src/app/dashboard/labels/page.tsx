@@ -255,7 +255,11 @@ export default async function LabelsPage({
                     <div className="text-[0.95rem] font-bold leading-tight">{selected.sku}</div>
                     <div className="text-[0.78rem] leading-snug text-gray-700">{selected.name}</div>
                   </div>
-                  <div className="mt-2 border-t border-gray-300 pt-1.5 text-center font-mono text-[1.05rem] tracking-[0.15em]">
+                  {/* px-2 + a smaller size/tracking keep the digits clear of
+                      the label edge - at the widest card (mobile, one column)
+                      the old 1.05rem/0.15em run filled the column and the last
+                      digit kissed the border. */}
+                  <div className="mt-2 border-t border-gray-300 px-2 pt-1.5 text-center font-mono text-[0.92rem] tracking-[0.1em]">
                     {selected.barcode}
                   </div>
                 </div>
