@@ -232,26 +232,27 @@ export default async function LabelsPage({
                       app chrome). `print-exact` keeps browsers from dropping
                       it when "background graphics" printing is off.
                     */}
-                    {/* eslint-disable-next-line @next/next/no-img-element -- static public asset on a print sheet; next/image's optimizer buys nothing here */}
-                    <img
-                      src="/Asset3.png"
-                      alt="Cobro Concrete"
-                      width={217}
-                      height={84}
-                      className="print-exact mb-1 h-4 w-auto"
-                    />
-                    <div className="flex items-baseline justify-between gap-2 leading-tight">
-                      <span className="text-[0.95rem] font-bold">{selected.sku}</span>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- static public asset on a print sheet; next/image's optimizer buys nothing here */}
+                      <img
+                        src="/Asset3.png"
+                        alt="Cobro Concrete"
+                        width={217}
+                        height={84}
+                        className="print-exact h-4 w-auto"
+                      />
                       {setId && (
                         // Which run this label came off, and which one of the
-                        // run it is - sits on the SKU line so the label keeps
-                        // its original height. Small and mono: a tracing
-                        // reference, not a headline for the person picking stock.
+                        // run it is - tucked onto the logo row (an existing
+                        // line) so the label keeps its original height and the
+                        // SKU keeps the full width it needs to stay one line.
+                        // Small and mono: a tracing reference, not a headline.
                         <span className="shrink-0 font-mono text-[0.62rem] tracking-wide text-gray-500">
                           {setId} · {i + 1}/{requestedQty}
                         </span>
                       )}
                     </div>
+                    <div className="text-[0.95rem] font-bold leading-tight">{selected.sku}</div>
                     <div className="text-[0.78rem] leading-snug text-gray-700">{selected.name}</div>
                   </div>
                   <div className="mt-2 border-t border-gray-300 pt-1.5 text-center font-mono text-[1.05rem] tracking-[0.15em]">

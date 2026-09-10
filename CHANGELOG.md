@@ -4,6 +4,15 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.46.0 — 2026-09-10
+
+**Label layout: set stamp moves to the logo row, fixing the still-too-tall card.** In v0.45.0 the set
+code shared the SKU line, which squeezed `CEM-42.5-50KG` into a three-line wrap and kept the card
+tall. It now sits faint and right-aligned on the logo row (an existing line, so no added height), and
+the SKU gets its full column width back and stays on one line. Card height drops back to the ~30mm
+minimum it had before label sets (measured ~173px → ~118px). No text is truncated; behaviour, payload
+and sequence are unchanged.
+
 ## v0.45.0 — 2026-09-10
 
 **Label layout: the set code + sequence moves onto the SKU line.** The v0.44.0 set stamp was added as
