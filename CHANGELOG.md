@@ -4,6 +4,13 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.45.0 — 2026-09-10
+
+**Label layout: the set code + sequence moves onto the SKU line.** The v0.44.0 set stamp was added as
+its own row under the product name, which pushed each label card taller. It now sits right-aligned on
+the SKU line (`CEM-42.5-50KG          5117DF · 1/9`), small and mono, so the label keeps the exact
+height it had before label sets existed. No behaviour change - same code, same sequence, same payload.
+
 ## v0.44.0 — 2026-09-10
 
 **Label sets: every "Generate sheet" run stamps its labels with a shared set code and a 1-based

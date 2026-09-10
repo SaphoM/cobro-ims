@@ -240,17 +240,19 @@ export default async function LabelsPage({
                       height={84}
                       className="print-exact mb-1 h-4 w-auto"
                     />
-                    <div className="text-[0.95rem] font-bold leading-tight">{selected.sku}</div>
+                    <div className="flex items-baseline justify-between gap-2 leading-tight">
+                      <span className="text-[0.95rem] font-bold">{selected.sku}</span>
+                      {setId && (
+                        // Which run this label came off, and which one of the
+                        // run it is - sits on the SKU line so the label keeps
+                        // its original height. Small and mono: a tracing
+                        // reference, not a headline for the person picking stock.
+                        <span className="shrink-0 font-mono text-[0.62rem] tracking-wide text-gray-500">
+                          {setId} · {i + 1}/{requestedQty}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[0.78rem] leading-snug text-gray-700">{selected.name}</div>
-                    {setId && (
-                      // Which run this label came off, and which one of the
-                      // run it is. Small and mono so it reads as a reference,
-                      // not a headline - it's for tracing a label back to its
-                      // batch, not for the person picking stock.
-                      <div className="mt-0.5 font-mono text-[0.6rem] leading-none tracking-wide text-gray-500">
-                        {setId} · {i + 1}/{requestedQty}
-                      </div>
-                    )}
                   </div>
                   <div className="mt-2 border-t border-gray-300 pt-1.5 text-center font-mono text-[1.05rem] tracking-[0.15em]">
                     {selected.barcode}
