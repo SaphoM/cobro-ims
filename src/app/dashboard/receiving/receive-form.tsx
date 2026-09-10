@@ -108,7 +108,14 @@ export function ReceiveForm({
   const [cameraOpen, setCameraOpen] = useState(false);
 
   function matchBarcode(scanned: string) {
-    const { barcode, supplierId, expectedQuantity: scannedExpectedQuantity } = parseScanPayload(scanned);
+    const {
+      barcode,
+      supplierId,
+      expectedQuantity: scannedExpectedQuantity,
+      setId,
+      seq,
+      setSize,
+    } = parseScanPayload(scanned);
     const match = products.find((p) => p.barcode === barcode);
     if (!match) {
       setScanMessage({ text: `No product with barcode "${barcode}".`, ok: false });
@@ -138,7 +145,11 @@ export function ReceiveForm({
     if (scannedExpectedQuantity != null) setExpectedQuantity(scannedExpectedQuantity);
     else if (!isSameProduct) setExpectedQuantity(null);
 
-    setScanMessage({ text: `Matched ${match.sku} - ${match.name}.`, ok: true });
+    // If the label was printed as part of a numbered run, say which run and
+    // which label of it - lets a clerk tie a delivery back to the set it was
+    // labelled from. Purely informational; it doesn't drive the tally.
+    const setNote = setId && seq != null && setSize != null ? ` (set ${setId}, label ${seq} of ${setSize})` : '';
+    setScanMessage({ text: `Matched ${match.sku} - ${match.name}.${setNote}`, ok: true });
 
     // Auto-close the camera the instant this scan brings the tally up to a
     // known expected quantity - set synchronously here (the event handler

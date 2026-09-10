@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { productRepository, supplierRepository } from '@/lib/data';
 import { getSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
@@ -48,16 +49,33 @@ export default async function LabelsPage({
     it should contain, as well as WHAT it is, so receiving scans once instead
     of scanning and then filling in the rest by hand. Supplier is required -
     see src/lib/scan-payload.ts.
+
+    Every "Generate sheet" run also stamps its labels with a shared set code
+    and a 1-based sequence, so a scan can tell which run a label came off and
+    which one of the run it is ("QR 3 of 100"). The code is minted per render
+    - the page holds no state, so a refresh is a new run with a new code, and
+    nothing server-side records a set's membership. That is deliberate and
+    understood: the grouping + ordinal live entirely on the label. Each label
+    therefore encodes a DISTINCT payload (the seq differs), so a QR is
+    generated per copy rather than once and repeated.
   */
-  const qrDataUrl = selected?.barcode
-    ? await generateQrDataUrl(
-        encodeScanPayload({
-          barcode: selected.barcode,
-          supplierId: selectedSupplier?.id ?? null,
-          expectedQuantity: selectedExpectedQuantity,
-        })
+  const setId = selected?.barcode ? randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase() : null;
+  const labelQrDataUrls = selected?.barcode
+    ? await Promise.all(
+        Array.from({ length: requestedQty }, (_, i) =>
+          generateQrDataUrl(
+            encodeScanPayload({
+              barcode: selected.barcode!,
+              supplierId: selectedSupplier?.id ?? null,
+              expectedQuantity: selectedExpectedQuantity,
+              setId,
+              seq: i + 1,
+              setSize: requestedQty,
+            })
+          )
+        )
       )
-    : null;
+    : [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -170,7 +188,18 @@ export default async function LabelsPage({
               <h2 className="font-display text-[1.05rem] font-medium text-text">
                 {requestedQty} label{requestedQty === 1 ? '' : 's'} - {selected.sku}
               </h2>
-              <p className="text-[0.82rem] text-text-muted">{selected.name}</p>
+              <p className="text-[0.82rem] text-text-muted">
+                {selected.name}
+                {setId && (
+                  <>
+                    {' · '}
+                    <span className="font-mono-brand text-text-faint">
+                      set {setId}
+                      {requestedQty > 1 && <>, numbered 1&ndash;{requestedQty}</>}
+                    </span>
+                  </>
+                )}
+              </p>
             </div>
             <PrintButton />
           </div>
@@ -179,7 +208,7 @@ export default async function LabelsPage({
             className="grid gap-3"
             style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(64mm, 1fr))' }}
           >
-            {Array.from({ length: requestedQty }).map((_, i) => (
+            {labelQrDataUrls.map((qrDataUrl, i) => (
               <div
                 key={i}
                 className="flex items-center gap-3 rounded-lg border border-accent/30 bg-white px-3 py-2.5 text-black print:break-inside-avoid"
@@ -189,7 +218,7 @@ export default async function LabelsPage({
                   // eslint-disable-next-line @next/next/no-img-element -- static data: URL, no next/image optimization to gain
                   <img
                     src={qrDataUrl}
-                    alt={`QR code for ${selected.barcode}`}
+                    alt={`QR code for ${selected.barcode} (label ${i + 1} of ${requestedQty})`}
                     width={72}
                     height={72}
                     className="shrink-0"
@@ -213,6 +242,15 @@ export default async function LabelsPage({
                     />
                     <div className="text-[0.95rem] font-bold leading-tight">{selected.sku}</div>
                     <div className="text-[0.78rem] leading-snug text-gray-700">{selected.name}</div>
+                    {setId && (
+                      // Which run this label came off, and which one of the
+                      // run it is. Small and mono so it reads as a reference,
+                      // not a headline - it's for tracing a label back to its
+                      // batch, not for the person picking stock.
+                      <div className="mt-0.5 font-mono text-[0.6rem] leading-none tracking-wide text-gray-500">
+                        {setId} · {i + 1}/{requestedQty}
+                      </div>
+                    )}
                   </div>
                   <div className="mt-2 border-t border-gray-300 pt-1.5 text-center font-mono text-[1.05rem] tracking-[0.15em]">
                     {selected.barcode}

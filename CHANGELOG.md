@@ -4,6 +4,27 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.44.0 — 2026-09-10
+
+**Label sets: every "Generate sheet" run stamps its labels with a shared set code and a 1-based
+sequence.** So a scan can tell which print run a label came off and which one of the run it is
+("QR 3 of 100"). It is a grouping + ordinal only — not a per-unit inventory identity, and not a link
+to a goods receipt (that larger tracking-mode model was scoped out).
+
+- New `COBRO3` scan payload: `COBRO3|<barcode>|<supplierId>|<expectedQuantity>|<setId>|<seq>|<setSize>`
+  (`scan-payload.ts`). `ScanPayload` gains `setId` / `seq` / `setSize`, all nullable
+  - Fully backwards-compatible: `encodeScanPayload` only emits COBRO3 when a set is present, else
+    falls back to COBRO2 / COBRO1 / bare barcode exactly as before; `parseScanPayload` reads all four,
+    and a malformed `seq`/`setSize` degrades to "unnumbered" rather than "3 of NaN"
+- `/dashboard/labels` — each render mints one 6-char set code; every copy now encodes a **distinct**
+  QR carrying its own `seq` of `setSize`. Printed on each label under the name (`407F2D · 3/4`), and
+  in the sheet summary bar (`set 407F2D, numbered 1–4`)
+  - Stateless by design: the page holds no state, so a refresh is a new run with a new code and
+    nothing server-side records a set's membership — the grouping + ordinal live entirely on the label
+- Receiving scan — a COBRO3 label shows `Matched … (set 1997BB, label 3 of 4)`; legacy scans unchanged
+- Verified end to end: lib round-trip across all payload versions, a real QR PNG rendered through the
+  `qrcode` service then decoded back to the exact COBRO3 string, and live label-sheet + receiving-scan
+
 ## v0.43.0 — 2026-09-10
 
 **QR / product-label creation is now its own business permission, with an Admin-only per-user override.**
