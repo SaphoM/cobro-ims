@@ -25,6 +25,7 @@ import {
   roleRepository,
   salesOrderRepository,
   stockLedgerRepository,
+  userRepository,
   warehouseRepository,
 } from '@/lib/data';
 import { countHeldStockReminders, getHeldStockReminders, STOCK_HELD_REMINDER_DAYS } from '@/lib/reminders';
@@ -196,6 +197,41 @@ export async function getNotifications(session: User): Promise<NotificationItem[
           tone: 'default',
         });
       }
+    }
+  }
+
+  // Supervisor and Team Leaders: "monitor outstanding Engineer-held stock"
+  // (8 September review §5-§7). Same lightweight held-stock rollup Stores
+  // and Admin get above, scoped the same way their pages are - a Team
+  // Leader to their own `area`'s stations, a Supervisor to every station.
+  // View-only: it links to the Overview where they can see the detail, it
+  // does not imply any action they can take themselves.
+  if (roleName === 'supervisor' || roleName === 'mechanical_team_leader' || roleName === 'electrical_team_leader') {
+    const [ledger, products, warehouses, users] = await Promise.all([
+      stockLedgerRepository.listAll(),
+      productRepository.list(),
+      warehouseRepository.list(),
+      userRepository.list(),
+    ]);
+    const areaByOwnerId = new Map(users.map((u) => [u.id, u.area]));
+    const stationIds = warehouses
+      .filter(
+        (w) =>
+          w.type === 'engineer_station' &&
+          (roleName === 'supervisor' || areaByOwnerId.get(w.ownerUserId ?? '') === session.area)
+      )
+      .map((w) => w.id);
+    const heldCount = countHeldStockReminders(stationIds, ledger, products, getNowMs());
+    if (heldCount > 0) {
+      items.push({
+        id: 'held-stock-oversight',
+        message:
+          roleName === 'supervisor'
+            ? `${plural(heldCount, 'item')} held by Engineers past ${STOCK_HELD_REMINDER_DAYS} days`
+            : `${plural(heldCount, 'item')} held by your team past ${STOCK_HELD_REMINDER_DAYS} days`,
+        href: '/dashboard',
+        tone: 'default',
+      });
     }
   }
 

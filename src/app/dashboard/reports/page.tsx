@@ -41,6 +41,15 @@ import { getSession } from '@/lib/auth';
 // suppliers, warehouse valuations, or anyone else's activity.
 const PURCHASING_SECTIONS = new Set(['Purchase order summary', 'Supplier summary', 'Open purchase orders']);
 const ENGINEER_VISIBLE_SECTIONS = new Set(['Requisition summary', 'Low stock / reorder suggestions']);
+// A Supervisor gets what a Team Leader gets PLUS movement history - the
+// "relevant usage/movement information" the 8 September review named for
+// this role, and the one thing that makes their reporting view broader
+// than a Team Leader's (whose view is also narrowed by `area`).
+const SUPERVISOR_VISIBLE_SECTIONS = new Set([
+  'Requisition summary',
+  'Low stock / reorder suggestions',
+  'Stock movement history',
+]);
 
 export default async function ReportsPage() {
   const [products, warehouses, ledger, suppliers, customers, allSalesOrders, purchaseOrders, movements, adjustments, adjustmentReasons, users, session] =
@@ -65,11 +74,13 @@ export default async function ReportsPage() {
   // View-only oversight, added per the 8 September client review - see
   // permissions.ts's ROLE_PERMISSIONS comment.
   const isTeamLeader = role?.name === 'mechanical_team_leader' || role?.name === 'electrical_team_leader';
+  const isSupervisor = role?.name === 'supervisor';
   const userById = new Map(users.map((u) => [u.id, u]));
   // Engineers only ever see their own requisitions here, same rule as
   // /dashboard/sales - never everyone else's, even in a read-only report. A
   // Team Leader sees every requisition raised by someone in their own
-  // `area` - team oversight, not the whole business (§22/§23).
+  // `area` - team oversight, not the whole business. A Supervisor sees
+  // every team's, unscoped - the point of being above the Team Leaders.
   const salesOrders =
     isEngineer && session
       ? allSalesOrders.filter((o) => o.createdBy === session.id)
@@ -79,9 +90,11 @@ export default async function ReportsPage() {
   const hideSection = (title: string) =>
     isEngineer || isTeamLeader
       ? !ENGINEER_VISIBLE_SECTIONS.has(title)
-      : isStoresClerk
-        ? PURCHASING_SECTIONS.has(title)
-        : false;
+      : isSupervisor
+        ? !SUPERVISOR_VISIBLE_SECTIONS.has(title)
+        : isStoresClerk
+          ? PURCHASING_SECTIONS.has(title)
+          : false;
 
   const now = getNowMs();
   const valuation = buildStockValuationReport(ledger, products, warehouses);
@@ -108,6 +121,8 @@ export default async function ReportsPage() {
             ? 'Your own requisitions and what’s currently below reorder point - the purchasing, supplier and warehouse-valuation reports below are a Stores/Admin function.'
             : isTeamLeader
               ? 'Your team’s requisitions and what’s currently below reorder point - purchasing, supplier and warehouse-valuation detail is a Stores/Admin function.'
+              : isSupervisor
+                ? 'Every team’s requisitions, stock movement history and what’s below reorder point - purchasing, supplier and warehouse-valuation detail is a Stores/Admin function.'
               : isStoresClerk
                 ? 'Operational store reports - stock, requisitions and movements. Purchasing and supplier detail is a Stores Manager/Admin function.'
                 : 'Fifteen of the RFQ’s "15+" standard reports - stock valuation, low stock, sales, customers, purchase orders, suppliers, invoice ageing, movement history, receiving history, movement type totals, pick list, adjustment reasons, warehouse summary, open purchase orders, and dormant stock.'}{' '}

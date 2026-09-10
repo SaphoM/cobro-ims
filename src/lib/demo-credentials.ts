@@ -5,7 +5,7 @@
  * — would pull the server-only module into the client bundle. This file has
  * no server-only imports and is safe to import from either side.
  *
- * Six accounts, one per RBAC role, so permission enforcement (see
+ * Seven accounts, one per RBAC role, so permission enforcement (see
  * src/lib/permissions.ts) is actually testable without a real user
  * directory. The first entry is the "primary" demo account shown by
  * default on the login page.
@@ -21,6 +21,7 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [
   { email: 'storesmanager@cobroconcrete.co.za', password: 'CobroStoresMgr2026', roleLabel: 'Stores Manager' },
   { email: 'clerk@cobroconcrete.co.za', password: 'CobroClerk2026', roleLabel: 'Stores Clerk' },
   { email: 'engineer@cobroconcrete.co.za', password: 'CobroEngineer2026', roleLabel: 'Engineer / Requester' },
+  { email: 'supervisor@cobroconcrete.co.za', password: 'CobroSupervisor2026', roleLabel: 'Supervisor' },
   { email: 'mechlead@cobroconcrete.co.za', password: 'CobroMechLead2026', roleLabel: 'Mechanical Team Leader' },
   { email: 'electlead@cobroconcrete.co.za', password: 'CobroElectLead2026', roleLabel: 'Electrical Team Leader' },
 ];

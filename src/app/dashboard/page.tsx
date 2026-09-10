@@ -130,12 +130,13 @@ export default async function DashboardOverviewPage() {
   // new authorization rule.
   const canReserve = isStoresRole;
   // View-only oversight, added per the 8 September client review - see
-  // permissions.ts's ROLE_PERMISSIONS comment. Neither holds a station of
-  // their own (only Engineer / Requester does), so they fall into the same
-  // "no station" branches Admin/Stores use below - `stationRows`/
-  // `storesRows` narrow what that branch actually shows them to their own
-  // team, rather than everything.
+  // permissions.ts's ROLE_PERMISSIONS comment. None of these hold a station
+  // of their own (only Engineer / Requester does), so they fall into the
+  // same "no station" branches Admin/Stores use below. A Team Leader's
+  // Station view is then narrowed to their own `area`; a Supervisor sees
+  // every team's, like Admin/Stores.
   const isTeamLeader = role?.name === 'mechanical_team_leader' || role?.name === 'electrical_team_leader';
+  const isSupervisor = role?.name === 'supervisor';
   // Only an Engineer / Requester has a personal station; Admin and Stores
   // have none, which is what splits the two shapes of Station/Stores view
   // below.
@@ -196,12 +197,12 @@ export default async function DashboardOverviewPage() {
     .map((product) => ({ id: product.id, label: `${product.sku} - ${product.name}` }))
     .sort((a, b) => a.label.localeCompare(b.label));
 
-  const storesRows = isAdminOrStores || isTeamLeader
+  const storesRows = isAdminOrStores || isTeamLeader || isSupervisor
     ? // The physical store(s) - what is actually in the store, as opposed to
-      // what is out on stations. A Team Leader gets this too: knowing
-      // what's actually available at Stores is useful context for their
-      // oversight, and it carries no team-specific sensitivity the way the
-      // Station view's "who's holding what" does.
+      // what is out on stations. Team Leader and Supervisor get this too:
+      // knowing what's actually available at Stores is useful context for
+      // their oversight, and it carries no team-specific sensitivity the way
+      // the Station view's "who's holding what" does.
       ledgerView.filter((row) => row.warehouse.type === 'store')
     : // What this Engineer may actually requisition from: every store PLUS
       // every OTHER Engineer's station, never their own - the same set
@@ -222,7 +223,7 @@ export default async function DashboardOverviewPage() {
       label: 'Station',
       description: isTeamLeader
         ? "Stock currently sitting on your team's own stations - issued from the store, not yet used."
-        : isAdminOrStores
+        : isAdminOrStores || isSupervisor
           ? "Stock currently sitting on Engineers' own stations - issued from the store, not yet used."
           : 'Stock currently at your own station - accepted from the store, still yours to use.',
       rows: stationRows,
@@ -230,7 +231,7 @@ export default async function DashboardOverviewPage() {
     {
       id: 'stores' as const,
       label: 'Stores',
-      description: isAdminOrStores || isTeamLeader
+      description: isAdminOrStores || isTeamLeader || isSupervisor
         ? 'Stock held in the store itself, excluding anything out on an Engineer\'s station.'
         : 'Stock you can requisition from - the store, plus any other Engineer\'s station holding it.',
       rows: storesRows,

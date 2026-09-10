@@ -4,6 +4,40 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.42.0 — 2026-09-10
+
+**Supervisor role - the one thing the "update organisational hierarchy" super-prompt actually needed.**
+Everything else that prompt describes (Team Leader roles + area-scoping, Stores-initiated returns, reminder
+foundation, Scan out / Scan to Use, no monthly reconciliation, no Engineer self-service returns, the
+Procurement/Viewer/Warehouse role migration) was already delivered in v0.40.0/v0.41.0 or explicitly deferred.
+
+- New `supervisor` role (`permissions.ts`, `seed.ts`, `demo-credentials.ts`) - operational oversight ABOVE the
+  Team Leaders, reporting to Management. The role model is now two non-crossing chains:
+  `admin -> supervisor -> {mechanical,electrical}_team_leader -> engineer_requester` and
+  `admin -> stores_manager -> stores_clerk`
+- Permission set is **identical to a Team Leader** (`view_requisitions` + `view_reports`) - the only difference
+  is SCOPE: a Team Leader's view is `area`-filtered, a Supervisor's is not
+  - `sales/page.tsx` - Supervisor sees every team's requisitions (Team Leader sees one team's), no action
+    buttons
+  - `reports/page.tsx` - new `SUPERVISOR_VISIBLE_SECTIONS`: Requisition summary + Low stock + Stock movement
+    history (broader than a Team Leader's two, far narrower than Admin's fifteen)
+  - `dashboard/page.tsx` - Station view shows every team's stations; Stores view read-only for context; no
+    Reserve/Requisition/Receive/EngineerScanCard
+  - `notifications.ts` - Supervisor and Team Leaders now get the lightweight "held stock past N days"
+    oversight rollup (Supervisor: all stations; Team Leader: own area) - "monitor outstanding Engineer-held
+    stock" from the 8 September review, reusing the existing `reminders.ts`
+- **No approval authority granted** - the 8 September review did not confirm whether a Supervisor approves
+  requisitions. The extension point (a `requisition.review/approve/reject`-shaped permission, or a scoped
+  `manage_sales_orders`) is documented; adding it needs no change to the shape of `ROLE_PERMISSIONS`
+- `supervisor` has `area: null` and no station - `isAreaScopedRole()` is false for it, so the user form shows
+  no area/station selector for a Supervisor and `ensureStation` never runs. Multiple Supervisors supported
+- New demo account `supervisor@cobroconcrete.co.za` / `CobroSupervisor2026` on the login picker
+- Verified live: nav shows exactly the 7 permitted items and none of the 8 restricted; Supervisor sees both a
+  Mechanical and an Electrical requisition (unscoped) with zero action buttons; Reports shows exactly 3
+  sections; station picker lists all engineer stations; notification bell renders without crashing. Regression:
+  Mechanical Team Leader still sees only its own team's requisition; Approve -> Issue on a requisition still
+  works end to end
+
 ## v0.41.0 — 2026-09-09
 
 **8 September client review — refinement, not rebuild. Sequenced per the client's explicit decisions.**

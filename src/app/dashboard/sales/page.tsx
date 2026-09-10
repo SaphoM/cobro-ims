@@ -34,7 +34,10 @@ export default async function SalesPage({
   const isAdmin = role?.name === 'admin';
   // View-only oversight, added per the 8 September client review - see
   // permissions.ts's ROLE_PERMISSIONS comment for why this stops at
-  // visibility (`view_requisitions`) rather than approval authority.
+  // visibility (`view_requisitions`) rather than approval authority. A Team
+  // Leader is area-scoped (below); a Supervisor is not - they simply fall
+  // through to the full list, same as Admin/Stores, but with no action
+  // buttons (canProcess is false for them too).
   const isTeamLeader = role?.name === 'mechanical_team_leader' || role?.name === 'electrical_team_leader';
   // Admin does not requisition stock - see permissions.ts's ROLE_EXCLUSIONS.
   // The server action already refuses this regardless of what's rendered

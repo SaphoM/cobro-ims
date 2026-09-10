@@ -55,9 +55,21 @@ export type Permission =
   | 'view_audit_log';
 
 /**
- * Six roles, matching Cobro's actual operating structure — not a generic
+ * Seven roles, matching Cobro's actual operating structure — not a generic
  * ERP hierarchy. See docs/ARCHITECTURE.md §1 for the full rationale and the
  * migration from the previous (admin/warehouse_clerk/procurement/viewer) set.
+ *
+ * Two SEPARATE reporting chains, confirmed at the 8 September review:
+ *
+ *   Management (admin) -> supervisor -> {mechanical,electrical}_team_leader -> engineer_requester
+ *   Management (admin) -> stores_manager -> stores_clerk
+ *
+ * The two chains do not cross: a supervisor is not a stores_manager, a team
+ * leader is not a stores_clerk, an engineer is not a stores operator.
+ * Inventory-control authority and operational/team authority are distinct.
+ * Permission-wise this file only cares about what each role may DO; the
+ * "who reports to whom" is org context, carried by the role name + the
+ * `area` field on User, not by a permission.
  *
  *   admin                    — system administration, supplier management, product/category
  *                               management, thresholds, reporting, management visibility.
@@ -98,6 +110,20 @@ export type Permission =
  *                               inventory ledger. Does NOT hold `manage_transfers` — an Engineer
  *                               cannot return their own held stock to Stores unilaterally; see
  *                               that permission's comment.
+ *   supervisor               — operational oversight ABOVE the Team Leaders, reporting to
+ *                               Management. Sees every team's activity, not one section's - the
+ *                               ONE thing that makes it broader than a Team Leader (which is
+ *                               `area`-scoped). Same permission set as a Team Leader though:
+ *                               `view_requisitions` + `view_reports` only. The 8 September
+ *                               review did NOT confirm the Supervisor's requisition-approval
+ *                               authority, so it is not granted here - see the extension-point
+ *                               note on the team-leader roles below; the same
+ *                               `requisition.review/approve/reject`-shaped permission would be
+ *                               added to `supervisor` (and/or the team leaders) if Cobro
+ *                               confirms it, with no change to the shape of this map. Does NOT
+ *                               get purchasing, supplier management, goods receiving, stores
+ *                               administration, inventory adjustments, user administration,
+ *                               security administration, or product master-data.
  *   mechanical_team_leader    — oversight-only role over the Mechanical section's requisitions
  *   electrical_team_leader    — and stock, added per the 8 September client review. Confirmed by
  *                               that meeting: the role exists. NOT confirmed: whether a Team
@@ -145,10 +171,16 @@ const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
   // above and docs/ARCHITECTURE.md).
   engineer_requester: ['create_requisitions', 'view_requisitions', 'view_reports'],
   // View-only oversight, deliberately - see the role-list comment above for
-  // why this stops well short of approval authority. Both team-leader roles
-  // get identical permissions; what differs is the `area` on the user
-  // record (Mechanical vs Electrical), which /dashboard/sales and
-  // /dashboard/reports use to actually scope what's visible.
+  // why this stops well short of approval authority. A Supervisor's grant is
+  // identical to a Team Leader's; the difference is purely SCOPE - a
+  // Supervisor's `area` is null and the pages below (/dashboard/sales,
+  // /dashboard/reports, the Overview) show them EVERY team's data rather
+  // than one section's.
+  supervisor: ['view_requisitions', 'view_reports'],
+  // Both team-leader roles get identical permissions; what differs is the
+  // `area` on the user record (Mechanical vs Electrical), which
+  // /dashboard/sales and /dashboard/reports use to actually scope what's
+  // visible.
   mechanical_team_leader: ['view_requisitions', 'view_reports'],
   electrical_team_leader: ['view_requisitions', 'view_reports'],
 };

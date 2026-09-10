@@ -69,10 +69,18 @@ export const roles: Role[] = [
     permissions: { create_requisitions: true, view_reports: true },
     createdAt: '2026-01-01T00:00:00Z',
   },
-  // Added per the 8 September client review - team oversight only, no
-  // approval authority (the meeting confirmed the roles exist, not that
-  // they approve requisitions). See permissions.ts's ROLE_PERMISSIONS
-  // comment for the full reasoning and the extension point if that changes.
+  // Added per the 8 September client review - team/operational oversight
+  // only, no approval authority (the meeting confirmed these roles exist,
+  // not that they approve requisitions). See permissions.ts's
+  // ROLE_PERMISSIONS comment for the full reasoning and the extension point
+  // if that changes.
+  {
+    id: 'role-supervisor',
+    name: 'supervisor',
+    description: 'Supervisor',
+    permissions: { view_requisitions: true, view_reports: true },
+    createdAt: '2026-01-01T00:00:00Z',
+  },
   {
     id: 'role-mechanical-lead',
     name: 'mechanical_team_leader',
@@ -192,6 +200,21 @@ export const users: User[] = [
     fullName: 'Demo Electrical Lead',
     roleId: 'role-electrical-lead',
     area: 'Electrical',
+    isActive: true,
+    mfaEnrolled: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    // Supervisor sits ABOVE both team leaders - no `area`, sees every
+    // team. On the demo picker so the "broader than a Team Leader" scope
+    // is testable against the Mechanical/Electrical requisitions the two
+    // engineers above raise.
+    id: 'user-supervisor',
+    email: 'supervisor@cobroconcrete.co.za',
+    fullName: 'Demo Supervisor',
+    roleId: 'role-supervisor',
+    area: null,
     isActive: true,
     mfaEnrolled: false,
     createdAt: '2026-01-01T00:00:00Z',
