@@ -260,6 +260,14 @@ export interface TransferRepository {
   /** Posts the transfer_in movement at the destination, closing out an in-transit transfer. */
   complete(transferId: string, completedBy: string): Promise<InterWarehouseTransfer>;
   getStatus(transferId: string): Promise<TransferStatus | null>;
+  /** What product/quantity this transfer actually carries - one transfer is
+   *  one product/quantity pair today (see InitiateTransferInput; there is no
+   *  multi-line transfer yet). Used to show what a transfer IS on the
+   *  Transfers page and, for a station-to-store return, to check a Stores
+   *  scan against the right product before completing it. Still answers
+   *  after the transfer completes, unlike the in-flight-only bookkeeping
+   *  `complete()` itself needs. */
+  getLine(transferId: string): Promise<{ productId: string; quantity: number } | null>;
 }
 
 export interface AdjustmentReasonRepository {

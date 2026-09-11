@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ReservedCell } from '@/app/dashboard/reserved-cell';
 import { QuickRequisitionButton } from '@/app/dashboard/quick-requisition-button';
+import { ReturnToStoresButton } from '@/app/dashboard/return-to-stores-button';
 import { ReserveButton } from '@/app/dashboard/reserve-button';
 import { selectClass } from '@/lib/ui/form-control-classes';
 import type { Customer, StockLedgerView } from '@/lib/domain/inventory';
@@ -43,6 +44,7 @@ export function StockByLocationCard({
   defaultStationId,
   productOptions,
   canRequest,
+  canReturn,
   showCosts,
   canEditPrice,
   sessionUserId,
@@ -71,6 +73,11 @@ export function StockByLocationCard({
    *  a list that reshapes itself per view is harder to use. */
   productOptions: { id: string; label: string }[];
   canRequest: boolean;
+  /** Whether THIS viewer may return their own station's unused stock to
+   *  Stores (`request_stock_return`) - only ever true for an Engineer /
+   *  Requester, who is also the only role with a station of their own, so
+   *  the button below only ever appears on that one row per table. */
+  canReturn: boolean;
   showCosts: boolean;
   canEditPrice: boolean;
   sessionUserId: string | null;
@@ -217,7 +224,11 @@ export function StockByLocationCard({
               <tr className="text-left text-text-faint">
                 <th className="px-5 py-2.5 font-medium">Product</th>
                 <th className="px-5 py-2.5 font-medium">Store</th>
-                {canRequest && <th className="px-2 py-2.5"><span className="sr-only">Requisition</span></th>}
+                {(canRequest || canReturn) && (
+                  <th className="px-2 py-2.5">
+                    <span className="sr-only">Requisition / Return</span>
+                  </th>
+                )}
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">On hand</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Reserved</th>
                 {showCosts && (
@@ -247,26 +258,43 @@ export function StockByLocationCard({
                       row.warehouse.code
                     )}
                   </td>
-                  {canRequest && (
+                  {(canRequest || canReturn) && (
                     <td className="px-2 py-3">
-                      {row.warehouse.ownerUserId !== sessionUserId && (
-                        <QuickRequisitionButton
-                          productId={row.productId}
-                          productSku={row.product.sku}
-                          productName={row.product.name}
-                          unitOfMeasure={row.product.unitOfMeasure}
-                          availableQty={row.quantityOnHand}
-                          elsewhere={(locationsByProduct[row.productId] ?? []).filter(
-                            (l) => l.warehouseId !== row.warehouseId
-                          )}
-                          unitPrice={showCosts ? row.product.unitPrice : null}
-                          canEditPrice={canEditPrice}
-                          warehouseId={row.warehouseId}
-                          warehouseLabel={
-                            row.warehouse.type === 'engineer_station' ? row.warehouse.name : row.warehouse.code
-                          }
-                          customers={customers}
-                        />
+                      {row.warehouse.type === 'engineer_station' && row.warehouse.ownerUserId === sessionUserId ? (
+                        // This viewer's own station - the one row a Return
+                        // action, not a Requisition, makes sense on: you
+                        // don't requisition from your own stock, you return
+                        // what you no longer need of it.
+                        canReturn && (
+                          <ReturnToStoresButton
+                            productId={row.productId}
+                            productSku={row.product.sku}
+                            productName={row.product.name}
+                            unitOfMeasure={row.product.unitOfMeasure}
+                            returnableQty={Math.max(row.quantityOnHand - row.quantityReserved, 0)}
+                          />
+                        )
+                      ) : (
+                        canRequest &&
+                        row.warehouse.ownerUserId !== sessionUserId && (
+                          <QuickRequisitionButton
+                            productId={row.productId}
+                            productSku={row.product.sku}
+                            productName={row.product.name}
+                            unitOfMeasure={row.product.unitOfMeasure}
+                            availableQty={row.quantityOnHand}
+                            elsewhere={(locationsByProduct[row.productId] ?? []).filter(
+                              (l) => l.warehouseId !== row.warehouseId
+                            )}
+                            unitPrice={showCosts ? row.product.unitPrice : null}
+                            canEditPrice={canEditPrice}
+                            warehouseId={row.warehouseId}
+                            warehouseLabel={
+                              row.warehouse.type === 'engineer_station' ? row.warehouse.name : row.warehouse.code
+                            }
+                            customers={customers}
+                          />
+                        )
                       )}
                     </td>
                   )}

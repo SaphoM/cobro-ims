@@ -35,6 +35,11 @@ export default async function DashboardOverviewPage() {
   // '*'. Gates the quick-requisition icon on the table below; the action
   // itself re-checks this independently either way.
   const canRequest = session ? await hasPermission(session, 'create_requisitions') : false;
+  // Same permission requestReturnToStoresAction requires - Engineer /
+  // Requester only. Gates the "Return to Stores" button on the table below,
+  // which only ever appears on the viewer's own station row either way; the
+  // action itself re-checks this independently regardless.
+  const canReturn = session ? await hasPermission(session, 'request_stock_return') : false;
   // Same permission the Product catalogue's price field requires - Admin
   // only. Everyone else gets the quick requisition's Unit value AND the
   // stock-movement form's Unit cost as a read-only display of the catalogue
@@ -302,6 +307,7 @@ export default async function DashboardOverviewPage() {
         defaultStationId={defaultStationId}
         productOptions={productOptions}
         canRequest={canRequest}
+        canReturn={canReturn}
         showCosts={showCosts}
         canEditPrice={canEditPrice}
         sessionUserId={session?.id ?? null}

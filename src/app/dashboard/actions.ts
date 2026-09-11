@@ -8,6 +8,8 @@ import {
   productRepository,
   stockLedgerRepository,
   stockMovementRepository,
+  transferRepository,
+  warehouseRepository,
 } from '@/lib/data';
 import { checkPermission, hasPermission, type Permission } from '@/lib/permissions';
 import { canSeeCosts } from '@/lib/costs';
@@ -183,6 +185,109 @@ export async function recordMovementAction(
     };
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Could not record movement.', success: null };
+  }
+}
+
+export interface RequestReturnFormState {
+  error: string | null;
+  success: string | null;
+}
+
+/**
+ * "Return to Stores" - an Engineer putting unused stock at THEIR OWN
+ * station in transit back to Stores. Reuses the existing inter-warehouse
+ * transfer model exactly as-is (no new ledger, no new status - see
+ * `InterWarehouseTransfer` / transferRepository): this posts the same
+ * `transfer_out` a Stores-initiated transfer would, the stock leaves the
+ * station's on-hand immediately, and it sits `in_transit` — not available
+ * to anyone — until Stores completes it from the existing /dashboard/transfers
+ * page. This action does not, and cannot, complete a transfer itself;
+ * completing one still requires `manage_transfers`, which this role does not
+ * hold. See `request_stock_return` in permissions.ts for the full reasoning.
+ */
+export async function requestReturnToStoresAction(
+  _prevState: RequestReturnFormState,
+  formData: FormData
+): Promise<RequestReturnFormState> {
+  const session = await getSession();
+  if (!session) {
+    return { error: 'Your session has expired. Please sign in again.', success: null };
+  }
+  if (!(await hasPermission(session, 'request_stock_return'))) {
+    return { error: 'Your role does not have permission to return stock to Stores.', success: null };
+  }
+
+  const productId = String(formData.get('productId') ?? '');
+  const quantityRaw = Number(formData.get('quantity'));
+  if (!productId) {
+    return { error: 'Product is required.', success: null };
+  }
+  if (!Number.isFinite(quantityRaw) || quantityRaw <= 0) {
+    return { error: 'Quantity must be a positive number.', success: null };
+  }
+
+  // The source is always the CALLER'S OWN station - never a warehouseId
+  // taken from the client. This is what keeps `request_stock_return` safe
+  // to grant broadly to Engineers: the permission says "you may return your
+  // own stock", and this is what actually enforces "your own", not someone
+  // else's station or an arbitrary warehouse.
+  const myStation = await warehouseRepository.getByOwner(session.id);
+  if (!myStation) {
+    return { error: "You don't have a station to return stock from.", success: null };
+  }
+
+  const [warehouses, ledgerEntry, product] = await Promise.all([
+    warehouseRepository.list(),
+    stockLedgerRepository.get(productId, myStation.id),
+    productRepository.getById(productId),
+  ]);
+  // Exactly one `type: 'store'` warehouse exists in this deployment - the
+  // same assumption src/app/dashboard/receiving/receive-form.tsx makes
+  // ("Store isn't gated here: it's either the one real store...").
+  const store = warehouses.find((w) => w.type === 'store');
+  if (!store) {
+    return { error: 'No store is configured to receive returned stock.', success: null };
+  }
+
+  // Reserved stock at this station is already committed to a pending
+  // peer-pickup requisition sourced from it (see dashboard/page.tsx) -
+  // returning it out from under that pickup would silently break it, so
+  // only the UNRESERVED portion is returnable. `transferRepository.initiate`
+  // itself only checks raw on-hand, so this narrower guard lives here.
+  const returnable = Math.max((ledgerEntry?.quantityOnHand ?? 0) - (ledgerEntry?.quantityReserved ?? 0), 0);
+  if (quantityRaw > returnable + 1e-9) {
+    return {
+      error: `Only ${returnable.toLocaleString()} ${product?.unitOfMeasure ?? 'unit(s)'} at your station ${
+        returnable === 1 ? 'is' : 'are'
+      } unreserved and returnable.`,
+      success: null,
+    };
+  }
+
+  try {
+    const transfer = await transferRepository.initiate({
+      fromWarehouseId: myStation.id,
+      toWarehouseId: store.id,
+      productId,
+      quantity: quantityRaw,
+      initiatedBy: session.id,
+    });
+    await auditLogRepository.write({
+      tableName: 'inter_warehouse_transfers',
+      recordId: transfer.id,
+      action: 'insert',
+      changedBy: session.id,
+      after: transfer,
+    });
+    revalidatePath('/dashboard');
+    revalidatePath('/dashboard/transfers');
+    revalidatePath('/dashboard/audit-log');
+    return {
+      error: null,
+      success: `${transfer.transferNumber} sent to Stores - it's in transit until Stores completes the return.`,
+    };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Could not request the return.', success: null };
   }
 }
 

@@ -4,6 +4,36 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.48.0 — 2026-09-11
+
+**Engineer-initiated "Return to Stores", with a scan required before Stores can receive it.**
+Phase 1 of the end-of-cycle stock return discussion - the return workflow only; configurable reminder
+cadence, an admin scope hierarchy, and the modal notification are deliberately deferred.
+
+- New `request_stock_return` permission (Engineer/Requester only, separate from `manage_transfers` -
+  Stores still has to complete the transfer before anything is actually available again)
+- `requestReturnToStoresAction` (`dashboard/actions.ts`) reuses the existing inter-warehouse transfer
+  model as-is - no new ledger, no new status. Hard-codes the source to the caller's OWN station (never
+  a client-supplied warehouseId), and only offers the UNRESERVED portion of what's on hand, so a
+  pending peer pickup can't be returned out from under it
+- New "Return to Stores" button on the Overview's Station view, rendered only on the viewer's own
+  station row (`stock-by-location-card.tsx`, `return-to-stores-button.tsx`)
+- Stock leaves the station's on-hand the moment a return is requested but does NOT become available at
+  Stores until Stores completes it - verified live: Store's ledger is untouched while a return sits
+  "in transit"
+- **Stores must scan the returned item before it's received** - a return-type transfer (source is an
+  Engineer's station) now shows "Scan to receive" instead of the old one-click "Mark received"
+  (`scan-to-receive-button.tsx`). Scan or type the barcode; a mismatch is refused and completes
+  nothing, same "confirm before it fires" shape as the existing "Scan to reserve". A plain
+  store-to-store transfer is unchanged - still one click, scanning was never the ask there
+  - New `TransferRepository.getLine` exposes what a transfer actually carries (product + quantity),
+    including after it completes - previously discarded the moment a transfer closed
+  - Transfers page gains a Product column
+- Full audit trail: the Engineer's request and Stores' scan-confirmed receipt are two distinct,
+  separately-attributed `inter_warehouse_transfers` entries
+- Verified end to end live: partial return (3 of 10), wrong-barcode rejection, correct-barcode
+  completion, exact ledger arithmetic, and the full audit trail
+
 ## v0.47.0 — 2026-09-10
 
 **Label barcode number gets breathing room from the card edge.** At the widest card (mobile, single

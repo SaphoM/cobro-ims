@@ -4,6 +4,7 @@ import { hasPermission } from '@/lib/permissions';
 import { AccessDenied } from '@/components/access-denied';
 import { TransferForm } from '@/app/dashboard/transfers/transfer-form';
 import { completeTransferAction } from '@/app/dashboard/transfers/actions';
+import { ScanToReceiveButton } from '@/app/dashboard/transfers/scan-to-receive-button';
 import type { Warehouse } from '@/lib/domain/inventory';
 
 // Same name-for-a-station/code-for-a-store convention every other picker in
@@ -38,6 +39,13 @@ export default async function TransfersPage() {
   ]);
 
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
+  const productById = new Map(products.map((p) => [p.id, p]));
+  // What each transfer actually IS - see TransferRepository.getLine's own
+  // doc comment for why this still answers after completion, not just
+  // in-transit.
+  const lineByTransferId = new Map(
+    await Promise.all(transfers.map(async (t) => [t.id, await transferRepository.getLine(t.id)] as const))
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -56,10 +64,11 @@ export default async function TransfersPage() {
           <p className="px-5 py-6 text-[0.85rem] text-text-faint">No transfers yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-[0.86rem]">
+            <table className="w-full min-w-[780px] border-collapse text-[0.86rem]">
               <thead>
                 <tr className="text-left text-text-faint">
                   <th className="px-5 py-2.5 font-medium">Transfer</th>
+                  <th className="px-5 py-2.5 font-medium">Product</th>
                   <th className="px-5 py-2.5 font-medium">From</th>
                   <th className="px-5 py-2.5 font-medium">To</th>
                   <th className="px-5 py-2.5 font-medium">Status</th>
@@ -67,33 +76,72 @@ export default async function TransfersPage() {
                 </tr>
               </thead>
               <tbody>
-                {transfers.map((t) => (
-                  <tr key={t.id} className="border-t border-accent/[0.08]">
-                    <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{t.transferNumber}</td>
-                    <td className="px-5 py-3 text-text-muted">{warehouseLabel(warehouseById.get(t.fromWarehouseId))}</td>
-                    <td className="px-5 py-3 text-text-muted">{warehouseLabel(warehouseById.get(t.toWarehouseId))}</td>
-                    <td className="px-5 py-3">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${
-                          t.status === 'in_transit'
-                            ? 'bg-accent/15 text-accent-strong'
-                            : 'bg-neutral-soft text-text-muted'
-                        }`}
-                      >
-                        {t.status === 'in_transit' ? 'In transit' : 'Completed'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      {t.status === 'in_transit' && (
-                        <form action={completeTransferAction.bind(null, t.id)}>
-                          <button type="submit" className="text-[0.8rem] font-semibold text-accent-strong hover:text-accent-hover">
-                            Mark received
-                          </button>
-                        </form>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {transfers.map((t) => {
+                  const fromWarehouse = warehouseById.get(t.fromWarehouseId);
+                  const line = lineByTransferId.get(t.id);
+                  const product = line ? productById.get(line.productId) : undefined;
+                  // A RETURN is a transfer whose source is an Engineer's own
+                  // station - the shape requestReturnToStoresAction always
+                  // creates. A plain store-to-store transfer (Admin/Stores
+                  // moving stock between stores) is not a return and keeps
+                  // the simple, ungated completion it always had.
+                  const isReturn = fromWarehouse?.type === 'engineer_station';
+                  return (
+                    <tr key={t.id} className="border-t border-accent/[0.08]">
+                      <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{t.transferNumber}</td>
+                      <td className="px-5 py-3 text-text-muted">
+                        {product ? (
+                          <>
+                            <span className="text-text">{product.sku}</span>
+                            {line && (
+                              <span className="ml-1.5 text-text-faint">
+                                · {line.quantity.toLocaleString()} {product.unitOfMeasure}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td className="px-5 py-3 text-text-muted">{warehouseLabel(fromWarehouse)}</td>
+                      <td className="px-5 py-3 text-text-muted">{warehouseLabel(warehouseById.get(t.toWarehouseId))}</td>
+                      <td className="px-5 py-3">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${
+                            t.status === 'in_transit'
+                              ? 'bg-accent/15 text-accent-strong'
+                              : 'bg-neutral-soft text-text-muted'
+                          }`}
+                        >
+                          {t.status === 'in_transit' ? 'In transit' : 'Completed'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        {t.status === 'in_transit' &&
+                          (isReturn && line && product ? (
+                            <ScanToReceiveButton
+                              transferId={t.id}
+                              productSku={product.sku}
+                              productName={product.name}
+                              productBarcode={product.barcode}
+                              quantity={line.quantity}
+                              unitOfMeasure={product.unitOfMeasure}
+                              fromLabel={warehouseLabel(fromWarehouse)}
+                            />
+                          ) : (
+                            <form action={completeTransferAction.bind(null, t.id)}>
+                              <button
+                                type="submit"
+                                className="text-[0.8rem] font-semibold text-accent-strong hover:text-accent-hover"
+                              >
+                                Mark received
+                              </button>
+                            </form>
+                          ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

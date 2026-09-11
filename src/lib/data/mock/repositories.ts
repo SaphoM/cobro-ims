@@ -568,7 +568,9 @@ export const mockTransferRepository: TransferRepository = {
     });
 
     // Track quantity + cost on the transfer record itself via a side map so
-    // `complete()` can post the matching transfer_in without re-deriving it.
+    // `complete()` can post the matching transfer_in without re-deriving it,
+    // and `getLine()` can answer what a transfer IS at any point in its
+    // life, not just while in transit (despite this map's name).
     pendingTransferLines.set(transfer.id, {
       productId: input.productId,
       quantity: Math.abs(input.quantity),
@@ -599,11 +601,18 @@ export const mockTransferRepository: TransferRepository = {
 
     transfer.status = 'completed';
     transfer.completedAt = new Date().toISOString();
-    pendingTransferLines.delete(transferId);
+    // NOT deleted from pendingTransferLines here (despite the name) - getLine
+    // below still needs to answer for a completed transfer, e.g. to show
+    // what was actually received or to have shown what a scan was checked
+    // against at the moment of receiving.
     return transfer;
   },
   async getStatus(transferId) {
     return state.transfers.find((t) => t.id === transferId)?.status ?? null;
+  },
+  async getLine(transferId) {
+    const line = pendingTransferLines.get(transferId);
+    return line ? { productId: line.productId, quantity: line.quantity } : null;
   },
 };
 

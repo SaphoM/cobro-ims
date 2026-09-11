@@ -34,6 +34,17 @@ export type Permission =
    *  (approve/issue/cancel, Stores-only) so an Engineer can raise a request
    *  without being able to process anyone's, their own included. */
   | 'create_requisitions'
+  /** Request that unused stock at MY OWN station go back to Stores —
+   *  Engineer/Requester only. Deliberately NOT `manage_transfers`: that
+   *  stays Stores-only, because a return only actually happens once Stores
+   *  completes the resulting transfer — this permission only lets an
+   *  Engineer put their own station's stock in transit toward Stores, the
+   *  same "originate a request, someone else fulfils it" shape as
+   *  `create_requisitions` vs `manage_sales_orders`. The Server Action
+   *  behind this hard-codes the source warehouse to the caller's own
+   *  station — the permission alone never lets anyone move a warehouse
+   *  they don't own. See requestReturnToStoresAction in dashboard/actions.ts. */
+  | 'request_stock_return'
   /** See the Requisitions module and its contents — distinct from
    *  `create_requisitions` (originate one) so Admin can retain management
    *  visibility over requisitions without being able to start one. Held by
@@ -121,7 +132,10 @@ export type Permission =
  *                               requisitions; cannot approve, issue, or otherwise touch the
  *                               inventory ledger. Does NOT hold `manage_transfers` — an Engineer
  *                               cannot return their own held stock to Stores unilaterally; see
- *                               that permission's comment.
+ *                               that permission's comment. Instead holds the narrower
+ *                               `request_stock_return`: can put their own station's unused
+ *                               stock in transit toward Stores, but Stores still has to
+ *                               complete the transfer before it's actually available again.
  *   supervisor               — operational oversight ABOVE the Team Leaders, reporting to
  *                               Management. Sees every team's activity, not one section's - the
  *                               ONE thing that makes it broader than a Team Leader (which is
@@ -176,14 +190,16 @@ const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
     'view_audit_log',
     'create_product_labels',
   ],
-  // Deliberately narrow: create_requisitions is the only inventory-adjacent
-  // permission this role holds. `view_reports` is granted too, but the
-  // Reports page itself cuts what an Engineer sees down to their own
-  // requisitions and stock-availability info — see /dashboard/reports.
-  // No `manage_transfers` - an Engineer cannot self-service a return to
-  // Stores; that stays a Stores-initiated transfer (see `manage_transfers`
-  // above and docs/ARCHITECTURE.md).
-  engineer_requester: ['create_requisitions', 'view_requisitions', 'view_reports'],
+  // Deliberately narrow: create_requisitions and request_stock_return are
+  // the only inventory-adjacent permissions this role holds, and both are
+  // REQUESTS - Stores still has to act (approve/issue, or complete the
+  // transfer) before anything actually moves. `view_reports` is granted
+  // too, but the Reports page itself cuts what an Engineer sees down to
+  // their own requisitions and stock-availability info — see
+  // /dashboard/reports. No `manage_transfers` - an Engineer cannot
+  // self-service a return to Stores; that stays a Stores-initiated
+  // transfer (see `manage_transfers` above and docs/ARCHITECTURE.md).
+  engineer_requester: ['create_requisitions', 'request_stock_return', 'view_requisitions', 'view_reports'],
   // View-only oversight, deliberately - see the role-list comment above for
   // why this stops well short of approval authority. A Supervisor's grant is
   // identical to a Team Leader's; the difference is purely SCOPE - a
