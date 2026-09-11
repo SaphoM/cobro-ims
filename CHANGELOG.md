@@ -4,6 +4,14 @@ Version tracks development milestones, not production releases — nothing below
 Supabase project or a Cobro user yet (see `docs/ARCHITECTURE.md` for what's real vs. mocked). Semantic
 versioning, pre-1.0 while auth, real data, and the remaining RFQ phases are outstanding.
 
+## v0.49.0 — 2026-09-11
+
+**Seed: Demo Engineer's station starts with stock.**
+
+- `stockLedger` in `seed.ts` gains one row: 8 Rebar Y12 at Demo Engineer's station, same WAC as the
+  store it came from. A fresh server start can now demo "Return to Stores" -> "Scan to receive"
+  immediately, without first seeding a store -> station transfer by hand every time
+
 ## v0.48.0 — 2026-09-11
 
 **Engineer-initiated "Return to Stores", with a scan required before Stores can receive it.**

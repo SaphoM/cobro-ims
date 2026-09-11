@@ -284,6 +284,13 @@ export const stockLedger: StockLedgerEntry[] = [
   { productId: 'prod-aggregate-19', warehouseId: 'wh-dbn', quantityOnHand: 38, quantityReserved: 0, weightedAverageCost: 410, updatedAt: '2026-08-12T07:45:00Z' },
   // Was entirely at RBB - moved here unchanged, no other quantity to blend with.
   { productId: 'prod-rebar-y12', warehouseId: 'wh-dbn', quantityOnHand: 640, quantityReserved: 0, weightedAverageCost: 118.75, updatedAt: '2026-08-06T13:00:00Z' },
+  // Demo Engineer's station starts with a little stock already accepted
+  // from the store and not yet used - purely so "Return to Stores" (see
+  // requestReturnToStoresAction) and the station's "Scan to Use" have
+  // something to act on from a fresh server start, without first having to
+  // seed a store->station transfer by hand every time. Same WAC as the
+  // store row above - it left there at that cost.
+  { productId: 'prod-rebar-y12', warehouseId: 'wh-station-engineer', quantityOnHand: 8, quantityReserved: 0, weightedAverageCost: 118.75, updatedAt: '2026-08-20T09:00:00Z' },
 ];
 
 export const suppliers: Supplier[] = [
