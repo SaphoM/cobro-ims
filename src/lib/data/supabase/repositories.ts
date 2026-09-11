@@ -67,6 +67,7 @@ import type {
   WriteAuditEntryInput,
 } from '@/lib/data/repositories';
 import { applyMovement } from '@/lib/services/inventory-engine';
+import { NEW_USER_DEFAULT_PASSWORD } from '@/lib/demo-credentials';
 
 // ---------------------------------------------------------------------------
 // Helpers: snake_case DB rows ↔ camelCase domain objects
@@ -1309,6 +1310,18 @@ export const sbSettingsRepository: SettingsRepository = {
 // Users
 // ---------------------------------------------------------------------------
 
+/**
+ * Normalise a raw DB user row into the User domain type.
+ * Guards against the label_permission column being absent (schema drift
+ * before the 20260911 migration is applied): defaults to 'inherited' so
+ * hasPermission() behaves correctly and no caller gets undefined.
+ */
+function toUser(row: Record<string, unknown>): User {
+  const user = toCamel<User>(row);
+  if (user.labelPermission == null) user.labelPermission = 'inherited';
+  return user;
+}
+
 export const sbUserRepository: UserRepository = {
   async findByEmail(email) {
     const { data, error } = await getSupabase()
@@ -1317,35 +1330,61 @@ export const sbUserRepository: UserRepository = {
       .ilike('email', email.toLowerCase())
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return data ? toCamel<User>(data) : null;
+    return data ? toUser(data) : null;
   },
   async getById(id) {
     const { data, error } = await getSupabase().from('users').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(error.message);
-    return data ? toCamel<User>(data) : null;
+    return data ? toUser(data) : null;
   },
   async list() {
     const { data, error } = await getSupabase().from('users').select('*').order('created_at');
     if (error) throw new Error(error.message);
-    return toCamelArray<User>(data);
+    return (data as Record<string, unknown>[]).map(toUser);
   },
   async create(input: CreateUserInput) {
     const email = input.email.trim().toLowerCase();
-    const { data, error } = await getSupabase()
-      .from('users')
-      .insert({
-        email,
+    const sb = getSupabase();
+
+    // public.users.id is a FK → auth.users.id (no default UUID).
+    // We must create the auth user first — the DB trigger handle_new_auth_user
+    // auto-inserts the public.users row using metadata we pass here, with the
+    // correct role/area/name so no PATCH is needed afterwards.
+    const { data: authData, error: authErr } = await sb.auth.admin.createUser({
+      email,
+      password: NEW_USER_DEFAULT_PASSWORD,
+      email_confirm: true,
+      user_metadata: {
         full_name: input.fullName,
         role_id: input.roleId,
         area: input.area ?? null,
-      })
-      .select()
-      .single();
-    if (error) {
-      if (error.code === '23505') throw new Error(`A user with the email ${email} already exists.`);
-      throw new Error(error.message);
+      },
+    });
+
+    if (authErr) {
+      if (authErr.message?.toLowerCase().includes('already been registered')) {
+        throw new Error(`A user with the email ${email} already exists.`);
+      }
+      throw new Error(authErr.message ?? 'Failed to create auth user.');
     }
-    return toCamel<User>(data);
+
+    const authUserId = authData.user.id;
+
+    // Read back the public user row the trigger just created.
+    const { data: pubRow, error: readErr } = await sb
+      .from('users')
+      .select('*')
+      .eq('id', authUserId)
+      .single();
+
+    if (readErr || !pubRow) {
+      // Trigger should have created the row synchronously — if it didn't,
+      // clean up the auth user to avoid a ghost (auth user with no public row).
+      await sb.auth.admin.deleteUser(authUserId);
+      throw new Error('User created in auth but public profile was not found — check DB trigger handle_new_auth_user.');
+    }
+
+    return toUser(pubRow);
   },
   async updateRole(userId, roleId) {
     const { data, error } = await getSupabase()
@@ -1355,7 +1394,7 @@ export const sbUserRepository: UserRepository = {
       .select()
       .single();
     if (error) throw new Error('User not found.');
-    return toCamel<User>(data);
+    return toUser(data);
   },
   async updateArea(userId, area) {
     const { data, error } = await getSupabase()
@@ -1365,7 +1404,7 @@ export const sbUserRepository: UserRepository = {
       .select()
       .single();
     if (error) throw new Error('User not found.');
-    return toCamel<User>(data);
+    return toUser(data);
   },
   async setLabelPermission(userId, value) {
     const { data, error } = await getSupabase()
@@ -1374,8 +1413,17 @@ export const sbUserRepository: UserRepository = {
       .eq('id', userId)
       .select()
       .single();
-    if (error) throw new Error('User not found.');
-    return toCamel<User>(data);
+    if (error) {
+      // 42703 = undefined_column — label_permission migration not yet applied
+      if (error.code === '42703') {
+        throw new Error(
+          'The label_permission column has not been added to the database yet. ' +
+          'Run migration 20260911000000_label_permission_and_seed_roles.sql in the Supabase SQL Editor.'
+        );
+      }
+      throw new Error('User not found.');
+    }
+    return toUser(data);
   },
   async setActive(userId, active) {
     const { data, error } = await getSupabase()
@@ -1385,7 +1433,7 @@ export const sbUserRepository: UserRepository = {
       .select()
       .single();
     if (error) throw new Error('User not found.');
-    return toCamel<User>(data);
+    return toUser(data);
   },
   async setMfaEnrolled(userId, enrolled) {
     const { data, error } = await getSupabase()
@@ -1395,7 +1443,7 @@ export const sbUserRepository: UserRepository = {
       .select()
       .single();
     if (error) throw new Error('User not found.');
-    return toCamel<User>(data);
+    return toUser(data);
   },
 };
 
