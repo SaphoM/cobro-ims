@@ -1012,7 +1012,9 @@ export const mockUserRepository: UserRepository = {
       updatedAt: now,
     };
     state.users.push(user);
-    return user;
+    // Mock parity with the Supabase repo's CreateUserResult contract. The mock
+    // layer has no real auth, so this password is illustrative only.
+    return { user, temporaryPassword: 'MockTemp-' + user.id.slice(0, 8) };
   },
   async updateRole(userId, roleId) {
     const user = state.users.find((u) => u.id === userId);

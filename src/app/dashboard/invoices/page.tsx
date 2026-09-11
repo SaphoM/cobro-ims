@@ -1,3 +1,6 @@
+import { redirect } from 'next/navigation';
+import { getSession } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 import { customerRepository, invoiceRepository, salesOrderRepository } from '@/lib/data';
 import { PaymentLine } from '@/app/dashboard/invoices/payment-line';
 import { CreditNoteLine } from '@/app/dashboard/invoices/credit-note-line';
@@ -5,6 +8,10 @@ import { getNowMs } from '@/lib/now';
 import type { InvoiceStatus } from '@/lib/domain/inventory';
 
 export default async function InvoicesPage() {
+  const session = await getSession();
+  if (!session) redirect('/login');
+  if (!(await hasPermission(session, 'manage_invoices'))) redirect('/dashboard');
+
   const [invoices, customers, orders] = await Promise.all([
     invoiceRepository.list(),
     customerRepository.list(),

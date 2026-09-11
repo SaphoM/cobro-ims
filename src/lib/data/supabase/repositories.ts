@@ -3,11 +3,21 @@
  * implements the exact same interface as its mock counterpart in
  * src/lib/data/mock/repositories.ts — callers never know the difference.
  *
- * Uses the service-role client (see src/lib/supabase.ts) because auth is
- * still mock-based and RBAC is enforced at the Server Action layer.
+ * Client policy (real Supabase Auth):
+ *   - Ordinary employee reads/writes go through the USER-SCOPED client
+ *     (createServerSupabaseClient) so auth.uid() resolves and RLS applies as
+ *     a real backstop underneath the Server Action permission checks.
+ *   - A SMALL set of trusted, privileged operations use the service-role
+ *     client (getServiceSupabase): the stock ledger/movement writer and
+ *     reservation adjuster (those tables have no user-writable RLS policy by
+ *     design), global document-number generation (must see every row, not
+ *     just the caller's), Auth Admin user creation, the app-settings singleton
+ *     write, and the cross-device scan-handoff token flow. Each is invoked
+ *     only after the Server Action layer has already authorised the caller.
  */
 
-import { getSupabase } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getServiceSupabase } from '@/lib/supabase/service';
 import type {
   AdjustmentReasonCode,
   AuditLogEntry,
@@ -67,7 +77,7 @@ import type {
   WriteAuditEntryInput,
 } from '@/lib/data/repositories';
 import { applyMovement } from '@/lib/services/inventory-engine';
-import { NEW_USER_DEFAULT_PASSWORD } from '@/lib/demo-credentials';
+import { generateTemporaryPassword } from '@/lib/temp-password';
 
 // ---------------------------------------------------------------------------
 // Helpers: snake_case DB rows ↔ camelCase domain objects
@@ -100,7 +110,7 @@ async function nextDocNumber(
   prefix: string,
   startAt = 1001
 ): Promise<string> {
-  const sb = getSupabase();
+  const sb = getServiceSupabase();
   const { data } = await sb
     .from(table)
     .select(column)
@@ -120,7 +130,7 @@ async function nextDocNumber(
  * upserts the ledger and inserts the movement row.
  */
 async function postMovement(input: RecordMovementInput): Promise<{ movement: StockMovement; ledger: StockLedgerEntry }> {
-  const sb = getSupabase();
+  const sb = getServiceSupabase();
 
   // 1. Current ledger snapshot
   const { data: ledgerRow } = await sb
@@ -182,17 +192,17 @@ async function postMovement(input: RecordMovementInput): Promise<{ movement: Sto
 
 export const sbWarehouseRepository: WarehouseRepository = {
   async list() {
-    const { data, error } = await getSupabase().from('warehouses').select('*').order('created_at');
+    const { data, error } = await (await createServerSupabaseClient()).from('warehouses').select('*').order('created_at');
     if (error) throw new Error(error.message);
     return toCamelArray<Warehouse>(data);
   },
   async getById(id) {
-    const { data, error } = await getSupabase().from('warehouses').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await (await createServerSupabaseClient()).from('warehouses').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(error.message);
     return data ? toCamel<Warehouse>(data) : null;
   },
   async create(input: CreateWarehouseInput) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('warehouses')
       .insert({
         code: input.code,
@@ -207,7 +217,7 @@ export const sbWarehouseRepository: WarehouseRepository = {
     return toCamel<Warehouse>(data);
   },
   async getByOwner(ownerUserId) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('warehouses')
       .select('*')
       .eq('type', 'engineer_station')
@@ -224,12 +234,12 @@ export const sbWarehouseRepository: WarehouseRepository = {
 
 export const sbRoleRepository: RoleRepository = {
   async list() {
-    const { data, error } = await getSupabase().from('roles').select('*').order('created_at');
+    const { data, error } = await (await createServerSupabaseClient()).from('roles').select('*').order('created_at');
     if (error) throw new Error(error.message);
     return toCamelArray(data);
   },
   async getById(id) {
-    const { data, error } = await getSupabase().from('roles').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await (await createServerSupabaseClient()).from('roles').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(error.message);
     return data ? toCamel(data) : null;
   },
@@ -241,7 +251,7 @@ export const sbRoleRepository: RoleRepository = {
 
 export const sbAuditLogRepository: AuditLogRepository = {
   async write(input: WriteAuditEntryInput) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('audit_log')
       .insert({
         table_name: input.tableName,
@@ -257,7 +267,7 @@ export const sbAuditLogRepository: AuditLogRepository = {
     return toCamel<AuditLogEntry>(data);
   },
   async list(limit = 200) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('audit_log')
       .select('*')
       .order('changed_at', { ascending: false })
@@ -273,27 +283,27 @@ export const sbAuditLogRepository: AuditLogRepository = {
 
 export const sbProductRepository: ProductRepository = {
   async list() {
-    const { data, error } = await getSupabase().from('products').select('*').order('created_at');
+    const { data, error } = await (await createServerSupabaseClient()).from('products').select('*').order('created_at');
     if (error) throw new Error(error.message);
     return toCamelArray<Product>(data);
   },
   async getById(id) {
-    const { data, error } = await getSupabase().from('products').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await (await createServerSupabaseClient()).from('products').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(error.message);
     return data ? toCamel<Product>(data) : null;
   },
   async getBySku(sku) {
-    const { data, error } = await getSupabase().from('products').select('*').ilike('sku', sku).maybeSingle();
+    const { data, error } = await (await createServerSupabaseClient()).from('products').select('*').ilike('sku', sku).maybeSingle();
     if (error) throw new Error(error.message);
     return data ? toCamel<Product>(data) : null;
   },
   async getByBarcode(barcode) {
-    const { data, error } = await getSupabase().from('products').select('*').eq('barcode', barcode).maybeSingle();
+    const { data, error } = await (await createServerSupabaseClient()).from('products').select('*').eq('barcode', barcode).maybeSingle();
     if (error) throw new Error(error.message);
     return data ? toCamel<Product>(data) : null;
   },
   async create(input: CreateProductInput) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('products')
       .insert({
         sku: input.sku,
@@ -325,7 +335,7 @@ export const sbProductRepository: ProductRepository = {
     if (unitPrice !== null && (!Number.isFinite(unitPrice) || unitPrice < 0)) {
       throw new Error('Price must be zero or a positive number.');
     }
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('products')
       .update({ unit_price: unitPrice, updated_at: new Date().toISOString() })
       .eq('id', productId)
@@ -335,7 +345,7 @@ export const sbProductRepository: ProductRepository = {
     return toCamel<Product>(data);
   },
   async listBom(parentProductId) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('product_bom')
       .select('*')
       .eq('parent_product_id', parentProductId);
@@ -346,7 +356,7 @@ export const sbProductRepository: ProductRepository = {
     if (input.parentProductId === input.componentProductId) {
       throw new Error('A product cannot be a component of itself.');
     }
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('product_bom')
       .insert({
         parent_product_id: input.parentProductId,
@@ -364,7 +374,7 @@ export const sbProductRepository: ProductRepository = {
     return toCamel<ProductBomLine>(data);
   },
   async removeBomLine(lineId) {
-    const { error } = await getSupabase().from('product_bom').delete().eq('id', lineId);
+    const { error } = await (await createServerSupabaseClient()).from('product_bom').delete().eq('id', lineId);
     if (error) throw new Error('BOM line not found.');
   },
 };
@@ -375,17 +385,17 @@ export const sbProductRepository: ProductRepository = {
 
 export const sbStockLedgerRepository: StockLedgerRepository = {
   async listAll() {
-    const { data, error } = await getSupabase().from('stock_ledger').select('*');
+    const { data, error } = await (await createServerSupabaseClient()).from('stock_ledger').select('*');
     if (error) throw new Error(error.message);
     return toCamelArray<StockLedgerEntry>(data);
   },
   async listByWarehouse(warehouseId) {
-    const { data, error } = await getSupabase().from('stock_ledger').select('*').eq('warehouse_id', warehouseId);
+    const { data, error } = await (await createServerSupabaseClient()).from('stock_ledger').select('*').eq('warehouse_id', warehouseId);
     if (error) throw new Error(error.message);
     return toCamelArray<StockLedgerEntry>(data);
   },
   async get(productId, warehouseId) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('stock_ledger')
       .select('*')
       .eq('product_id', productId)
@@ -395,7 +405,9 @@ export const sbStockLedgerRepository: StockLedgerRepository = {
     return data ? toCamel<StockLedgerEntry>(data) : null;
   },
   async adjustReserved(productId, warehouseId, delta) {
-    const sb = getSupabase();
+    // Service-role: stock_ledger has no user-writable UPDATE policy — this is
+    // a trusted reservation write invoked only from confirm/dispatch/cancel.
+    const sb = getServiceSupabase();
     const { data: row, error: readErr } = await sb
       .from('stock_ledger')
       .select('*')
@@ -436,14 +448,14 @@ export const sbStockLedgerRepository: StockLedgerRepository = {
 
 export const sbStockMovementRepository: StockMovementRepository = {
   async listByProduct(productId, warehouseId) {
-    let q = getSupabase().from('stock_movements').select('*').eq('product_id', productId);
+    let q = (await createServerSupabaseClient()).from('stock_movements').select('*').eq('product_id', productId);
     if (warehouseId) q = q.eq('warehouse_id', warehouseId);
     const { data, error } = await q.order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return toCamelArray<StockMovement>(data);
   },
   async listRecent(limit = 20) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('stock_movements')
       .select('*')
       .order('created_at', { ascending: false })
@@ -462,12 +474,12 @@ export const sbStockMovementRepository: StockMovementRepository = {
 
 export const sbSupplierRepository: SupplierRepository = {
   async list() {
-    const { data, error } = await getSupabase().from('suppliers').select('*').order('created_at');
+    const { data, error } = await (await createServerSupabaseClient()).from('suppliers').select('*').order('created_at');
     if (error) throw new Error(error.message);
     return toCamelArray<Supplier>(data);
   },
   async create(input: CreateSupplierInput) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('suppliers')
       .insert({
         name: input.name,
@@ -488,12 +500,12 @@ export const sbSupplierRepository: SupplierRepository = {
 
 export const sbCustomerRepository: CustomerRepository = {
   async list() {
-    const { data, error } = await getSupabase().from('customers').select('*').order('created_at');
+    const { data, error } = await (await createServerSupabaseClient()).from('customers').select('*').order('created_at');
     if (error) throw new Error(error.message);
     return toCamelArray<Customer>(data);
   },
   async create(input: CreateCustomerInput) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('customers')
       .insert({
         name: input.name,
@@ -514,7 +526,7 @@ export const sbCustomerRepository: CustomerRepository = {
 
 export const sbReceivingRepository: ReceivingRepository = {
   async listRecentReceipts(limit = 20) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('goods_receipts')
       .select('*')
       .order('received_at', { ascending: false, nullsFirst: false })
@@ -524,7 +536,7 @@ export const sbReceivingRepository: ReceivingRepository = {
   },
 
   async quickReceive(input: QuickReceiveInput) {
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
     const now = new Date().toISOString();
     const poNumber = await nextDocNumber('purchase_orders', 'po_number', 'PO');
     const grnNumber = await nextDocNumber('goods_receipts', 'grn_number', 'GRN');
@@ -593,7 +605,7 @@ export const sbReceivingRepository: ReceivingRepository = {
 
 async function poWithLine(poRow: Record<string, unknown>): Promise<PurchaseOrderWithLine> {
   const po = toCamel<PurchaseOrder>(poRow);
-  const { data: lineRow, error } = await getSupabase()
+  const { data: lineRow, error } = await (await createServerSupabaseClient())
     .from('purchase_order_lines')
     .select('*')
     .eq('purchase_order_id', po.id)
@@ -605,7 +617,7 @@ async function poWithLine(poRow: Record<string, unknown>): Promise<PurchaseOrder
 
 export const sbPurchaseOrderRepository: PurchaseOrderRepository = {
   async list() {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('purchase_orders')
       .select('*')
       .order('created_at', { ascending: false });
@@ -617,7 +629,7 @@ export const sbPurchaseOrderRepository: PurchaseOrderRepository = {
     return results;
   },
   async create(input: CreatePurchaseOrderInput) {
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
     const poNumber = await nextDocNumber('purchase_orders', 'po_number', 'PO');
     const now = new Date().toISOString();
 
@@ -646,7 +658,7 @@ export const sbPurchaseOrderRepository: PurchaseOrderRepository = {
     return poWithLine(poRow);
   },
   async issue(poId) {
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
     const { data: existing } = await sb.from('purchase_orders').select('status').eq('id', poId).single();
     if (!existing) throw new Error('Purchase order not found.');
     if (existing.status !== 'draft') throw new Error(`Purchase order is already ${existing.status}.`);
@@ -661,7 +673,7 @@ export const sbPurchaseOrderRepository: PurchaseOrderRepository = {
     return poWithLine(poRow);
   },
   async receive(poId, quantity, receivedBy) {
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
     const { data: poRow } = await sb.from('purchase_orders').select('*').eq('id', poId).single();
     if (!poRow) throw new Error('Purchase order not found.');
     if (poRow.status !== 'issued' && poRow.status !== 'partially_received') {
@@ -730,7 +742,7 @@ export const sbPurchaseOrderRepository: PurchaseOrderRepository = {
     };
   },
   async getStatus(poId) {
-    const { data } = await getSupabase().from('purchase_orders').select('status').eq('id', poId).maybeSingle();
+    const { data } = await (await createServerSupabaseClient()).from('purchase_orders').select('status').eq('id', poId).maybeSingle();
     return (data?.status as PurchaseOrder['status']) ?? null;
   },
 };
@@ -741,7 +753,7 @@ export const sbPurchaseOrderRepository: PurchaseOrderRepository = {
 
 export const sbTransferRepository: TransferRepository = {
   async list() {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('inter_warehouse_transfers')
       .select('*')
       .order('initiated_at', { ascending: false });
@@ -752,7 +764,7 @@ export const sbTransferRepository: TransferRepository = {
     if (input.fromWarehouseId === input.toWarehouseId) {
       throw new Error('Source and destination warehouse must differ.');
     }
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
 
     const { data: ledgerRow } = await sb
       .from('stock_ledger')
@@ -803,7 +815,7 @@ export const sbTransferRepository: TransferRepository = {
     return toCamel<InterWarehouseTransfer>(xfrRow);
   },
   async complete(transferId, completedBy) {
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
     const { data: xfrRow } = await sb
       .from('inter_warehouse_transfers')
       .select('*')
@@ -851,7 +863,7 @@ export const sbTransferRepository: TransferRepository = {
     return toCamel<InterWarehouseTransfer>(updated);
   },
   async getStatus(transferId) {
-    const { data } = await getSupabase()
+    const { data } = await (await createServerSupabaseClient())
       .from('inter_warehouse_transfers')
       .select('status')
       .eq('id', transferId)
@@ -859,7 +871,7 @@ export const sbTransferRepository: TransferRepository = {
     return (data?.status as InterWarehouseTransfer['status']) ?? null;
   },
   async getLine(transferId) {
-    const { data: lineRow } = await getSupabase()
+    const { data: lineRow } = await (await createServerSupabaseClient())
       .from('inter_warehouse_transfer_lines')
       .select('product_id, quantity')
       .eq('transfer_id', transferId)
@@ -877,7 +889,7 @@ export const sbTransferRepository: TransferRepository = {
 
 export const sbAdjustmentReasonRepository: AdjustmentReasonRepository = {
   async list() {
-    const { data, error } = await getSupabase().from('adjustment_reason_codes').select('*');
+    const { data, error } = await (await createServerSupabaseClient()).from('adjustment_reason_codes').select('*');
     if (error) throw new Error(error.message);
     return toCamelArray<AdjustmentReasonCode>(data);
   },
@@ -889,7 +901,7 @@ export const sbAdjustmentReasonRepository: AdjustmentReasonRepository = {
 
 export const sbStockAdjustmentRepository: StockAdjustmentRepository = {
   async list() {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('stock_adjustments')
       .select('*')
       .order('requested_at', { ascending: false });
@@ -897,7 +909,7 @@ export const sbStockAdjustmentRepository: StockAdjustmentRepository = {
     return toCamelArray<StockAdjustment>(data);
   },
   async request(input: RequestAdjustmentInput) {
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
     const adjNumber = await nextDocNumber('stock_adjustments', 'adjustment_number', 'ADJ');
 
     const { data: adjRow, error: adjErr } = await sb
@@ -924,7 +936,7 @@ export const sbStockAdjustmentRepository: StockAdjustmentRepository = {
     return toCamel<StockAdjustment>(adjRow);
   },
   async decide(adjustmentId, decision, decidedBy) {
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
     const { data: adjRow } = await sb
       .from('stock_adjustments')
       .select('*')
@@ -977,7 +989,7 @@ export const sbStockAdjustmentRepository: StockAdjustmentRepository = {
 
 export const sbSalesOrderRepository: SalesOrderRepository = {
   async list() {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('sales_orders')
       .select('*')
       .order('created_at', { ascending: false });
@@ -985,14 +997,14 @@ export const sbSalesOrderRepository: SalesOrderRepository = {
     return toCamelArray<SalesOrder>(data);
   },
   async getById(orderId) {
-    const { data, error } = await getSupabase().from('sales_orders').select('*').eq('id', orderId).maybeSingle();
+    const { data, error } = await (await createServerSupabaseClient()).from('sales_orders').select('*').eq('id', orderId).maybeSingle();
     if (error) throw new Error(error.message);
     return data ? toCamel<SalesOrder>(data) : null;
   },
   async create(input: CreateSalesOrderInput) {
     const orderNumber = await nextDocNumber('sales_orders', 'order_number', 'REQ');
 
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('sales_orders')
       .insert({
         order_number: orderNumber,
@@ -1010,7 +1022,7 @@ export const sbSalesOrderRepository: SalesOrderRepository = {
     return toCamel<SalesOrder>(data);
   },
   async confirm(orderId) {
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
     const { data: row } = await sb.from('sales_orders').select('*').eq('id', orderId).single();
     if (!row) throw new Error('Sales order not found.');
     if (row.status !== 'draft') throw new Error(`Order is already ${row.status}.`);
@@ -1027,7 +1039,7 @@ export const sbSalesOrderRepository: SalesOrderRepository = {
     return toCamel<SalesOrder>(updated);
   },
   async dispatch(orderId, dispatchedBy) {
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
     const { data: row } = await sb.from('sales_orders').select('*').eq('id', orderId).single();
     if (!row) throw new Error('Sales order not found.');
     if (row.status !== 'confirmed') throw new Error('Only confirmed orders can be dispatched.');
@@ -1092,7 +1104,7 @@ export const sbSalesOrderRepository: SalesOrderRepository = {
     return toCamel<SalesOrder>(updated);
   },
   async cancel(orderId) {
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
     const { data: row } = await sb.from('sales_orders').select('*').eq('id', orderId).single();
     if (!row) throw new Error('Sales order not found.');
     if (row.status === 'dispatched' || row.status === 'cancelled') {
@@ -1111,7 +1123,7 @@ export const sbSalesOrderRepository: SalesOrderRepository = {
     return toCamel<SalesOrder>(updated);
   },
   async getStatus(orderId) {
-    const { data } = await getSupabase().from('sales_orders').select('status').eq('id', orderId).maybeSingle();
+    const { data } = await (await createServerSupabaseClient()).from('sales_orders').select('status').eq('id', orderId).maybeSingle();
     return (data?.status as SalesOrder['status']) ?? null;
   },
 };
@@ -1128,7 +1140,7 @@ function invoiceOutstanding(inv: Invoice): number {
 
 export const sbInvoiceRepository: InvoiceRepository = {
   async list() {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('invoices')
       .select('*')
       .order('issued_at', { ascending: false });
@@ -1136,7 +1148,7 @@ export const sbInvoiceRepository: InvoiceRepository = {
     return toCamelArray<Invoice>(data);
   },
   async getBySalesOrderId(salesOrderId) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('invoices')
       .select('*')
       .eq('sales_order_id', salesOrderId)
@@ -1145,7 +1157,7 @@ export const sbInvoiceRepository: InvoiceRepository = {
     return data ? toCamel<Invoice>(data) : null;
   },
   async generateFromSalesOrder(salesOrderId, createdBy) {
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
     const { data: orderRow } = await sb.from('sales_orders').select('*').eq('id', salesOrderId).single();
     if (!orderRow) throw new Error('Sales order not found.');
     if (orderRow.status !== 'dispatched') throw new Error('Only dispatched orders can be invoiced.');
@@ -1182,7 +1194,7 @@ export const sbInvoiceRepository: InvoiceRepository = {
     return toCamel<Invoice>(data);
   },
   async recordPayment(invoiceId, amount, recordedBy) {
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
     const { data: invRow } = await sb.from('invoices').select('*').eq('id', invoiceId).single();
     if (!invRow) throw new Error('Invoice not found.');
     const invoice = toCamel<Invoice>(invRow);
@@ -1220,7 +1232,7 @@ export const sbInvoiceRepository: InvoiceRepository = {
     return { invoice: toCamel<Invoice>(updatedInv), payment: toCamel<InvoicePayment>(payRow) };
   },
   async listPayments(invoiceId) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('invoice_payments')
       .select('*')
       .eq('invoice_id', invoiceId);
@@ -1228,7 +1240,7 @@ export const sbInvoiceRepository: InvoiceRepository = {
     return toCamelArray<InvoicePayment>(data);
   },
   async issueCreditNote(invoiceId, amount, reason, issuedBy) {
-    const sb = getSupabase();
+    const sb = (await createServerSupabaseClient());
     const { data: invRow } = await sb.from('invoices').select('*').eq('id', invoiceId).single();
     if (!invRow) throw new Error('Invoice not found.');
     const invoice = toCamel<Invoice>(invRow);
@@ -1272,7 +1284,7 @@ export const sbInvoiceRepository: InvoiceRepository = {
     return { invoice: toCamel<Invoice>(updatedInv), creditNote: toCamel<CreditNote>(cnRow) };
   },
   async listCreditNotes(invoiceId) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('credit_notes')
       .select('*')
       .eq('invoice_id', invoiceId);
@@ -1287,7 +1299,7 @@ export const sbInvoiceRepository: InvoiceRepository = {
 
 export const sbSettingsRepository: SettingsRepository = {
   async get() {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('app_settings')
       .select('*')
       .eq('id', 'singleton')
@@ -1297,7 +1309,8 @@ export const sbSettingsRepository: SettingsRepository = {
     return { showCostsToAllRoles: data.show_costs_to_all_roles as boolean };
   },
   async setShowCostsToAllRoles(visible: boolean) {
-    const sb = getSupabase();
+    // Service-role: app_settings has no INSERT policy (upsert needs one).
+    const sb = getServiceSupabase();
     const { error } = await sb
       .from('app_settings')
       .upsert({ id: 'singleton', show_costs_to_all_roles: visible, updated_at: new Date().toISOString() });
@@ -1324,7 +1337,7 @@ function toUser(row: Record<string, unknown>): User {
 
 export const sbUserRepository: UserRepository = {
   async findByEmail(email) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('users')
       .select('*')
       .ilike('email', email.toLowerCase())
@@ -1333,27 +1346,35 @@ export const sbUserRepository: UserRepository = {
     return data ? toUser(data) : null;
   },
   async getById(id) {
-    const { data, error } = await getSupabase().from('users').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await (await createServerSupabaseClient()).from('users').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(error.message);
     return data ? toUser(data) : null;
   },
   async list() {
-    const { data, error } = await getSupabase().from('users').select('*').order('created_at');
+    const { data, error } = await (await createServerSupabaseClient()).from('users').select('*').order('created_at');
     if (error) throw new Error(error.message);
     return (data as Record<string, unknown>[]).map(toUser);
   },
   async create(input: CreateUserInput) {
     const email = input.email.trim().toLowerCase();
-    const sb = getSupabase();
+    // Service-role: user creation goes through the Auth Admin API.
+    const sb = getServiceSupabase();
+
+    // A fresh, unique one-time password — shown once to the creating admin,
+    // never stored in plaintext (Supabase keeps only its hash).
+    const temporaryPassword = generateTemporaryPassword();
 
     // public.users.id is a FK → auth.users.id (no default UUID).
     // We must create the auth user first — the DB trigger handle_new_auth_user
     // auto-inserts the public.users row using metadata we pass here, with the
     // correct role/area/name so no PATCH is needed afterwards.
+    // app_metadata.must_change_password (service-role-only writable, so the
+    // user cannot clear it themselves) forces a password change on first login.
     const { data: authData, error: authErr } = await sb.auth.admin.createUser({
       email,
-      password: NEW_USER_DEFAULT_PASSWORD,
+      password: temporaryPassword,
       email_confirm: true,
+      app_metadata: { must_change_password: true },
       user_metadata: {
         full_name: input.fullName,
         role_id: input.roleId,
@@ -1384,10 +1405,10 @@ export const sbUserRepository: UserRepository = {
       throw new Error('User created in auth but public profile was not found — check DB trigger handle_new_auth_user.');
     }
 
-    return toUser(pubRow);
+    return { user: toUser(pubRow), temporaryPassword };
   },
   async updateRole(userId, roleId) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('users')
       .update({ role_id: roleId, updated_at: new Date().toISOString() })
       .eq('id', userId)
@@ -1397,7 +1418,7 @@ export const sbUserRepository: UserRepository = {
     return toUser(data);
   },
   async updateArea(userId, area) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('users')
       .update({ area, updated_at: new Date().toISOString() })
       .eq('id', userId)
@@ -1407,7 +1428,7 @@ export const sbUserRepository: UserRepository = {
     return toUser(data);
   },
   async setLabelPermission(userId, value) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('users')
       .update({ label_permission: value, updated_at: new Date().toISOString() })
       .eq('id', userId)
@@ -1426,7 +1447,7 @@ export const sbUserRepository: UserRepository = {
     return toUser(data);
   },
   async setActive(userId, active) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('users')
       .update({ is_active: active, updated_at: new Date().toISOString() })
       .eq('id', userId)
@@ -1436,7 +1457,7 @@ export const sbUserRepository: UserRepository = {
     return toUser(data);
   },
   async setMfaEnrolled(userId, enrolled) {
-    const { data, error } = await getSupabase()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('users')
       .update({ mfa_enrolled: enrolled, updated_at: new Date().toISOString() })
       .eq('id', userId)
@@ -1456,7 +1477,8 @@ const SCAN_HANDOFF_TTL_MS = 3 * 60 * 1000;
 export const sbScanHandoffRepository: ScanHandoffRepository = {
   async create(initiatingUserId) {
     const now = Date.now();
-    const { data, error } = await getSupabase()
+    // Service-role: cross-device token flow; scan_handoff has no user UPDATE policy.
+    const { data, error } = await getServiceSupabase()
       .from('scan_handoff_sessions')
       .insert({
         initiating_user_id: initiatingUserId,
@@ -1469,7 +1491,7 @@ export const sbScanHandoffRepository: ScanHandoffRepository = {
     return toCamel<ScanHandoffSession>(data);
   },
   async get(id) {
-    const sb = getSupabase();
+    const sb = getServiceSupabase();
     const { data, error } = await sb.from('scan_handoff_sessions').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) return null;
@@ -1487,7 +1509,7 @@ export const sbScanHandoffRepository: ScanHandoffRepository = {
     return toCamel<ScanHandoffSession>(data);
   },
   async resolve(id, resolvedByUserId, result) {
-    const sb = getSupabase();
+    const sb = getServiceSupabase();
     const { data: row } = await sb.from('scan_handoff_sessions').select('*').eq('id', id).maybeSingle();
     if (!row) throw new Error('That scanning session no longer exists.');
 

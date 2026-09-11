@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/auth';
+import { getSession, getMfaStepUpState, getMustChangePassword } from '@/lib/auth';
 import { isUsingMockData, roleRepository } from '@/lib/data';
 import { signOutAction } from '@/app/dashboard/actions';
 import { NavLink } from '@/app/dashboard/nav-link';
@@ -14,6 +14,14 @@ import { hasPermission } from '@/lib/permissions';
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect('/login');
+  // A first-login temporary password must be changed before any dashboard
+  // route renders — can't be skipped by navigating straight to a protected page.
+  if (await getMustChangePassword()) redirect('/change-password');
+  // Enrolled users must finish MFA before any dashboard route renders — a
+  // password-only (aal1) session is bounced back to the login code step so the
+  // step-up can't be skipped by navigating straight to a protected page.
+  const { stepUpPending } = await getMfaStepUpState();
+  if (stepUpPending) redirect('/login');
   const role = await roleRepository.getById(session.roleId);
   const notifications = await getNotifications(session);
   // Menu visibility is the first of three separate RBAC layers (menu, route,

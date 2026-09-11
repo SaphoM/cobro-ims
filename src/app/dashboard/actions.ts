@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { getSession, destroySession } from '@/lib/auth';
+import { getSession, signOut } from '@/lib/auth';
 import {
   auditLogRepository,
   productRepository,
@@ -293,6 +293,6 @@ export async function requestReturnToStoresAction(
 
 export async function signOutAction() {
   'use server';
-  await destroySession();
+  await signOut();
   redirect('/login');
 }

@@ -5,7 +5,6 @@ import { getSession } from '@/lib/auth';
 import { auditLogRepository, roleRepository, userRepository, warehouseRepository } from '@/lib/data';
 import { hasPermission, requirePermission } from '@/lib/permissions';
 import { FACTORY_AREAS, isAreaScopedRole } from '@/lib/areas';
-import { NEW_USER_DEFAULT_PASSWORD } from '@/lib/demo-credentials';
 import type { LabelPermission, User } from '@/lib/domain/inventory';
 
 const LABEL_PERMISSION_VALUES: LabelPermission[] = ['inherited', 'allowed', 'revoked'];
@@ -76,7 +75,7 @@ export async function createUserAction(
   const area = isAreaScoped ? areaRaw : null;
 
   try {
-    const user = await userRepository.create({ email, fullName, roleId, area });
+    const { user, temporaryPassword } = await userRepository.create({ email, fullName, roleId, area });
     // A station is an Engineer / Requester thing only - a Team Leader
     // oversees a section, they don't hold stock of their own (see
     // docs/ARCHITECTURE.md and permissions.ts's role-list comment).
@@ -86,14 +85,16 @@ export async function createUserAction(
       recordId: user.id,
       action: 'insert',
       changedBy: session.id,
+      // NB: never include the temporary password in the audit record.
       after: user,
     });
     revalidatePath('/dashboard/users');
     return {
       error: null,
-      success: `${user.fullName} created as ${role.description ?? role.name}. They can sign in with ${
-        user.email
-      } / ${NEW_USER_DEFAULT_PASSWORD}.`,
+      // The one-time temporary password is surfaced to the admin here and
+      // nowhere else — not stored, not logged. The employee must change it on
+      // first login before they can use the app.
+      success: `${user.fullName} created as ${role.description ?? role.name}. Give them these one-time sign-in details — they'll be required to set their own password on first login:\nEmail: ${user.email}\nTemporary password: ${temporaryPassword}`,
     };
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Could not create the user.', success: null };

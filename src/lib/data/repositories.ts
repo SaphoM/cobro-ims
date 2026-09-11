@@ -365,11 +365,22 @@ export interface CreateUserInput {
   area?: string | null;
 }
 
+/**
+ * Result of creating a user. `temporaryPassword` is a freshly generated,
+ * per-user one-time password the admin hands to the new employee; it is shown
+ * once and never stored in plaintext. The new account is flagged
+ * must_change_password so the employee is forced to change it on first login.
+ */
+export interface CreateUserResult {
+  user: User;
+  temporaryPassword: string;
+}
+
 export interface UserRepository {
   findByEmail(email: string): Promise<User | null>;
   getById(id: string): Promise<User | null>;
   list(): Promise<User[]>;
-  create(input: CreateUserInput): Promise<User>;
+  create(input: CreateUserInput): Promise<CreateUserResult>;
   updateRole(userId: string, roleId: string): Promise<User>;
   updateArea(userId: string, area: string | null): Promise<User>;
   /** Admin's per-user override of `create_product_labels` — see

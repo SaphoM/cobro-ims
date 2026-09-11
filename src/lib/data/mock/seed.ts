@@ -158,10 +158,8 @@ export const users: User[] = [
   // creating them live via /dashboard/users) so more-than-one engineer
   // station exists by default - the mock data layer resets on every server
   // restart, so a station created live during a session doesn't survive
-  // one. Sign in with NEW_USER_DEFAULT_PASSWORD (src/lib/demo-credentials.ts) -
-  // the same mock-auth path any admin-created user gets, these two just
-  // aren't on the login page's quick-pick card since that's one account
-  // per ROLE, not per person.
+  // one. These two seed users exist only for the in-memory mock data source
+  // (DATA_SOURCE=mock); the production Supabase path uses real Supabase Auth.
   {
     id: 'user-engineer-2',
     email: 'sarah.naidoo@cobroconcrete.co.za',
@@ -186,9 +184,9 @@ export const users: User[] = [
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   },
-  // On the login page's demo-account picker (see demo-credentials.ts) since
-  // there's no existing Mechanical/Electrical team-leader-area coverage
-  // otherwise reachable without creating one live via /dashboard/users.
+  // Seeded (mock data source only) since there's no existing
+  // Mechanical/Electrical team-leader-area coverage otherwise reachable
+  // without creating one live via /dashboard/users.
   // Demo Engineer (area: Mechanical) and Sarah Naidoo (area: Electrical)
   // above are exactly what each of these should - and shouldn't - see.
   {

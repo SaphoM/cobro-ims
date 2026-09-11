@@ -2,8 +2,9 @@ import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { roleRepository, settingsRepository } from '@/lib/data';
 import { hasPermission } from '@/lib/permissions';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { CostVisibilityToggle } from '@/app/dashboard/cost-visibility-toggle';
-import { disableMfaAction, enableMfaAction } from '@/app/dashboard/security/actions';
+import { MfaSetup } from '@/app/dashboard/security/mfa-setup';
 
 export default async function SecurityPage() {
   const session = await getSession();
@@ -12,14 +13,22 @@ export default async function SecurityPage() {
   const canManagePricing = await hasPermission(session, 'manage_pricing');
   const settings = await settingsRepository.get();
 
+  // Real MFA status straight from Supabase Auth (not a stored flag).
+  const supabase = await createServerSupabaseClient();
+  const { data: factorData } = await supabase.auth.mfa.listFactors();
+  const verifiedTotp = (factorData?.all ?? []).find(
+    (f) => f.factor_type === 'totp' && f.status === 'verified'
+  );
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const isAal2 = aal?.currentLevel === 'aal2';
+
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Security</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Two-factor authentication for privileged users, per the RFQ. This is a mock enrollment flow -
-          no real authenticator app is involved, only the flag a real Supabase Auth MFA flow would set -
-          but it gates the same action a real 2FA requirement would.
+          Real two-factor authentication (TOTP) via Supabase Auth, per the RFQ. Privileged actions —
+          approving write-offs and adjustments — require a verified second factor for the current session.
         </p>
       </div>
 
@@ -35,45 +44,14 @@ export default async function SecurityPage() {
           </div>
           <span
             className={`rounded-full px-3 py-1 text-[0.76rem] font-semibold ${
-              session.mfaEnrolled ? 'bg-accent/15 text-accent-strong' : 'bg-danger/15 text-danger-text'
+              verifiedTotp ? 'bg-accent/15 text-accent-strong' : 'bg-danger/15 text-danger-text'
             }`}
           >
-            {session.mfaEnrolled ? '2FA enabled' : '2FA not enabled'}
+            {verifiedTotp ? '2FA enabled' : '2FA not enabled'}
           </span>
         </div>
 
-        {!session.mfaEnrolled ? (
-          <div className="rounded-xl border border-accent/[0.14] bg-surface-2 p-4">
-            <p className="mb-3 text-[0.85rem] text-text-muted">
-              Approving or rejecting write-offs and adjustments requires 2FA - it&apos;s the one action in
-              the system that posts a real stock-value change with no second approver. Enable it to unlock
-              that action.
-            </p>
-            <form action={enableMfaAction}>
-              <button
-                type="submit"
-                className="rounded-lg bg-accent px-5 py-2.5 text-[0.88rem] font-bold text-ink transition-colors hover:bg-accent-hover"
-              >
-                Enable 2FA
-              </button>
-            </form>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-accent/40 bg-accent/[0.08] p-4">
-            <p className="mb-3 text-[0.85rem] text-accent-strong">
-              2FA is enabled for this account. You can approve/reject adjustments and other privileged
-              actions your role allows.
-            </p>
-            <form action={disableMfaAction}>
-              <button
-                type="submit"
-                className="rounded-lg border border-danger/40 px-5 py-2.5 text-[0.85rem] font-semibold text-danger-text transition-colors hover:bg-danger/10"
-              >
-                Disable 2FA
-              </button>
-            </form>
-          </div>
-        )}
+        <MfaSetup enrolled={!!verifiedTotp} factorId={verifiedTotp?.id ?? null} isAal2={isAal2} />
       </section>
     </div>
   );

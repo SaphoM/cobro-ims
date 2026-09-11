@@ -15,6 +15,7 @@
  */
 
 import { roleRepository } from '@/lib/data';
+import { getSessionAal, getMustChangePassword } from '@/lib/auth';
 import type { User } from '@/lib/domain/inventory';
 
 export type Permission =
@@ -282,15 +283,28 @@ export interface PermissionCheck {
 
 /** The full check — role permission AND, for privileged permissions, MFA enrollment. Never throws. */
 export async function checkPermission(user: User, permission: Permission): Promise<PermissionCheck> {
+  // A user still on their temporary password can't perform any privileged
+  // action, even by calling the Server Action directly — they must change it
+  // first (the UI already forces this; this closes the direct-endpoint path).
+  if (await getMustChangePassword()) {
+    return { allowed: false, reason: 'You must change your temporary password before doing that.' };
+  }
   if (!(await hasPermission(user, permission))) {
     const role = await roleRepository.getById(user.roleId);
     return { allowed: false, reason: `${role?.name ?? 'this role'} does not have permission to do that.` };
   }
-  if (PRIVILEGED_PERMISSIONS.includes(permission) && !user.mfaEnrolled) {
-    return {
-      allowed: false,
-      reason: 'This action requires two-factor authentication. Enable 2FA under Security first.',
-    };
+  if (PRIVILEGED_PERMISSIONS.includes(permission)) {
+    // Real MFA: require the CURRENT session to have cleared TOTP (Supabase
+    // AAL2), not a stored boolean. This mirrors the DB backstop in
+    // app_has_privileged_permission (auth.jwt() ->> 'aal').
+    const aal = await getSessionAal();
+    if (aal !== 'aal2') {
+      return {
+        allowed: false,
+        reason:
+          'This action requires two-factor authentication. Verify your 2FA code for this session (set up 2FA under Security if you have not).',
+      };
+    }
   }
   return { allowed: true, reason: null };
 }
