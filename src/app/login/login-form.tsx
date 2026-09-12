@@ -43,7 +43,7 @@ export function LoginForm({
             />
           </span>
           {/* Light-mode logo — change h-[...] w-[...] here only; does not affect dark mode */}
-          <span className="logo-light relative block h-[168px] w-[220px]">
+          <span className="logo-light relative block h-[169px] w-[201px]">
             <Image
               src="/brc-logo-light.png"
               alt="BRC"
