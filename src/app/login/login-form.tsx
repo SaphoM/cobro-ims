@@ -31,22 +31,27 @@ export function LoginForm({
       <div className="mb-1 flex flex-col items-center">
         {/* Cobro's supplied lockup. `brand-logo` inverts it on dark only. */}
         <h1 className="flex justify-center">
-          <Image
-            src="/brc-logo.png"
-            alt="BRC"
-            width={264}
-            height={220}
-            priority
-            className="logo-dark h-[128px] w-auto"
-          />
-          <Image
-            src="/brc-logo-light.png"
-            alt="BRC"
-            width={1304}
-            height={1149}
-            priority
-            className="logo-light h-[128px] w-auto"
-          />
+          {/* Both logos occupy this exact same fixed box and are centred inside
+              it (object-contain), so the light-mode swap keeps identical size
+              and placement regardless of each image's own aspect ratio. */}
+          <span className="relative block h-[128px] w-[160px]">
+            <Image
+              src="/brc-logo.png"
+              alt="BRC"
+              fill
+              sizes="160px"
+              priority
+              className="logo-dark object-contain"
+            />
+            <Image
+              src="/brc-logo-light.png"
+              alt="BRC"
+              fill
+              sizes="160px"
+              priority
+              className="logo-light object-contain"
+            />
+          </span>
         </h1>
       </div>
       <p className="mb-6 text-center text-[0.92rem] text-text-muted">
