@@ -84,8 +84,8 @@ export default async function SalesPage({
         <h1 className="font-display text-[1.3rem] font-medium text-text">Requisitions</h1>
         <p className="text-[0.86rem] text-text-muted">
           Internal stock requests from a department or workshop - draft → approve (reserves stock) → issue
-          (posts the outbound movement, releases the reservation). Not customer sales - see
-          docs/ARCHITECTURE.md for why this module was repurposed from Sales &amp; Dispatch.
+          (posts the outbound movement, releases the reservation). These are internal stock requests, not
+          customer sales.
         </p>
       </div>
 

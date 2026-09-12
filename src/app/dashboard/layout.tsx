@@ -35,7 +35,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   ).filter((item): item is (typeof NAV_ITEMS)[number] => item !== null);
 
   return (
-    <div className="flex min-h-screen">
+    // Desktop: a fixed-height (100dvh) shell with overflow hidden, so the
+    // sidebar and the main content are independent scroll areas and neither
+    // scrolls the other. Mobile keeps min-h-screen so the page scrolls
+    // normally behind the off-canvas drawer.
+    <div className="flex min-h-screen min-[992px]:h-[100dvh] min-[992px]:overflow-hidden">
       {/* CSS-only mobile nav toggle - no client JS needed to open/close the drawer. */}
       <input type="checkbox" id="mobile-nav-toggle" className="peer/nav hidden" />
 
@@ -132,7 +136,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         className="fixed inset-0 z-30 hidden bg-black/70 max-[991px]:peer-checked/nav:block"
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col min-[992px]:overflow-hidden">
         {/*
           The ☰ toggle lives in normal flow inside this header — never floating over the page —
           so it can't cover page content. The header is sticky with an opaque background so it
@@ -173,7 +177,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
             Running on mock data - no Supabase project is connected yet.
           </div>
         )}
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+        {/* On desktop this is the ONLY vertical scroll area for section content,
+            so long pages never stretch the shell or move the docked sidebar. */}
+        <div className="flex-1 min-[992px]:min-h-0 min-[992px]:overflow-y-auto">
+          <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+        </div>
       </div>
     </div>
   );

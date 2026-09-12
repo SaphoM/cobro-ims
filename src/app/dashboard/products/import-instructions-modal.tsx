@@ -108,8 +108,7 @@ export function ImportInstructionsModal() {
                     below this shows as &quot;low stock&quot; on the dashboard.
                   </li>
                   <li>
-                    <code className="font-mono-brand text-text">reorder_quantity</code> - Optional. Informational
-                    only for now.
+                    <code className="font-mono-brand text-text">reorder_quantity</code> - Optional. Informational.
                   </li>
                 </ul>
               </InstructionSection>

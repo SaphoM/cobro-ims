@@ -125,8 +125,8 @@ export default async function ReportsPage() {
                 ? 'Every team’s requisitions, stock movement history and what’s below reorder point - purchasing, supplier and warehouse-valuation detail is a Stores/Admin function.'
               : isStoresClerk
                 ? 'Operational store reports - stock, requisitions and movements. Purchasing and supplier detail is a Stores Manager/Admin function.'
-                : 'Fifteen of the RFQ’s "15+" standard reports - stock valuation, low stock, sales, customers, purchase orders, suppliers, invoice ageing, movement history, receiving history, movement type totals, pick list, adjustment reasons, warehouse summary, open purchase orders, and dormant stock.'}{' '}
-          Every table exports to CSV (opens in Excel), per the RFQ&apos;s data-export requirement.
+                : 'Fifteen standard reports - stock valuation, low stock, sales, customers, purchase orders, suppliers, invoice ageing, movement history, receiving history, movement type totals, pick list, adjustment reasons, warehouse summary, open purchase orders, and dormant stock.'}{' '}
+          Every table exports to CSV (opens in Excel).
         </p>
       </div>
 
@@ -244,7 +244,7 @@ export default async function ReportsPage() {
       <ReportSection
         title="Dormant stock"
         hidden={hideSection('Dormant stock')}
-        subtitle={`${dormantStock.length} product-warehouse combinations with no movement recorded this session`}
+        subtitle={`${dormantStock.length} product-warehouse combinations with no movement recorded`}
         exportFilename="dormant-stock"
         rows={dormantStock}
       >

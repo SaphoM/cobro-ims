@@ -27,7 +27,7 @@ export default async function SecurityPage() {
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Security</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Real two-factor authentication (TOTP) via Supabase Auth, per the RFQ. Privileged actions —
+          Two-factor authentication (TOTP) for your account. Privileged actions —
           approving write-offs and adjustments — require a verified second factor for the current session.
         </p>
       </div>

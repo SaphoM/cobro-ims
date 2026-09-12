@@ -36,10 +36,8 @@ export default async function BomPage({
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Bill of materials</h1>
         <p className="text-[0.86rem] text-text-muted">
-          Flat parent → component structure - the schema&apos;s committed shape. Whether Cobro needs
-          nested/multi-level BOM is still a{' '}
-          <span className="text-accent-strong">BUSINESS DECISION REQUIRED</span> item; this covers what&apos;s
-          built today.
+          Define which components make up a finished product. Bills of materials use a flat
+          parent → component structure.
         </p>
       </div>
 

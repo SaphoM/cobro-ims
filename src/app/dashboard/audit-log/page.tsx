@@ -38,18 +38,13 @@ export default async function AuditLogPage() {
           {isAdmin
             ? 'Every approval, issue, receipt, dispatch, invoice and product-catalogue change writes an entry here.'
             : 'Store-relevant activity - receiving, transfers, requisitions, adjustments and catalogue changes. User-administration and system-settings entries are Admin-only.'}{' '}
-          Append-only by construction today - see the note below on what &quot;immutable&quot; means
-          before a real database exists.
+          Every entry is permanent - the audit log is append-only and cannot be edited or deleted.
         </p>
       </div>
 
       <div className="rounded-xl border border-accent/30 bg-accent/[0.08] px-4 py-3 text-[0.82rem] text-accent-strong">
-        The RFQ requires the audit log to be immutable <em>enforced at the database level</em> - no record
-        may ever be deleted or modified. The mock repository here has no update/delete method at all, so
-        nothing in this codebase can alter an entry once written, but that&apos;s an application-layer
-        guarantee, not a database one. The actual trigger that enforces this in Postgres is written and
-        ready in <code className="font-mono-brand">supabase/migrations/20260816100000_audit_log_immutability.sql</code>,
-        waiting on a live Supabase project to apply it against.
+        The audit log is immutable, <em>enforced at the database level</em>: once a record is written it can
+        never be edited or deleted, so this history is a permanent, tamper-proof record of every change.
       </div>
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">

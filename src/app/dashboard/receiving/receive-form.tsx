@@ -243,9 +243,7 @@ export function ReceiveForm({
     <div className="rounded-2xl border border-accent/[0.14] bg-surface p-5">
       <h2 className="mb-1 font-display text-[1.05rem] font-medium text-text">Receive stock (GRN)</h2>
       <p className="mb-4 text-[0.83rem] text-text-muted">
-        Creates the purchase order, the goods receipt, and posts the receipt movement in one step - a
-        deliberate shortcut while full Purchase Order lifecycle management (RFQ Phase 3) doesn&apos;t exist
-        yet. The schema underneath still models PO → GRN properly.
+        Creates the purchase order, the goods receipt, and posts the receipt movement into stock in one step.
       </p>
 
       <form

@@ -28,12 +28,11 @@ export default async function ProductsPage() {
       <div>
         <h1 className="font-display text-[1.3rem] font-medium text-text">Product catalogue</h1>
         <p className="text-[0.86rem] text-text-muted">
-          SKUs, units of measure, barcodes and reorder thresholds. Flat parent → component{' '}
+          SKUs, units of measure, barcodes and reorder thresholds. Define{' '}
           <a href="/dashboard/bom" className="text-accent-strong hover:underline">
             bills of materials
           </a>{' '}
-          are built; whether Cobro needs nested/multi-level BOM is still a{' '}
-          <span className="text-accent-strong">BUSINESS DECISION REQUIRED</span> item - see docs/ARCHITECTURE.md.
+          to link finished products to their components.
         </p>
       </div>
 
@@ -87,6 +86,13 @@ export default async function ProductsPage() {
               </tr>
             </thead>
             <tbody>
+              {sorted.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-5 py-6 text-[0.85rem] text-text-faint">
+                    No products have been added yet.{canManageCatalogue ? ' Add your first product above.' : ''}
+                  </td>
+                </tr>
+              )}
               {sorted.map((p) => (
                 <tr key={p.id} className="border-t border-accent/[0.08]">
                   <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{p.sku}</td>

@@ -43,28 +43,34 @@ export default async function SuppliersPage() {
         <div className="border-b border-accent/[0.14] px-5 py-4">
           <h2 className="font-display text-[1.05rem] font-medium text-text">{sorted.length} suppliers</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] border-collapse text-[0.86rem]">
-            <thead>
-              <tr className="text-left text-text-faint">
-                <th className="px-5 py-2.5 font-medium">Name</th>
-                <th className="px-5 py-2.5 font-medium">Email</th>
-                <th className="px-5 py-2.5 font-medium">Phone</th>
-                <th className="px-5 py-2.5 font-medium">Address</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((s) => (
-                <tr key={s.id} className="border-t border-accent/[0.08]">
-                  <td className="px-5 py-3 text-text">{s.name}</td>
-                  <td className="px-5 py-3 text-text-muted">{s.contactEmail ?? '-'}</td>
-                  <td className="px-5 py-3 text-text-muted">{s.contactPhone ?? '-'}</td>
-                  <td className="px-5 py-3 text-text-muted">{s.address ?? '-'}</td>
+        {sorted.length === 0 ? (
+          <p className="px-5 py-6 text-[0.85rem] text-text-faint">
+            No suppliers have been added yet.{canManageSuppliers ? ' Add your first supplier above.' : ''}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] border-collapse text-[0.86rem]">
+              <thead>
+                <tr className="text-left text-text-faint">
+                  <th className="px-5 py-2.5 font-medium">Name</th>
+                  <th className="px-5 py-2.5 font-medium">Email</th>
+                  <th className="px-5 py-2.5 font-medium">Phone</th>
+                  <th className="px-5 py-2.5 font-medium">Address</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {sorted.map((s) => (
+                  <tr key={s.id} className="border-t border-accent/[0.08]">
+                    <td className="px-5 py-3 text-text">{s.name}</td>
+                    <td className="px-5 py-3 text-text-muted">{s.contactEmail ?? '-'}</td>
+                    <td className="px-5 py-3 text-text-muted">{s.contactPhone ?? '-'}</td>
+                    <td className="px-5 py-3 text-text-muted">{s.address ?? '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   );
