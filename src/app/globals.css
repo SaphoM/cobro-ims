@@ -173,6 +173,18 @@ body {
   filter: none;
 }
 
+/* Login logo swaps by theme: the dark-mode artwork by default, the light-mode
+   artwork (Logo02) when data-theme='light'. Only one is ever shown. */
+.logo-light {
+  display: none;
+}
+:root[data-theme='light'] .logo-dark {
+  display: none;
+}
+:root[data-theme='light'] .logo-light {
+  display: block;
+}
+
 .card-shadow {
   box-shadow: var(--card-shadow);
 }

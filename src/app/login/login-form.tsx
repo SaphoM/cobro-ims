@@ -37,7 +37,15 @@ export function LoginForm({
             width={264}
             height={220}
             priority
-            className="h-[128px] w-auto"
+            className="logo-dark h-[128px] w-auto"
+          />
+          <Image
+            src="/brc-logo-light.png"
+            alt="BRC"
+            width={1304}
+            height={1149}
+            priority
+            className="logo-light h-[128px] w-auto"
           />
         </h1>
       </div>
