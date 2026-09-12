@@ -103,6 +103,16 @@ export interface AddBomLineInput {
   quantity: number;
 }
 
+/** Editable catalogue fields for a product. Price is edited separately via
+ *  setUnitPrice (manage_pricing); SKU is the immutable business key. */
+export interface UpdateProductInput {
+  name: string;
+  unitOfMeasure: string;
+  barcode?: string | null;
+  reorderPoint?: number | null;
+  reorderQuantity?: number | null;
+}
+
 export interface ProductRepository {
   list(): Promise<Product[]>;
   getById(id: string): Promise<Product | null>;
@@ -110,6 +120,11 @@ export interface ProductRepository {
   /** Barcode/QR lookup — RFQ Phase 5. Matches on the exact barcode value scanned. */
   getByBarcode(barcode: string): Promise<Product | null>;
   create(input: CreateProductInput): Promise<Product>;
+  /** Edit a product's catalogue fields (name, unit, barcode, reorder thresholds). */
+  update(id: string, input: UpdateProductInput): Promise<Product>;
+  /** Permanently remove a product. Throws a friendly error if it is still
+   *  referenced by stock, movements or documents (referential integrity). */
+  delete(id: string): Promise<void>;
   /**
    * Changes a product's standing price. Separate from `create` because it is
    * separately permissioned - only `manage_pricing` may call it - and it is
@@ -174,9 +189,15 @@ export interface CreateSupplierInput {
   address?: string | null;
 }
 
+export type UpdateSupplierInput = CreateSupplierInput;
+
 export interface SupplierRepository {
   list(): Promise<Supplier[]>;
   create(input: CreateSupplierInput): Promise<Supplier>;
+  update(id: string, input: UpdateSupplierInput): Promise<Supplier>;
+  /** Permanently remove a supplier. Throws a friendly error if it is still
+   *  referenced by purchase orders (referential integrity). */
+  delete(id: string): Promise<void>;
 }
 
 export interface CreateCustomerInput {
@@ -186,9 +207,15 @@ export interface CreateCustomerInput {
   address?: string | null;
 }
 
+export type UpdateCustomerInput = CreateCustomerInput;
+
 export interface CustomerRepository {
   list(): Promise<Customer[]>;
   create(input: CreateCustomerInput): Promise<Customer>;
+  update(id: string, input: UpdateCustomerInput): Promise<Customer>;
+  /** Permanently remove a department. Throws a friendly error if it is still
+   *  referenced by requisitions/invoices (referential integrity). */
+  delete(id: string): Promise<void>;
 }
 
 export interface QuickReceiveInput {

@@ -344,6 +344,45 @@ export const sbProductRepository: ProductRepository = {
     if (error) throw new Error('That product could not be found.');
     return toCamel<Product>(data);
   },
+  async update(id, input) {
+    const { data, error } = await (await createServerSupabaseClient())
+      .from('products')
+      .update({
+        name: input.name,
+        unit_of_measure: input.unitOfMeasure,
+        barcode: input.barcode ?? null,
+        reorder_point: input.reorderPoint ?? null,
+        reorder_quantity: input.reorderQuantity ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) {
+      if (error.code === '23505' && error.message.includes('barcode')) {
+        throw new Error(`Barcode "${input.barcode}" is already assigned to another product.`);
+      }
+      throw new Error('That product could not be found or updated.');
+    }
+    return toCamel<Product>(data);
+  },
+  async delete(id) {
+    const { data, error } = await (await createServerSupabaseClient())
+      .from('products')
+      .delete()
+      .eq('id', id)
+      .select('id');
+    if (error) {
+      // 23503 = FK violation: the product is referenced by stock, movements or documents.
+      if (error.code === '23503') {
+        throw new Error('This product has stock or purchase/sales history and cannot be deleted.');
+      }
+      throw new Error(error.message);
+    }
+    if (!data || data.length === 0) {
+      throw new Error('Product not found, or you do not have permission to delete it.');
+    }
+  },
   async listBom(parentProductId) {
     const { data, error } = await (await createServerSupabaseClient())
       .from('product_bom')
@@ -492,6 +531,37 @@ export const sbSupplierRepository: SupplierRepository = {
     if (error) throw new Error(error.message);
     return toCamel<Supplier>(data);
   },
+  async update(id, input) {
+    const { data, error } = await (await createServerSupabaseClient())
+      .from('suppliers')
+      .update({
+        name: input.name,
+        contact_email: input.contactEmail ?? null,
+        contact_phone: input.contactPhone ?? null,
+        address: input.address ?? null,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error('That supplier could not be found or updated.');
+    return toCamel<Supplier>(data);
+  },
+  async delete(id) {
+    const { data, error } = await (await createServerSupabaseClient())
+      .from('suppliers')
+      .delete()
+      .eq('id', id)
+      .select('id');
+    if (error) {
+      if (error.code === '23503') {
+        throw new Error('This supplier is referenced by existing purchase orders and cannot be deleted.');
+      }
+      throw new Error(error.message);
+    }
+    if (!data || data.length === 0) {
+      throw new Error('Supplier not found, or you do not have permission to delete it.');
+    }
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -517,6 +587,37 @@ export const sbCustomerRepository: CustomerRepository = {
       .single();
     if (error) throw new Error(error.message);
     return toCamel<Customer>(data);
+  },
+  async update(id, input) {
+    const { data, error } = await (await createServerSupabaseClient())
+      .from('customers')
+      .update({
+        name: input.name,
+        contact_email: input.contactEmail ?? null,
+        contact_phone: input.contactPhone ?? null,
+        address: input.address ?? null,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error('That department could not be found or updated.');
+    return toCamel<Customer>(data);
+  },
+  async delete(id) {
+    const { data, error } = await (await createServerSupabaseClient())
+      .from('customers')
+      .delete()
+      .eq('id', id)
+      .select('id');
+    if (error) {
+      if (error.code === '23503') {
+        throw new Error('This department is referenced by existing requisitions or invoices and cannot be deleted.');
+      }
+      throw new Error(error.message);
+    }
+    if (!data || data.length === 0) {
+      throw new Error('Department not found, or you do not have permission to delete it.');
+    }
   },
 };
 

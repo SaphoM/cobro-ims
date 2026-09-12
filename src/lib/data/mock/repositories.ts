@@ -256,6 +256,25 @@ export const mockProductRepository: ProductRepository = {
     product.updatedAt = new Date().toISOString();
     return product;
   },
+  async update(id, input) {
+    const product = state.products.find((p) => p.id === id);
+    if (!product) throw new Error('That product could not be found.');
+    if (input.barcode && state.products.some((p) => p.id !== id && p.barcode === input.barcode)) {
+      throw new Error(`Barcode "${input.barcode}" is already assigned to another product.`);
+    }
+    product.name = input.name;
+    product.unitOfMeasure = input.unitOfMeasure;
+    product.barcode = input.barcode ?? null;
+    product.reorderPoint = input.reorderPoint ?? null;
+    product.reorderQuantity = input.reorderQuantity ?? null;
+    product.updatedAt = new Date().toISOString();
+    return product;
+  },
+  async delete(id) {
+    const i = state.products.findIndex((p) => p.id === id);
+    if (i === -1) throw new Error('That product could not be found.');
+    state.products.splice(i, 1);
+  },
   async listBom(parentProductId): Promise<ProductBomLine[]> {
     return state.bomLines.filter((l) => l.parentProductId === parentProductId);
   },
@@ -350,6 +369,20 @@ export const mockSupplierRepository: SupplierRepository = {
     state.suppliers.push(supplier);
     return supplier;
   },
+  async update(id, input) {
+    const s = state.suppliers.find((x) => x.id === id);
+    if (!s) throw new Error('Supplier not found.');
+    s.name = input.name;
+    s.contactEmail = input.contactEmail ?? null;
+    s.contactPhone = input.contactPhone ?? null;
+    s.address = input.address ?? null;
+    return s;
+  },
+  async delete(id) {
+    const i = state.suppliers.findIndex((x) => x.id === id);
+    if (i === -1) throw new Error('Supplier not found.');
+    state.suppliers.splice(i, 1);
+  },
 };
 
 export const mockCustomerRepository: CustomerRepository = {
@@ -368,6 +401,20 @@ export const mockCustomerRepository: CustomerRepository = {
     };
     state.customers.push(customer);
     return customer;
+  },
+  async update(id, input) {
+    const c = state.customers.find((x) => x.id === id);
+    if (!c) throw new Error('Department not found.');
+    c.name = input.name;
+    c.contactEmail = input.contactEmail ?? null;
+    c.contactPhone = input.contactPhone ?? null;
+    c.address = input.address ?? null;
+    return c;
+  },
+  async delete(id) {
+    const i = state.customers.findIndex((x) => x.id === id);
+    if (i === -1) throw new Error('Department not found.');
+    state.customers.splice(i, 1);
   },
 };
 

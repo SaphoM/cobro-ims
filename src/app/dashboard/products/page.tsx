@@ -2,7 +2,7 @@ import { productRepository } from '@/lib/data';
 import { NewProductForm } from '@/app/dashboard/products/new-product-form';
 import { BulkImportForm } from '@/app/dashboard/products/bulk-import-form';
 import { ImportInstructionsModal } from '@/app/dashboard/products/import-instructions-modal';
-import { PriceCell } from '@/app/dashboard/products/price-cell';
+import { ProductRow } from '@/app/dashboard/products/product-row';
 import { getSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 import { canSeeCosts } from '@/lib/costs';
@@ -94,36 +94,14 @@ export default async function ProductsPage() {
                 </tr>
               )}
               {sorted.map((p) => (
-                <tr key={p.id} className="border-t border-accent/[0.08]">
-                  <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{p.sku}</td>
-                  <td className="px-5 py-3 text-text">{p.name}</td>
-                  <td className="px-5 py-3 text-text-muted">{p.unitOfMeasure}</td>
-                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{p.barcode ?? '-'}</td>
-                  <td className="px-5 py-3 text-right tabular-nums">
-                    <PriceCell
-                      productId={p.id}
-                      sku={p.sku}
-                      unitPrice={p.unitPrice}
-                      canEdit={canEditPrice}
-                      costsVisible={costsVisible}
-                    />
-                  </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">
-                    {p.reorderPoint?.toLocaleString() ?? '-'}
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <div className="flex justify-end gap-3">
-                      <a href={`/dashboard/bom?productId=${p.id}`} className="text-[0.78rem] font-semibold text-accent-strong hover:underline">
-                        BOM
-                      </a>
-                      {p.barcode && canPrintLabels && (
-                        <a href={`/dashboard/labels?productId=${p.id}`} className="text-[0.78rem] font-semibold text-accent-strong hover:underline">
-                          Print labels
-                        </a>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                <ProductRow
+                  key={p.id}
+                  product={p}
+                  canEditPrice={canEditPrice}
+                  costsVisible={costsVisible}
+                  canPrintLabels={canPrintLabels}
+                  canManageCatalogue={canManageCatalogue}
+                />
               ))}
             </tbody>
           </table>

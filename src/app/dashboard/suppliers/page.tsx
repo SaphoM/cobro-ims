@@ -3,6 +3,8 @@ import { getSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 import { AccessDenied } from '@/components/access-denied';
 import { SupplierForm } from '@/app/dashboard/suppliers/supplier-form';
+import { ContactRow } from '@/app/dashboard/_components/contact-row';
+import { updateSupplierAction, deleteSupplierAction } from '@/app/dashboard/suppliers/actions';
 
 export default async function SuppliersPage() {
   const session = await getSession();
@@ -56,16 +58,19 @@ export default async function SuppliersPage() {
                   <th className="px-5 py-2.5 font-medium">Email</th>
                   <th className="px-5 py-2.5 font-medium">Phone</th>
                   <th className="px-5 py-2.5 font-medium">Address</th>
+                  <th className="px-5 py-2.5 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
                 {sorted.map((s) => (
-                  <tr key={s.id} className="border-t border-accent/[0.08]">
-                    <td className="px-5 py-3 text-text">{s.name}</td>
-                    <td className="px-5 py-3 text-text-muted">{s.contactEmail ?? '-'}</td>
-                    <td className="px-5 py-3 text-text-muted">{s.contactPhone ?? '-'}</td>
-                    <td className="px-5 py-3 text-text-muted">{s.address ?? '-'}</td>
-                  </tr>
+                  <ContactRow
+                    key={s.id}
+                    record={s}
+                    updateAction={updateSupplierAction}
+                    deleteAction={deleteSupplierAction}
+                    canManage={canManageSuppliers}
+                    noun="supplier"
+                  />
                 ))}
               </tbody>
             </table>

@@ -2,6 +2,8 @@ import { customerRepository } from '@/lib/data';
 import { getSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 import { CustomerForm } from '@/app/dashboard/customers/customer-form';
+import { ContactRow } from '@/app/dashboard/_components/contact-row';
+import { updateCustomerAction, deleteCustomerAction } from '@/app/dashboard/customers/actions';
 
 export default async function CustomersPage() {
   const session = await getSession();
@@ -41,16 +43,19 @@ export default async function CustomersPage() {
                   <th className="px-5 py-2.5 font-medium">Email</th>
                   <th className="px-5 py-2.5 font-medium">Phone</th>
                   <th className="px-5 py-2.5 font-medium">Address</th>
+                  <th className="px-5 py-2.5 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
                 {sorted.map((c) => (
-                  <tr key={c.id} className="border-t border-accent/[0.08]">
-                    <td className="px-5 py-3 text-text">{c.name}</td>
-                    <td className="px-5 py-3 text-text-muted">{c.contactEmail ?? '-'}</td>
-                    <td className="px-5 py-3 text-text-muted">{c.contactPhone ?? '-'}</td>
-                    <td className="px-5 py-3 text-text-muted">{c.address ?? '-'}</td>
-                  </tr>
+                  <ContactRow
+                    key={c.id}
+                    record={c}
+                    updateAction={updateCustomerAction}
+                    deleteAction={deleteCustomerAction}
+                    canManage={canManageCustomers}
+                    noun="department"
+                  />
                 ))}
               </tbody>
             </table>
