@@ -32,12 +32,12 @@ export function LoginForm({
         {/* Cobro's supplied lockup. `brand-logo` inverts it on dark only. */}
         <h1 className="flex justify-center">
           <Image
-            src="/Asset1.png"
-            alt="Cobro Concrete IMS - Inventory Management Systems"
+            src="/brc-logo.png"
+            alt="BRC"
             width={264}
-            height={111}
+            height={220}
             priority
-            className="brand-logo h-[74px] w-auto"
+            className="h-[128px] w-auto"
           />
         </h1>
       </div>
