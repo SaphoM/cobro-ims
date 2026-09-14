@@ -32,7 +32,7 @@ export function LoginForm({
         {/* Cobro's supplied lockup. `brand-logo` inverts it on dark only. */}
         <h1 className="flex justify-center">
           {/* Dark-mode logo — change h-[...] w-[...] here only; does not affect light mode */}
-          <span className="logo-dark relative block h-[128px] w-[160px]">
+          <span className="logo-dark relative block h-[122px] w-[154px]">
             <Image
               src="/brc-logo.png"
               alt="BRC"
