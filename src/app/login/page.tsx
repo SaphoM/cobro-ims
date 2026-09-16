@@ -33,7 +33,15 @@ export default async function LoginPage({
       <ThemeToggle className="absolute top-5 right-5 z-10 flex items-center gap-2 rounded-lg border-2 border-accent/50 bg-surface-2 px-3 py-2 text-[0.8rem] font-bold text-accent-strong transition-colors hover:border-accent hover:bg-accent/10" />
       <LoginForm next={safeNext} startInMfaStep={stepUpPending} />
       <p className="text-center font-mono-brand text-[0.68rem] font-medium tracking-[0.08em] text-text-faint uppercase">
-        Built by <span className="text-text-muted">X Spark</span>
+        Built by{' '}
+        <a
+          href="https://www.xspark.co.za"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-text-muted hover:text-accent-strong hover:underline"
+        >
+          X Spark
+        </a>
         <span className="mx-1.5 text-accent-strong/40">·</span>
         <span>v{packageJson.version}</span>
       </p>
