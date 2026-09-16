@@ -1,4 +1,4 @@
-import { productRepository, transferRepository, warehouseRepository } from '@/lib/data';
+import { categoryRepository, productRepository, transferRepository, warehouseRepository } from '@/lib/data';
 import { getSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 import { AccessDenied } from '@/components/access-denied';
@@ -32,14 +32,16 @@ export default async function TransfersPage() {
     );
   }
 
-  const [products, warehouses, transfers] = await Promise.all([
+  const [products, warehouses, transfers, categories] = await Promise.all([
     productRepository.list(),
     warehouseRepository.list(),
     transferRepository.list(),
+    categoryRepository.list(),
   ]);
 
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
   const productById = new Map(products.map((p) => [p.id, p]));
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
   // What each transfer actually IS - see TransferRepository.getLine's own
   // doc comment for why this still answers after completion, not just
   // in-transit.
@@ -54,7 +56,7 @@ export default async function TransfersPage() {
         <p className="text-[0.86rem] text-text-muted">In-transit stock is out of the source ledger but not yet in the destination&apos;s.</p>
       </div>
 
-      <TransferForm products={products} warehouses={warehouses} />
+      <TransferForm products={products} warehouses={warehouses} categories={categories} />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">
@@ -96,6 +98,11 @@ export default async function TransfersPage() {
                             {line && (
                               <span className="ml-1.5 text-text-faint">
                                 · {line.quantity.toLocaleString()} {product.unitOfMeasure}
+                              </span>
+                            )}
+                            {product.categoryId && categoryById.get(product.categoryId) && (
+                              <span className="ml-1.5 rounded-full bg-accent/10 px-2 py-0.5 text-[0.68rem] font-semibold text-accent-strong">
+                                {categoryById.get(product.categoryId)!.name}
                               </span>
                             )}
                           </>

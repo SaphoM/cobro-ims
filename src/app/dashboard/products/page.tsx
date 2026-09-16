@@ -1,4 +1,4 @@
-import { productRepository } from '@/lib/data';
+import { categoryRepository, productRepository } from '@/lib/data';
 import { NewProductForm } from '@/app/dashboard/products/new-product-form';
 import { BulkImportForm } from '@/app/dashboard/products/bulk-import-form';
 import { ImportInstructionsModal } from '@/app/dashboard/products/import-instructions-modal';
@@ -8,8 +8,11 @@ import { hasPermission } from '@/lib/permissions';
 import { canSeeCosts } from '@/lib/costs';
 
 export default async function ProductsPage() {
-  const products = await productRepository.list();
-  const session = await getSession();
+  const [products, categories, session] = await Promise.all([
+    productRepository.list(),
+    categoryRepository.list(),
+    getSession(),
+  ]);
   const canEditPrice = session ? await hasPermission(session, 'manage_pricing') : false;
   const costsVisible = await canSeeCosts(session);
   // Engineer / Requester (and any signed-out visitor) gets view/search only -
@@ -21,6 +24,7 @@ export default async function ProductsPage() {
   // was revoked also loses the "Print labels" row link here, not just the
   // nav entry.
   const canPrintLabels = session ? await hasPermission(session, 'create_product_labels') : false;
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
   const sorted = [...products].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
@@ -66,7 +70,7 @@ export default async function ProductsPage() {
       </section>
       )}
 
-      {canManageCatalogue && <NewProductForm />}
+      {canManageCatalogue && <NewProductForm categories={categories} />}
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">
@@ -78,6 +82,7 @@ export default async function ProductsPage() {
               <tr className="text-left text-text-faint">
                 <th className="px-5 py-2.5 font-medium">SKU</th>
                 <th className="px-5 py-2.5 font-medium">Name</th>
+                <th className="px-5 py-2.5 font-medium">Category</th>
                 <th className="px-5 py-2.5 font-medium">UoM</th>
                 <th className="px-5 py-2.5 font-medium">Barcode</th>
                 <th className="px-5 py-2.5 text-right font-medium tabular-nums">Price</th>
@@ -97,6 +102,8 @@ export default async function ProductsPage() {
                 <ProductRow
                   key={p.id}
                   product={p}
+                  category={p.categoryId ? (categoryById.get(p.categoryId) ?? null) : null}
+                  categories={categories}
                   canEditPrice={canEditPrice}
                   costsVisible={costsVisible}
                   canPrintLabels={canPrintLabels}

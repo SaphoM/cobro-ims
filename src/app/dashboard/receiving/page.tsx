@@ -1,4 +1,5 @@
 import {
+  categoryRepository,
   productRepository,
   receivingRepository,
   roleRepository,
@@ -42,10 +43,11 @@ export default async function ReceivingPage({
   const showCosts = await canSeeCosts(session);
 
   const { barcode } = await searchParams;
-  const [suppliers, warehouses, products, receipts] = await Promise.all([
+  const [suppliers, warehouses, products, categories, receipts] = await Promise.all([
     supplierRepository.list(),
     warehouseRepository.list(),
     productRepository.list(),
+    categoryRepository.list(),
     receivingRepository.listRecentReceipts(),
   ]);
 
@@ -64,6 +66,7 @@ export default async function ReceivingPage({
         suppliers={suppliers}
         warehouses={warehouses.filter((w) => w.type === 'store')}
         products={products}
+        categories={categories}
         initialBarcode={barcode}
         canEditPrice={canEditPrice}
         showCosts={showCosts}

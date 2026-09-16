@@ -22,6 +22,7 @@ import type {
   InvoicePayment,
   Product,
   ProductBomLine,
+  ProductCategory,
   PurchaseOrder,
   PurchaseOrderLine,
   SalesOrder,
@@ -37,6 +38,7 @@ import type {
   AddBomLineInput,
   AdjustmentReasonRepository,
   AuditLogRepository,
+  CategoryRepository,
   CreateCustomerInput,
   CreatePurchaseOrderInput,
   CreateProductInput,
@@ -233,7 +235,7 @@ export const mockProductRepository: ProductRepository = {
       sku: input.sku,
       name: input.name,
       description: null,
-      categoryId: null,
+      categoryId: input.categoryId ?? null,
       unitOfMeasure: input.unitOfMeasure,
       barcode: input.barcode ?? null,
       reorderPoint: input.reorderPoint ?? null,
@@ -264,6 +266,7 @@ export const mockProductRepository: ProductRepository = {
     }
     product.name = input.name;
     product.unitOfMeasure = input.unitOfMeasure;
+    if ('categoryId' in input) product.categoryId = input.categoryId ?? null;
     product.barcode = input.barcode ?? null;
     product.reorderPoint = input.reorderPoint ?? null;
     product.reorderQuantity = input.reorderQuantity ?? null;
@@ -1100,5 +1103,19 @@ export const mockUserRepository: UserRepository = {
     user.mfaEnrolled = enrolled;
     user.updatedAt = new Date().toISOString();
     return user;
+  },
+};
+
+// Seeded category ids — stable across mock restarts so existing products in
+// seed data can reference them without a lookup.
+export const REPAIR_CATEGORY_ID = '00000000-0000-0000-0000-000000000001';
+
+export const mockCategoryRepository: CategoryRepository = {
+  async list() {
+    return [{ id: REPAIR_CATEGORY_ID, name: 'Repair items', parentId: null }];
+  },
+  async getById(id) {
+    if (id === REPAIR_CATEGORY_ID) return { id: REPAIR_CATEGORY_ID, name: 'Repair items', parentId: null };
+    return null;
   },
 };

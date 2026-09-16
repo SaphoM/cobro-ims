@@ -1,5 +1,6 @@
 import {
   adjustmentReasonRepository,
+  categoryRepository,
   productRepository,
   stockAdjustmentRepository,
   warehouseRepository,
@@ -32,11 +33,12 @@ export default async function AdjustmentsPage({
   }
 
   const { barcode } = await searchParams;
-  const [products, warehouses, reasonCodes, adjustments] = await Promise.all([
+  const [products, warehouses, reasonCodes, adjustments, categories] = await Promise.all([
     productRepository.list(),
     warehouseRepository.list(),
     adjustmentReasonRepository.list(),
     stockAdjustmentRepository.list(),
+    categoryRepository.list(),
   ]);
 
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
@@ -59,7 +61,7 @@ export default async function AdjustmentsPage({
         </div>
       )}
 
-      <AdjustmentForm products={products} warehouses={warehouses} reasonCodes={reasonCodes} initialBarcode={barcode} />
+      <AdjustmentForm products={products} warehouses={warehouses} reasonCodes={reasonCodes} categories={categories} initialBarcode={barcode} />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">

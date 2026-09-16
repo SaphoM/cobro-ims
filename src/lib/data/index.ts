@@ -27,6 +27,7 @@ import {
   mockSettingsRepository,
   mockUserRepository,
   mockWarehouseRepository,
+  mockCategoryRepository,
 } from '@/lib/data/mock/repositories';
 
 import {
@@ -48,6 +49,7 @@ import {
   sbSettingsRepository,
   sbUserRepository,
   sbWarehouseRepository,
+  sbCategoryRepository,
 } from '@/lib/data/supabase/repositories';
 
 const DATA_SOURCE = process.env.DATA_SOURCE ?? 'mock';
@@ -78,5 +80,7 @@ export const stockAdjustmentRepository = useSb ? sbStockAdjustmentRepository : m
 export const userRepository = useSb ? sbUserRepository : mockUserRepository;
 export const settingsRepository = useSb ? sbSettingsRepository : mockSettingsRepository;
 export const scanHandoffRepository = useSb ? sbScanHandoffRepository : mockScanHandoffRepository;
+
+export const categoryRepository = useSb ? sbCategoryRepository : mockCategoryRepository;
 
 export const isUsingMockData = DATA_SOURCE === 'mock';

@@ -4,7 +4,7 @@ import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import { createSalesOrderAction, type SalesOrderFormState } from '@/app/dashboard/sales/actions';
 import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
-import type { Customer, Product, StockLedgerEntry, Warehouse } from '@/lib/domain/inventory';
+import type { Customer, Product, ProductCategory, StockLedgerEntry, Warehouse } from '@/lib/domain/inventory';
 
 const initialState: SalesOrderFormState = { error: null, success: null };
 
@@ -12,12 +12,14 @@ export function SalesOrderForm({
   customers,
   warehouses,
   products,
+  categories,
   ledger,
   initialBarcode,
 }: {
   customers: Customer[];
   warehouses: Warehouse[];
   products: Product[];
+  categories: ProductCategory[];
   /** On-hand per product/warehouse, to drive the "available" counter below
    *  Product/Store - re-derives live as either selection changes, the same
    *  way the Overview's "Record a stock movement" and Quick requisition
@@ -57,7 +59,9 @@ export function SalesOrderForm({
     }
     return map;
   }, [ledger]);
+  const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const selectedProduct = products.find((p) => p.id === productId);
+  const selectedCategory = selectedProduct?.categoryId ? categoryById.get(selectedProduct.categoryId) : undefined;
   const selectedWarehouse = warehouses.find((w) => w.id === warehouseId);
   const availableQty = onHandByKey.get(`${productId}::${warehouseId}`) ?? 0;
 
@@ -222,6 +226,7 @@ export function SalesOrderForm({
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.sku} - {p.name}
+                {p.categoryId && categoryById.get(p.categoryId) ? ` (${categoryById.get(p.categoryId)!.name})` : ''}
               </option>
             ))}
           </select>
@@ -234,6 +239,11 @@ export function SalesOrderForm({
             {availableQty.toLocaleString()} {selectedProduct?.unitOfMeasure ?? ''} available at{' '}
             {selectedWarehouse ? (selectedWarehouse.type === 'engineer_station' ? selectedWarehouse.name : selectedWarehouse.code) : '—'}
             {availableQty === 0 && ' - none on hand here'}
+            {selectedCategory && (
+              <span className="ml-2 rounded-full bg-accent/10 px-2 py-0.5 text-[0.68rem] font-semibold text-accent-strong">
+                {selectedCategory.name}
+              </span>
+            )}
           </p>
         )}
 

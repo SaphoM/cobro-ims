@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import type { Product } from '@/lib/domain/inventory';
+import type { Product, ProductCategory } from '@/lib/domain/inventory';
 import { PriceCell } from '@/app/dashboard/products/price-cell';
 import { updateProductAction, deleteProductAction, type CreateProductFormState } from '@/app/dashboard/products/actions';
-import { inputClass } from '@/lib/ui/form-control-classes';
+import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 
 const initial: CreateProductFormState = { error: null, success: null };
 
@@ -17,12 +17,16 @@ const initial: CreateProductFormState = { error: null, success: null };
  */
 export function ProductRow({
   product,
+  category,
+  categories,
   canEditPrice,
   costsVisible,
   canPrintLabels,
   canManageCatalogue,
 }: {
   product: Product;
+  category: ProductCategory | null;
+  categories: ProductCategory[];
   canEditPrice: boolean;
   costsVisible: boolean;
   canPrintLabels: boolean;
@@ -57,6 +61,15 @@ export function ProductRow({
       <tr className="border-t border-accent/[0.08]">
         <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{product.sku}</td>
         <td className="px-5 py-3 text-text">{product.name}</td>
+        <td className="px-5 py-3">
+          {category ? (
+            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[0.72rem] font-semibold text-accent-strong">
+              {category.name}
+            </span>
+          ) : (
+            <span className="text-text-faint">—</span>
+          )}
+        </td>
         <td className="px-5 py-3 text-text-muted">{product.unitOfMeasure}</td>
         <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{product.barcode ?? '-'}</td>
         <td className="px-5 py-3 text-right tabular-nums">
@@ -118,7 +131,7 @@ export function ProductRow({
 
       {editing && (
         <tr className="border-t border-accent/[0.08] bg-surface-2/50">
-          <td colSpan={7} className="px-5 py-3">
+          <td colSpan={8} className="px-5 py-3">
             <form action={handleSave} className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6 lg:items-end">
               <input type="hidden" name="id" value={product.id} />
               <div className="flex flex-col gap-1">
@@ -136,6 +149,15 @@ export function ProductRow({
               <label className="flex flex-col gap-1">
                 <span className="text-[0.7rem] font-semibold text-text-muted">Barcode</span>
                 <input name="barcode" defaultValue={product.barcode ?? ''} placeholder="Optional" className={inputClass} />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[0.7rem] font-semibold text-text-muted">Category</span>
+                <select name="categoryId" defaultValue={product.categoryId ?? ''} className={selectClass}>
+                  <option value="">— none —</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-[0.7rem] font-semibold text-text-muted">Reorder point</span>

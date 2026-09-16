@@ -6,7 +6,7 @@ import { QuickRequisitionButton } from '@/app/dashboard/quick-requisition-button
 import { ReturnToStoresButton } from '@/app/dashboard/return-to-stores-button';
 import { ReserveButton } from '@/app/dashboard/reserve-button';
 import { selectClass } from '@/lib/ui/form-control-classes';
-import type { Customer, StockLedgerView } from '@/lib/domain/inventory';
+import type { Customer, ProductCategory, StockLedgerView } from '@/lib/domain/inventory';
 
 /** The stock views this card can show. What each one CONTAINS is decided on
  *  the server and varies by role (see dashboard/page.tsx) - this component
@@ -52,6 +52,7 @@ export function StockByLocationCard({
   locationsByProduct,
   canReserve,
   pendingByRow,
+  categories,
 }: {
   views: StockView[];
   /** Which tab the toggle opens on, decided by role rather than by array
@@ -93,7 +94,9 @@ export function StockByLocationCard({
    *  waiting on that row, store rows only. A row with none renders no
    *  Reserve button - there is nothing for it to do yet. */
   pendingByRow: Record<string, number>;
+  categories: ProductCategory[];
 }) {
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
   const [activeId, setActiveId] = useState<StockViewId>(
     views.some((v) => v.id === defaultViewId) ? defaultViewId : (views[0]?.id ?? 'stores')
   );
@@ -243,7 +246,14 @@ export function StockByLocationCard({
               {rows.map((row) => (
                 <tr key={`${row.productId}::${row.warehouseId}`} className="border-t border-accent/[0.08]">
                   <td className="px-5 py-3">
-                    <div className="text-text">{row.product.name}</div>
+                    <div className="text-text">
+                      {row.product.name}
+                      {row.product.categoryId && categoryById.get(row.product.categoryId) && (
+                        <span className="ml-1.5 rounded-full bg-accent/10 px-2 py-0.5 text-[0.68rem] font-semibold text-accent-strong">
+                          {categoryById.get(row.product.categoryId)!.name}
+                        </span>
+                      )}
+                    </div>
                     <div className="font-mono-brand text-[0.72rem] text-text-faint">{row.product.sku}</div>
                   </td>
                   <td className="px-5 py-3 text-text-muted">

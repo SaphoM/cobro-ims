@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState } from 'react';
 import { requestAdjustmentAction, type AdjustmentFormState } from '@/app/dashboard/adjustments/actions';
 import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
-import type { AdjustmentReasonCode, Product, Warehouse } from '@/lib/domain/inventory';
+import type { AdjustmentReasonCode, Product, ProductCategory, Warehouse } from '@/lib/domain/inventory';
 
 const initialState: AdjustmentFormState = { error: null, success: null };
 
@@ -12,13 +12,16 @@ export function AdjustmentForm({
   products,
   warehouses,
   reasonCodes,
+  categories,
   initialBarcode,
 }: {
   products: Product[];
   warehouses: Warehouse[];
   reasonCodes: AdjustmentReasonCode[];
+  categories: ProductCategory[];
   initialBarcode?: string;
 }) {
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
   const [state, formAction, pending] = useActionState(requestAdjustmentAction, initialState);
   const [scanMessage, setScanMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const productSelectRef = useRef<HTMLSelectElement>(null);
@@ -119,6 +122,7 @@ export function AdjustmentForm({
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.sku} - {p.name}
+                {p.categoryId && categoryById.get(p.categoryId) ? ` (${categoryById.get(p.categoryId)!.name})` : ''}
               </option>
             ))}
           </select>

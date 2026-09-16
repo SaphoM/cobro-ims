@@ -22,6 +22,7 @@ import { getSession } from '@/lib/auth';
 import { parseScanPayload } from '@/lib/scan-payload';
 import {
   auditLogRepository,
+  categoryRepository,
   productRepository,
   stockLedgerRepository,
   stockMovementRepository,
@@ -47,6 +48,7 @@ export interface ScanProductView {
   name: string;
   barcode: string | null;
   unitOfMeasure: string;
+  categoryName: string | null;
   reorderPoint: number | null;
   /** The product's standing price. Null when unpriced, or withheld when the caller may not see costs. */
   unitPrice: number | null;
@@ -136,9 +138,10 @@ async function stockElsewhere(productId: string, excludeWarehouseId: string): Pr
 }
 
 async function buildProductView(product: Product): Promise<ScanProductView> {
-  const [warehouses, ledger] = await Promise.all([
+  const [warehouses, ledger, category] = await Promise.all([
     warehouseRepository.list(),
     stockLedgerRepository.listAll(),
+    product.categoryId ? categoryRepository.getById(product.categoryId) : Promise.resolve(null),
   ]);
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
 
@@ -165,6 +168,7 @@ async function buildProductView(product: Product): Promise<ScanProductView> {
     name: product.name,
     barcode: product.barcode,
     unitOfMeasure: product.unitOfMeasure,
+    categoryName: category?.name ?? null,
     reorderPoint: product.reorderPoint,
     unitPrice: costsVisible ? product.unitPrice : null,
     costsVisible,

@@ -23,6 +23,7 @@ export async function createProductAction(
   const sku = String(formData.get('sku') ?? '').trim();
   const name = String(formData.get('name') ?? '').trim();
   const unitOfMeasure = String(formData.get('unitOfMeasure') ?? '').trim();
+  const categoryId = String(formData.get('categoryId') ?? '').trim() || null;
   const barcode = String(formData.get('barcode') ?? '').trim();
   const reorderPointRaw = formData.get('reorderPoint');
   const reorderQuantityRaw = formData.get('reorderQuantity');
@@ -37,6 +38,7 @@ export async function createProductAction(
       sku,
       name,
       unitOfMeasure,
+      categoryId,
       barcode: barcode || null,
       reorderPoint: reorderPointRaw ? Number(reorderPointRaw) : null,
       reorderQuantity: reorderQuantityRaw ? Number(reorderQuantityRaw) : null,
@@ -72,6 +74,7 @@ export async function updateProductAction(
   const barcode = String(formData.get('barcode') ?? '').trim();
   const reorderPointRaw = formData.get('reorderPoint');
   const reorderQuantityRaw = formData.get('reorderQuantity');
+  const categoryId = String(formData.get('categoryId') ?? '').trim() || null;
 
   if (!id) return { error: 'Missing product reference.', success: null };
   if (!name || !unitOfMeasure) return { error: 'Name and unit of measure are required.', success: null };
@@ -83,6 +86,7 @@ export async function updateProductAction(
       barcode: barcode || null,
       reorderPoint: reorderPointRaw ? Number(reorderPointRaw) : null,
       reorderQuantity: reorderQuantityRaw ? Number(reorderQuantityRaw) : null,
+      categoryId,
     });
     await auditLogRepository.write({
       tableName: 'products',

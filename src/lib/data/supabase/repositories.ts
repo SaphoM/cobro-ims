@@ -29,6 +29,7 @@ import type {
   InvoicePayment,
   Product,
   ProductBomLine,
+  ProductCategory,
   PurchaseOrder,
   PurchaseOrderLine,
   SalesOrder,
@@ -45,6 +46,7 @@ import type {
   AdjustmentReasonRepository,
   AppSettings,
   AuditLogRepository,
+  CategoryRepository,
   CreateCustomerInput,
   CreateProductInput,
   CreatePurchaseOrderInput,
@@ -309,6 +311,7 @@ export const sbProductRepository: ProductRepository = {
         sku: input.sku,
         name: input.name,
         unit_of_measure: input.unitOfMeasure,
+        category_id: input.categoryId ?? null,
         barcode: input.barcode ?? null,
         reorder_point: input.reorderPoint ?? null,
         reorder_quantity: input.reorderQuantity ?? null,
@@ -350,6 +353,7 @@ export const sbProductRepository: ProductRepository = {
       .update({
         name: input.name,
         unit_of_measure: input.unitOfMeasure,
+        ...('categoryId' in input ? { category_id: input.categoryId ?? null } : {}),
         barcode: input.barcode ?? null,
         reorder_point: input.reorderPoint ?? null,
         reorder_quantity: input.reorderQuantity ?? null,
@@ -895,11 +899,12 @@ export const sbTransferRepository: TransferRepository = {
     if (xfrErr) throw new Error(xfrErr.message);
 
     // Store line for complete()
-    await sb.from('inter_warehouse_transfer_lines').insert({
+    const { error: lineErr } = await sb.from('inter_warehouse_transfer_lines').insert({
       transfer_id: xfrRow.id,
       product_id: input.productId,
       quantity: Math.abs(input.quantity),
     });
+    if (lineErr) throw new Error(lineErr.message);
 
     // Post transfer_out
     await postMovement({
@@ -1637,5 +1642,29 @@ export const sbScanHandoffRepository: ScanHandoffRepository = {
       .single();
     if (error) throw new Error(error.message);
     return toCamel<ScanHandoffSession>(updated);
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Product Categories
+// ---------------------------------------------------------------------------
+
+export const sbCategoryRepository: CategoryRepository = {
+  async list() {
+    const { data, error } = await (await createServerSupabaseClient())
+      .from('product_categories')
+      .select('*')
+      .order('name');
+    if (error) throw new Error(error.message);
+    return toCamelArray<ProductCategory>(data);
+  },
+  async getById(id) {
+    const { data, error } = await (await createServerSupabaseClient())
+      .from('product_categories')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? toCamel<ProductCategory>(data) : null;
   },
 };

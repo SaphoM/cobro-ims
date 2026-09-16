@@ -1,5 +1,6 @@
 import {
   adjustmentReasonRepository,
+  categoryRepository,
   customerRepository,
   productRepository,
   purchaseOrderRepository,
@@ -52,7 +53,7 @@ const SUPERVISOR_VISIBLE_SECTIONS = new Set([
 ]);
 
 export default async function ReportsPage() {
-  const [products, warehouses, ledger, suppliers, customers, allSalesOrders, purchaseOrders, movements, adjustments, adjustmentReasons, users, session] =
+  const [products, warehouses, ledger, suppliers, customers, allSalesOrders, purchaseOrders, movements, adjustments, adjustmentReasons, users, categories, session] =
     await Promise.all([
       productRepository.list(),
       warehouseRepository.list(),
@@ -65,8 +66,18 @@ export default async function ReportsPage() {
       stockAdjustmentRepository.list(),
       adjustmentReasonRepository.list(),
       userRepository.list(),
+      categoryRepository.list(),
       getSession(),
     ]);
+
+  // Every report row below carries a `sku` (resolved from productId at
+  // build time in reports.ts), so looking category up by sku - rather than
+  // threading categoryId through every report-builder's return type - keeps
+  // this a page-level display concern instead of a data-model change.
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
+  const categoryNameBySku = new Map(
+    products.filter((p) => p.categoryId).map((p) => [p.sku, categoryById.get(p.categoryId!)?.name ?? null])
+  );
 
   const role = session ? await roleRepository.getById(session.roleId) : null;
   const isEngineer = role?.name === 'engineer_requester';
@@ -153,7 +164,10 @@ export default async function ReportsPage() {
               <tr key={i} className="border-t border-accent/[0.08]">
                 <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
                 <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
-                <td className="px-5 py-3 text-text-muted">{r.productName}</td>
+                <td className="px-5 py-3 text-text-muted">
+                  {r.productName}
+                  <CategoryTag name={categoryNameBySku.get(r.sku)} />
+                </td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
                   {r.quantityOnHand.toLocaleString()} {r.unitOfMeasure}
                 </td>
@@ -193,7 +207,10 @@ export default async function ReportsPage() {
                 <tr key={i} className="border-t border-accent/[0.08]">
                   <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
                   <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
-                  <td className="px-5 py-3 text-text-muted">{r.productName}</td>
+                  <td className="px-5 py-3 text-text-muted">
+                    {r.productName}
+                    <CategoryTag name={categoryNameBySku.get(r.sku)} />
+                  </td>
                   <td className="px-5 py-3 text-right tabular-nums text-danger">
                     {r.quantityOnHand.toLocaleString()} {r.unitOfMeasure}
                   </td>
@@ -266,7 +283,10 @@ export default async function ReportsPage() {
                 <tr key={i} className="border-t border-accent/[0.08]">
                   <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
                   <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
-                  <td className="px-5 py-3 text-text-muted">{r.productName}</td>
+                  <td className="px-5 py-3 text-text-muted">
+                    {r.productName}
+                    <CategoryTag name={categoryNameBySku.get(r.sku)} />
+                  </td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOnHand.toLocaleString()}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
                     R {r.value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -301,7 +321,10 @@ export default async function ReportsPage() {
               <tr key={i} className="border-t border-accent/[0.08]">
                 <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.orderNumber}</td>
                 <td className="px-5 py-3 text-text-muted">{r.customerName}</td>
-                <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{r.sku}</td>
+                <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">
+                  {r.sku}
+                  <CategoryTag name={categoryNameBySku.get(r.sku)} />
+                </td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantity.toLocaleString()}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
                   R {r.value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -376,7 +399,10 @@ export default async function ReportsPage() {
                   <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.orderNumber}</td>
                   <td className="px-5 py-3 text-text-muted">{r.customerName}</td>
                   <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{r.sku}</td>
-                  <td className="px-5 py-3 text-text-muted">{r.productName}</td>
+                  <td className="px-5 py-3 text-text-muted">
+                    {r.productName}
+                    <CategoryTag name={categoryNameBySku.get(r.sku)} />
+                  </td>
                   <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
                     {r.quantity.toLocaleString()} {r.unitOfMeasure}
@@ -421,7 +447,10 @@ export default async function ReportsPage() {
               <tr key={i} className="border-t border-accent/[0.08]">
                 <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.poNumber}</td>
                 <td className="px-5 py-3 text-text-muted">{r.supplierName}</td>
-                <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{r.sku}</td>
+                <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">
+                  {r.sku}
+                  <CategoryTag name={categoryNameBySku.get(r.sku)} />
+                </td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOrdered.toLocaleString()}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.quantityReceived.toLocaleString()}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
@@ -494,7 +523,10 @@ export default async function ReportsPage() {
                 <tr key={i} className="border-t border-accent/[0.08]">
                   <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.poNumber}</td>
                   <td className="px-5 py-3 text-text-muted">{r.supplierName}</td>
-                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{r.sku}</td>
+                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">
+                    {r.sku}
+                    <CategoryTag name={categoryNameBySku.get(r.sku)} />
+                  </td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOutstanding.toLocaleString()}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
                     R {r.outstandingValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -537,7 +569,10 @@ export default async function ReportsPage() {
               {movementHistory.map((r, i) => (
                 <tr key={i} className="border-t border-accent/[0.08]">
                   <td className="px-5 py-3 text-text-muted">{new Date(r.createdAt).toLocaleString('en-ZA')}</td>
-                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
+                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">
+                    {r.sku}
+                    <CategoryTag name={categoryNameBySku.get(r.sku)} />
+                  </td>
                   <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
                   <td className="px-5 py-3 text-text-muted capitalize">{r.movementType.replace('_', ' ')}</td>
                   <td className={`px-5 py-3 text-right tabular-nums ${r.quantity < 0 ? 'text-danger' : 'text-text'}`}>
@@ -581,7 +616,10 @@ export default async function ReportsPage() {
                 <tr key={i} className="border-t border-accent/[0.08]">
                   <td className="px-5 py-3 text-text-muted">{new Date(r.receivedAt).toLocaleString('en-ZA')}</td>
                   <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
-                  <td className="px-5 py-3 text-text-muted">{r.productName}</td>
+                  <td className="px-5 py-3 text-text-muted">
+                    {r.productName}
+                    <CategoryTag name={categoryNameBySku.get(r.sku)} />
+                  </td>
                   <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantity.toLocaleString()}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">R {r.unitCost.toFixed(2)}</td>
@@ -708,4 +746,17 @@ function ReportSection<T extends object>({
 
 function EmptyState({ text }: { text: string }) {
   return <p className="px-5 py-6 text-[0.85rem] text-text-faint">{text}</p>;
+}
+
+/** Same badge used on the Product Catalogue, Requisitions, and Transfers
+ *  tables - renders nothing for an uncategorised product, so every report
+ *  row keeps its existing layout unless the product it names has a
+ *  category worth showing. */
+function CategoryTag({ name }: { name: string | null | undefined }) {
+  if (!name) return null;
+  return (
+    <span className="ml-1.5 rounded-full bg-accent/10 px-2 py-0.5 text-[0.68rem] font-semibold text-accent-strong">
+      {name}
+    </span>
+  );
 }

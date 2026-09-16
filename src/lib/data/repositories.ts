@@ -22,6 +22,7 @@ import type {
   PoStatus,
   Product,
   ProductBomLine,
+  ProductCategory,
   PurchaseOrder,
   PurchaseOrderLine,
   Role,
@@ -87,10 +88,16 @@ export interface AuditLogRepository {
   list(limit?: number): Promise<AuditLogEntry[]>;
 }
 
+export interface CategoryRepository {
+  list(): Promise<ProductCategory[]>;
+  getById(id: string): Promise<ProductCategory | null>;
+}
+
 export interface CreateProductInput {
   sku: string;
   name: string;
   unitOfMeasure: string;
+  categoryId?: string | null;
   barcode?: string | null;
   reorderPoint?: number | null;
   reorderQuantity?: number | null;
@@ -108,6 +115,7 @@ export interface AddBomLineInput {
 export interface UpdateProductInput {
   name: string;
   unitOfMeasure: string;
+  categoryId?: string | null;
   barcode?: string | null;
   reorderPoint?: number | null;
   reorderQuantity?: number | null;
@@ -459,6 +467,7 @@ export interface ScanHandoffSession {
    *  permission-checked Server Action any other scan result would. */
   result: string | null;
 }
+
 
 export interface ScanHandoffRepository {
   /** Creates a new pending session for `initiatingUserId`, expiring in a few

@@ -1,4 +1,5 @@
 import {
+  categoryRepository,
   customerRepository,
   productRepository,
   roleRepository,
@@ -19,10 +20,11 @@ export default async function SalesPage({
   searchParams: Promise<{ barcode?: string }>;
 }) {
   const { barcode } = await searchParams;
-  const [customers, warehouses, products, allOrders, users, ledger, session] = await Promise.all([
+  const [customers, warehouses, products, categories, allOrders, users, ledger, session] = await Promise.all([
     customerRepository.list(),
     warehouseRepository.list(),
     productRepository.list(),
+    categoryRepository.list(),
     salesOrderRepository.list(),
     userRepository.list(),
     stockLedgerRepository.listAll(),
@@ -72,6 +74,7 @@ export default async function SalesPage({
 
   const customerById = new Map(customers.map((c) => [c.id, c]));
   const productById = new Map(products.map((p) => [p.id, p]));
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
   // Requisition sources: every store, plus every OTHER Engineer's station -
   // seeing an unused item sitting on a peer's shelf and requesting it
   // straight from there (instead of a fresh store pickup) is the point of
@@ -94,6 +97,7 @@ export default async function SalesPage({
           customers={customers}
           warehouses={requestableWarehouses}
           products={products}
+          categories={categories}
           ledger={ledger}
           initialBarcode={barcode}
         />
@@ -158,6 +162,11 @@ export default async function SalesPage({
                       <td className="px-5 py-3 text-text-muted">{customerById.get(o.customerId)?.name}</td>
                       <td className="px-5 py-3 text-text-muted">
                         {product?.sku} <span className="text-text-faint">- {product?.name}</span>
+                        {product?.categoryId && categoryById.get(product.categoryId) && (
+                          <span className="ml-1.5 rounded-full bg-accent/10 px-2 py-0.5 text-[0.68rem] font-semibold text-accent-strong">
+                            {categoryById.get(product.categoryId)!.name}
+                          </span>
+                        )}
                       </td>
                       <td className="px-5 py-3 text-text-muted">
                         {sourceWarehouse?.type === 'engineer_station' ? sourceWarehouse.name : sourceWarehouse?.code}

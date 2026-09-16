@@ -1,4 +1,5 @@
 import {
+  categoryRepository,
   customerRepository,
   productRepository,
   roleRepository,
@@ -19,7 +20,7 @@ import { StockByLocationCard, type StockView } from '@/app/dashboard/stock-by-lo
 import type { StockLedgerView } from '@/lib/domain/inventory';
 
 export default async function DashboardOverviewPage() {
-  const [products, warehouses, ledgerEntries, customers, suppliers, salesOrders, users, session] = await Promise.all([
+  const [products, warehouses, ledgerEntries, customers, suppliers, salesOrders, users, categories, session] = await Promise.all([
     productRepository.list(),
     warehouseRepository.list(),
     stockLedgerRepository.listAll(),
@@ -27,6 +28,7 @@ export default async function DashboardOverviewPage() {
     supplierRepository.list(),
     salesOrderRepository.list(),
     userRepository.list(),
+    categoryRepository.list(),
     getSession(),
   ]);
   const showCosts = await canSeeCosts(session);
@@ -273,6 +275,7 @@ export default async function DashboardOverviewPage() {
           suppliers={suppliers}
           warehouses={warehouses.filter((w) => w.type === 'store')}
           products={products}
+          categories={categories}
           canEditPrice={canEditPrice}
           showCosts={showCosts}
           centerSubmit={isStoresRole}
@@ -315,6 +318,7 @@ export default async function DashboardOverviewPage() {
         locationsByProduct={Object.fromEntries(locationsByProduct)}
         canReserve={canReserve}
         pendingByRow={Object.fromEntries(pendingByRow)}
+        categories={categories}
       />
     </div>
   );

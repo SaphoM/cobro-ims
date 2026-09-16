@@ -6,7 +6,7 @@ import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import { HIDDEN_COST } from '@/lib/ui/cost-display';
 import { parseScanPayload } from '@/lib/scan-payload';
-import type { Product, Supplier, Warehouse } from '@/lib/domain/inventory';
+import type { Product, ProductCategory, Supplier, Warehouse } from '@/lib/domain/inventory';
 
 const initialState: ReceiveFormState = { error: null, success: null };
 
@@ -14,6 +14,7 @@ export function ReceiveForm({
   suppliers,
   warehouses,
   products,
+  categories,
   initialBarcode,
   canEditPrice,
   showCosts,
@@ -22,6 +23,7 @@ export function ReceiveForm({
   suppliers: Supplier[];
   warehouses: Warehouse[];
   products: Product[];
+  categories: ProductCategory[];
   initialBarcode?: string;
   /** `manage_pricing` - Admin only. Everyone else sees the cost as read-only
    *  bold text (the catalogue price), and the server discards whatever unit
@@ -51,6 +53,8 @@ export function ReceiveForm({
   // there is genuinely nothing selected until then.
   const [selectedProductId, setSelectedProductId] = useState('');
   const selectedProduct = products.find((p) => p.id === selectedProductId);
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
+  const selectedCategory = selectedProduct?.categoryId ? categoryById.get(selectedProduct.categoryId) : undefined;
 
   /*
     Supplier comes from the scan when the label carries one (see
@@ -194,6 +198,11 @@ export function ReceiveForm({
             <div className="min-w-0">
               <div className="truncate text-[0.92rem] font-bold leading-snug text-accent-strong">
                 {selectedProduct.name}
+                {selectedCategory && (
+                  <span className="ml-1.5 rounded-full bg-accent/15 px-2 py-0.5 align-middle text-[0.62rem] font-semibold">
+                    {selectedCategory.name}
+                  </span>
+                )}
               </div>
               <div className="truncate font-mono-brand text-[0.68rem] text-text-faint">{selectedProduct.sku}</div>
               <div
@@ -390,8 +399,13 @@ export function ReceiveForm({
               {selectedProduct && <span className="ml-1 font-normal text-text-faint">from the scan</span>}
             </span>
             {selectedProduct ? (
-              <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+              <div className="flex h-9 items-center gap-1.5 text-[0.95rem] font-bold text-accent-strong">
                 {selectedProduct.sku} - {selectedProduct.name}
+                {selectedCategory && (
+                  <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[0.68rem] font-semibold">
+                    {selectedCategory.name}
+                  </span>
+                )}
               </div>
             ) : (
               <div className="flex h-9 items-center text-[0.9rem] text-text-faint">

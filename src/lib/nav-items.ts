@@ -26,6 +26,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Overview', permission: null },
+  { href: '/dashboard/scan', label: 'Barcode / QR scan', permission: null },
   { href: '/dashboard/products', label: 'Product catalogue', permission: null },
   { href: '/dashboard/bom', label: 'Bill of materials', permission: null },
   { href: '/dashboard/purchase-orders', label: 'Purchase orders', permission: 'manage_purchase_orders' },

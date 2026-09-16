@@ -2,11 +2,12 @@
 
 import { useActionState } from 'react';
 import { createProductAction, type CreateProductFormState } from '@/app/dashboard/products/actions';
-import { inputClass } from '@/lib/ui/form-control-classes';
+import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
+import type { ProductCategory } from '@/lib/domain/inventory';
 
 const initialState: CreateProductFormState = { error: null, success: null };
 
-export function NewProductForm() {
+export function NewProductForm({ categories }: { categories: ProductCategory[] }) {
   const [state, formAction, pending] = useActionState(createProductAction, initialState);
 
   return (
@@ -29,6 +30,17 @@ export function NewProductForm() {
         <label className="flex flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">Barcode</span>
           <input name="barcode" placeholder="Optional" className={inputClass} />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[0.75rem] font-semibold text-text-muted">Category</span>
+          <select name="categoryId" className={selectClass}>
+            <option value="">— none —</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">Reorder point</span>

@@ -239,6 +239,7 @@ export interface StockLedgerEntry {
   updatedAt: ISODateTime;
 }
 
+
 export type StockMovementType =
   | 'receipt'
   | 'dispatch'

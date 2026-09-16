@@ -447,6 +447,11 @@ export function ScanStation({
             <div>
               <h2 className="font-display text-[1.05rem] font-medium text-text">
                 {result.product.sku} - {result.product.name}
+                {result.product.categoryName && (
+                  <span className="ml-2 rounded-full bg-accent/10 px-2 py-0.5 align-middle text-[0.68rem] font-semibold text-accent-strong">
+                    {result.product.categoryName}
+                  </span>
+                )}
               </h2>
               <p className="font-mono-brand text-[0.78rem] text-text-faint">
                 Barcode: {result.product.barcode}

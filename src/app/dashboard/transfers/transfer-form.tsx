@@ -4,11 +4,20 @@ import { useActionState, useRef, useState } from 'react';
 import { initiateTransferAction, type TransferFormState } from '@/app/dashboard/transfers/actions';
 import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
-import type { Product, Warehouse } from '@/lib/domain/inventory';
+import type { Product, ProductCategory, Warehouse } from '@/lib/domain/inventory';
 
 const initialState: TransferFormState = { error: null, success: null };
 
-export function TransferForm({ products, warehouses }: { products: Product[]; warehouses: Warehouse[] }) {
+export function TransferForm({
+  products,
+  warehouses,
+  categories,
+}: {
+  products: Product[];
+  warehouses: Warehouse[];
+  categories: ProductCategory[];
+}) {
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
   const [state, formAction, pending] = useActionState(initiateTransferAction, initialState);
   const [scanMessage, setScanMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const productSelectRef = useRef<HTMLSelectElement>(null);
@@ -118,6 +127,7 @@ export function TransferForm({ products, warehouses }: { products: Product[]; wa
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.sku} - {p.name}
+                {p.categoryId && categoryById.get(p.categoryId) ? ` (${categoryById.get(p.categoryId)!.name})` : ''}
               </option>
             ))}
           </select>
