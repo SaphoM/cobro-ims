@@ -5,6 +5,7 @@ import { createSalesOrderAction, type SalesOrderFormState } from '@/app/dashboar
 import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import type { Customer, Product, ProductCategory, StockLedgerEntry, Warehouse } from '@/lib/domain/inventory';
+import { formatCurrency } from '@/lib/ui/currency';
 
 const initialState: SalesOrderFormState = { error: null, success: null };
 
@@ -47,7 +48,6 @@ export function SalesOrderForm({
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? '');
   const [productId, setProductId] = useState(products[0]?.id ?? '');
   const [quantity, setQuantity] = useState('');
-  const [unitPrice, setUnitPrice] = useState('');
 
   // Keyed by "productId::warehouseId" so the counter below re-derives
   // instantly as either Product or Store changes, instead of needing its
@@ -107,7 +107,6 @@ export function SalesOrderForm({
     if (state.success && state.success !== lastHandledSuccess.current) {
       lastHandledSuccess.current = state.success;
       setQuantity('');
-      setUnitPrice('');
     }
   }, [state.success]);
 
@@ -264,18 +263,18 @@ export function SalesOrderForm({
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Unit value (R)</span>
-          <input
-            type="number"
-            name="unitPrice"
-            min="0"
-            step="0.01"
-            required
-            value={unitPrice}
-            onChange={(e) => setUnitPrice(e.target.value)}
-            placeholder="0.00"
-            className={inputClass}
-          />
+          <span className="text-[0.75rem] font-semibold text-text-muted">
+            Unit value (R)<span className="ml-1 font-normal text-text-faint">from the catalogue</span>
+          </span>
+          {/* Read-only everywhere - not just visually. The value shown here is
+              purely a display; the server re-derives and enforces the real
+              catalogue price itself (see createSalesOrderAction) regardless
+              of what this hidden input carries, so there is no submitted
+              value for anyone to manipulate. */}
+          <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+            {selectedProduct?.unitPrice != null ? `${formatCurrency(selectedProduct.unitPrice)}` : 'No price set'}
+          </div>
+          <input type="hidden" name="unitPrice" value={selectedProduct?.unitPrice ?? 0} />
         </label>
 
         <div className="flex items-end lg:col-span-6">

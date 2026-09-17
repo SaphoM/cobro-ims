@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import { issueCreditNoteAction, type IssueCreditNoteFormState } from '@/app/dashboard/invoices/actions';
+import { formatCurrency } from '@/lib/ui/currency';
 
 const initialState: IssueCreditNoteFormState = { error: null, success: null };
 
@@ -26,7 +27,7 @@ export function CreditNoteLine({ invoiceId, outstanding }: { invoiceId: string; 
           max={outstanding}
           step="0.01"
           required
-          placeholder={`up to R${outstanding.toFixed(2)}`}
+          placeholder={`up to ${formatCurrency(outstanding)}`}
           className="h-9 w-32 rounded-lg border border-accent/[0.14] bg-surface-2 px-2.5 py-1.5 text-right text-[0.82rem] text-text placeholder:text-text-faint focus:border-accent focus:outline-none"
         />
         <button

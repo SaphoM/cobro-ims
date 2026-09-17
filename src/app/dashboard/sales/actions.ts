@@ -56,16 +56,12 @@ export async function createSalesOrderAction(
   const warehouseId = String(formData.get('warehouseId') ?? '');
   const productId = String(formData.get('productId') ?? '');
   const quantity = Number(formData.get('quantity'));
-  const unitPrice = Number(formData.get('unitPrice'));
 
   if (!customerId || !warehouseId || !productId) {
     return { error: 'Requesting department, warehouse and product are required.', success: null };
   }
   if (!Number.isFinite(quantity) || quantity <= 0) {
     return { error: 'Quantity must be a positive number.', success: null };
-  }
-  if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-    return { error: 'Unit value must be zero or a positive number.', success: null };
   }
 
   /*
@@ -85,6 +81,21 @@ export async function createSalesOrderAction(
   ]);
   if (!product) return { error: 'That product could not be found.', success: null };
   if (!warehouse) return { error: 'That store could not be found.', success: null };
+  /*
+    Unit value is never taken from the client - the requester's own submitted
+    unitPrice (whatever the form sent, tampered with or not) is ignored
+    outright. The Product Catalogue is the sole source of truth for what a
+    requisition is valued at, exactly as it already is on Goods Receiving for
+    every non-Admin role (see receiveStockAction) - a requester is never in a
+    position to price their own request.
+  */
+  if (product.unitPrice == null || product.unitPrice <= 0) {
+    return {
+      error: `${product.sku} has no catalogue price set - ask an administrator to set one before it can be requisitioned.`,
+      success: null,
+    };
+  }
+  const unitPrice = product.unitPrice;
   if (warehouse.type === 'engineer_station' && warehouse.ownerUserId === session.id) {
     return { error: "You can't requisition stock from your own station - it's already yours.", success: null };
   }

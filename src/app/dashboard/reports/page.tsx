@@ -24,6 +24,7 @@ import {
   buildPickList,
   buildPurchaseOrderSummary,
   buildReceivingHistory,
+  buildRepairCostReport,
   buildSalesSummary,
   buildStockValuationReport,
   buildSupplierSummary,
@@ -32,6 +33,7 @@ import {
 import { getNowMs } from '@/lib/now';
 import { ExportCsvButton } from '@/components/export-csv-button';
 import { getSession } from '@/lib/auth';
+import { formatCurrency } from '@/lib/ui/currency';
 
 // What each role sees on this page, beyond the underlying data access
 // already enforced elsewhere (`view_reports` gates the route itself - see
@@ -41,7 +43,7 @@ import { getSession } from '@/lib/auth';
 // their own requisitions and what's short on the shelf - not purchasing,
 // suppliers, warehouse valuations, or anyone else's activity.
 const PURCHASING_SECTIONS = new Set(['Purchase order summary', 'Supplier summary', 'Open purchase orders']);
-const ENGINEER_VISIBLE_SECTIONS = new Set(['Requisition summary', 'Low stock / reorder suggestions']);
+const ENGINEER_VISIBLE_SECTIONS = new Set(['Requisition summary', 'Low stock / reorder suggestions', 'Repair item cost']);
 // A Supervisor gets what a Team Leader gets PLUS movement history - the
 // "relevant usage/movement information" the 8 September review named for
 // this role, and the one thing that makes their reporting view broader
@@ -50,6 +52,7 @@ const SUPERVISOR_VISIBLE_SECTIONS = new Set([
   'Requisition summary',
   'Low stock / reorder suggestions',
   'Stock movement history',
+  'Repair item cost',
 ]);
 
 export default async function ReportsPage() {
@@ -122,6 +125,7 @@ export default async function ReportsPage() {
   const warehouseSummary = buildWarehouseSummary(ledger, products, warehouses);
   const openPurchaseOrders = buildOpenPurchaseOrders(purchaseOrders, products, suppliers, now);
   const dormantStock = buildDormantStock(ledger, movements, products, warehouses);
+  const repairCostReport = buildRepairCostReport(movements, products, categories, warehouses);
 
   return (
     <div className="flex flex-col gap-6">
@@ -144,7 +148,7 @@ export default async function ReportsPage() {
       <ReportSection
         title="Stock valuation"
         hidden={hideSection('Stock valuation')}
-        subtitle={`Grand total: R ${valuation.grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} across ${valuation.byWarehouse.length} stores`}
+        subtitle={`Grand total: ${formatCurrency(valuation.grandTotal)} across ${valuation.byWarehouse.length} stores`}
         exportFilename="stock-valuation"
         rows={valuation.rows}
       >
@@ -171,9 +175,53 @@ export default async function ReportsPage() {
                 <td className="px-5 py-3 text-right tabular-nums text-text">
                   {r.quantityOnHand.toLocaleString()} {r.unitOfMeasure}
                 </td>
-                <td className="px-5 py-3 text-right tabular-nums text-text-muted">R {r.weightedAverageCost.toFixed(2)}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text-muted">{formatCurrency(r.weightedAverageCost)}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
-                  R {r.value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(r.value)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </ReportSection>
+
+      <ReportSection
+        title="Repair item cost"
+        hidden={hideSection('Repair item cost')}
+        subtitle="What every Repair-items product has actually cost, based on real dispatch and use records"
+        exportFilename="repair-item-cost"
+        rows={repairCostReport}
+      >
+        <table className="w-full min-w-[720px] border-collapse text-[0.86rem]">
+          <thead>
+            <tr className="text-left text-text-faint">
+              <th className="px-5 py-2.5 font-medium">SKU</th>
+              <th className="px-5 py-2.5 font-medium">Product</th>
+              <th className="px-5 py-2.5 font-medium">Barcode</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Qty issued</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Qty used</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Unit value</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Total material cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            {repairCostReport.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-5 py-6 text-[0.85rem] text-text-faint">
+                  No Repair-items products in the catalogue yet.
+                </td>
+              </tr>
+            )}
+            {repairCostReport.map((r) => (
+              <tr key={r.sku} className="border-t border-accent/[0.08]">
+                <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
+                <td className="px-5 py-3 text-text-muted">{r.productName}</td>
+                <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{r.barcode ?? '—'}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityIssued.toLocaleString()}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityUsed.toLocaleString()}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text-muted">{formatCurrency(r.unitValue)}</td>
+                <td className="px-5 py-3 text-right tabular-nums font-semibold text-text">
+                  {formatCurrency(r.totalMaterialCost)}
                 </td>
               </tr>
             ))}
@@ -250,7 +298,7 @@ export default async function ReportsPage() {
                   {r.lowStockCount}
                 </td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
-                  R {r.totalValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(r.totalValue)}
                 </td>
               </tr>
             ))}
@@ -289,7 +337,7 @@ export default async function ReportsPage() {
                   </td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOnHand.toLocaleString()}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
-                    R {r.value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatCurrency(r.value)}
                   </td>
                 </tr>
               ))}
@@ -327,7 +375,7 @@ export default async function ReportsPage() {
                 </td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantity.toLocaleString()}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
-                  R {r.value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(r.value)}
                 </td>
                 <td className="px-5 py-3 text-text-muted capitalize">{r.status}</td>
               </tr>
@@ -360,10 +408,10 @@ export default async function ReportsPage() {
                 <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.orderCount}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.dispatchedCount}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
-                  R {r.totalOrderedValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(r.totalOrderedValue)}
                 </td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
-                  R {r.totalDispatchedValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(r.totalDispatchedValue)}
                 </td>
               </tr>
             ))}
@@ -485,10 +533,10 @@ export default async function ReportsPage() {
                 <td className="px-5 py-3 text-text">{r.supplierName}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.orderCount}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
-                  R {r.totalOrderedValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(r.totalOrderedValue)}
                 </td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
-                  R {r.totalReceivedValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(r.totalReceivedValue)}
                 </td>
               </tr>
             ))}
@@ -529,7 +577,7 @@ export default async function ReportsPage() {
                   </td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOutstanding.toLocaleString()}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
-                    R {r.outstandingValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatCurrency(r.outstandingValue)}
                   </td>
                   <td className={`px-5 py-3 text-right tabular-nums ${(r.daysOpen ?? 0) > 14 ? 'text-danger' : 'text-text-muted'}`}>
                     {r.daysOpen ?? '-'}
@@ -579,7 +627,7 @@ export default async function ReportsPage() {
                     {r.quantity > 0 ? '+' : ''}
                     {r.quantity.toLocaleString()}
                   </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">R {r.unitCost.toFixed(2)}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">{formatCurrency(r.unitCost)}</td>
                   <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{r.batchRef ?? '-'}</td>
                   <td className="px-5 py-3 text-text-faint">{r.referenceType?.replace(/_/g, ' ') ?? '-'}</td>
                 </tr>
@@ -622,9 +670,9 @@ export default async function ReportsPage() {
                   </td>
                   <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantity.toLocaleString()}</td>
-                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">R {r.unitCost.toFixed(2)}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">{formatCurrency(r.unitCost)}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
-                    R {r.value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatCurrency(r.value)}
                   </td>
                 </tr>
               ))}
@@ -659,7 +707,7 @@ export default async function ReportsPage() {
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.count}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.totalUnits.toLocaleString()}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
-                    R {r.totalValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatCurrency(r.totalValue)}
                   </td>
                 </tr>
               ))}

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getSession, signOut } from '@/lib/auth';
+import { formatCurrency } from '@/lib/ui/currency';
 import {
   auditLogRepository,
   productRepository,
@@ -180,7 +181,7 @@ export async function recordMovementAction(
     return {
       error: null,
       success: costsVisible
-        ? `Posted. New on-hand: ${ledger.quantityOnHand} @ WAC R${ledger.weightedAverageCost.toFixed(2)}.`
+        ? `Posted. New on-hand: ${ledger.quantityOnHand} @ WAC ${formatCurrency(ledger.weightedAverageCost)}.`
         : `Posted. New on-hand: ${ledger.quantityOnHand}.`,
     };
   } catch (err) {

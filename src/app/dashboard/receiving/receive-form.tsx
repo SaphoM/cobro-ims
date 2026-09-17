@@ -7,6 +7,7 @@ import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import { HIDDEN_COST } from '@/lib/ui/cost-display';
 import { parseScanPayload } from '@/lib/scan-payload';
 import type { Product, ProductCategory, Supplier, Warehouse } from '@/lib/domain/inventory';
+import { formatCurrency } from '@/lib/ui/currency';
 
 const initialState: ReceiveFormState = { error: null, success: null };
 
@@ -463,7 +464,7 @@ export function ReceiveForm({
                   {!showCosts
                     ? HIDDEN_COST
                     : selectedProduct?.unitPrice != null
-                      ? `R ${selectedProduct.unitPrice.toFixed(2)}`
+                      ? `${formatCurrency(selectedProduct.unitPrice)}`
                       : 'No price set'}
                 </div>
                 <input type="hidden" name="unitCost" value={selectedProduct?.unitPrice ?? 0} />

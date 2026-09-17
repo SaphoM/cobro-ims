@@ -18,6 +18,7 @@ import { ReceiveForm } from '@/app/dashboard/receiving/receive-form';
 import { EngineerScanCard } from '@/app/dashboard/engineer-scan-card';
 import { StockByLocationCard, type StockView } from '@/app/dashboard/stock-by-location-card';
 import type { StockLedgerView } from '@/lib/domain/inventory';
+import { formatCurrency } from '@/lib/ui/currency';
 
 export default async function DashboardOverviewPage() {
   const [products, warehouses, ledgerEntries, customers, suppliers, salesOrders, users, categories, session] = await Promise.all([
@@ -253,7 +254,7 @@ export default async function DashboardOverviewPage() {
           label="Stock on hand (value)"
           value={
             showCosts
-              ? `R ${totalStockValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              ? `${formatCurrency(totalStockValue)}`
               : HIDDEN_COST
           }
         />

@@ -13,6 +13,7 @@ import { hasPermission } from '@/lib/permissions';
 import { SalesOrderForm } from '@/app/dashboard/sales/sales-order-form';
 import { RequisitionActionsCell } from '@/app/dashboard/sales/requisition-actions-cell';
 import type { SalesOrderStatus } from '@/lib/domain/inventory';
+import { formatCurrency } from '@/lib/ui/currency';
 
 export default async function SalesPage({
   searchParams,
@@ -175,11 +176,7 @@ export default async function SalesPage({
                         {o.quantityOrdered.toLocaleString()} {product?.unitOfMeasure}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text">
-                        R{' '}
-                        {(o.quantityOrdered * o.unitPrice).toLocaleString('en-ZA', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                        {formatCurrency(o.quantityOrdered * o.unitPrice)}
                       </td>
                       <td className="px-5 py-3">
                         <StatusPill status={o.status} />

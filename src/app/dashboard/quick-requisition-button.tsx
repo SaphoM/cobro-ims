@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from 'react';
 import { createSalesOrderAction, type SalesOrderFormState } from '@/app/dashboard/sales/actions';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import type { Customer } from '@/lib/domain/inventory';
+import { formatCurrency } from '@/lib/ui/currency';
 
 const initialState: SalesOrderFormState = { error: null, success: null };
 
@@ -224,7 +225,7 @@ export function QuickRequisitionButton({
                           styled as a control, since there's nothing here to
                           interact with. */}
                       <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
-                        {unitPrice != null ? `R ${unitPrice.toFixed(2)}` : 'No price set'}
+                        {unitPrice != null ? `${formatCurrency(unitPrice)}` : 'No price set'}
                       </div>
                       <input type="hidden" name="unitPrice" value={unitPrice ?? 0} />
                     </>

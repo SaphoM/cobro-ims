@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
 import { auditLogRepository, invoiceRepository } from '@/lib/data';
 import { hasPermission, requirePermission } from '@/lib/permissions';
+import { formatCurrency } from '@/lib/ui/currency';
 
 async function requireSession() {
   const session = await getSession();
@@ -61,7 +62,7 @@ export async function recordPaymentAction(
     revalidatePath('/dashboard/invoices');
     return {
       error: null,
-      success: `Payment of R${amount.toFixed(2)} recorded - ${invoice.invoiceNumber} is now ${invoice.status.replace('_', ' ')}.`,
+      success: `Payment of ${formatCurrency(amount)} recorded - ${invoice.invoiceNumber} is now ${invoice.status.replace('_', ' ')}.`,
     };
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Could not record the payment.', success: null };
@@ -106,7 +107,7 @@ export async function issueCreditNoteAction(
     revalidatePath('/dashboard/invoices');
     return {
       error: null,
-      success: `${creditNote.creditNoteNumber} issued for R${amount.toFixed(2)} - ${invoice.invoiceNumber} is now ${invoice.status.replace('_', ' ')}.`,
+      success: `${creditNote.creditNoteNumber} issued for ${formatCurrency(amount)} - ${invoice.invoiceNumber} is now ${invoice.status.replace('_', ' ')}.`,
     };
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Could not issue the credit note.', success: null };

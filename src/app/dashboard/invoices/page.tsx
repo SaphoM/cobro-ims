@@ -6,6 +6,7 @@ import { PaymentLine } from '@/app/dashboard/invoices/payment-line';
 import { CreditNoteLine } from '@/app/dashboard/invoices/credit-note-line';
 import { getNowMs } from '@/lib/now';
 import type { InvoiceStatus } from '@/lib/domain/inventory';
+import { formatCurrency } from '@/lib/ui/currency';
 
 export default async function InvoicesPage() {
   const session = await getSession();
@@ -45,7 +46,7 @@ export default async function InvoicesPage() {
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatTile
           label="Outstanding (unpaid + partial)"
-          value={`R ${totalOutstanding.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          value={`${formatCurrency(totalOutstanding)}`}
         />
         <StatTile label="Overdue invoices" value={overdueCount.toString()} tone={overdueCount > 0 ? 'warning' : 'default'} />
       </section>
@@ -87,17 +88,17 @@ export default async function InvoicesPage() {
                         {orderById.get(inv.salesOrderId)?.orderNumber}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text-muted">
-                        R {inv.subtotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatCurrency(inv.subtotal)}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text-muted">
-                        R {inv.vatAmount.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatCurrency(inv.vatAmount)}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text">
-                        R {inv.total.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatCurrency(inv.total)}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text-muted">
                         {inv.creditedAmount > 0
-                          ? `R ${inv.creditedAmount.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          ? `${formatCurrency(inv.creditedAmount)}`
                           : '-'}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text-muted">

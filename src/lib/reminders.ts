@@ -23,17 +23,13 @@
 import type { Product, StockLedgerEntry } from '@/lib/domain/inventory';
 
 /**
- * Placeholder, not settled policy - the 8 September meeting requested
- * reminders but did not confirm a frequency. A single named constant here
- * (rather than a number buried inside the filter logic below) is the
- * "configurable in future" the meeting asked for without building a
- * settings screen this app has no other precedent for (see src/lib/areas.ts
- * for the same reasoning applied to the factory-area list). Promote to a
- * repository-backed, Admin-editable setting once Cobro confirms the real
- * number - src/lib/costs.ts's single show-costs toggle is the shape to
- * follow when that happens.
+ * Confirmed policy: stock untouched on an Engineer's station for more than
+ * one day is flagged. A single named constant here (rather than a number
+ * buried inside the filter logic below) keeps this easy to change again -
+ * see src/lib/costs.ts's single show-costs toggle for the same shape, if
+ * this needs to become a repository-backed, Admin-editable setting later.
  */
-export const STOCK_HELD_REMINDER_DAYS = 14;
+export const STOCK_HELD_REMINDER_DAYS = 1;
 
 export interface HeldStockReminder {
   productId: string;

@@ -15,6 +15,7 @@ import type {
   Customer,
   Invoice,
   Product,
+  ProductCategory,
   PurchaseOrderLine,
   PurchaseOrder,
   SalesOrder,
@@ -319,6 +320,81 @@ export function buildReceivingHistory(
 // ---------------------------------------------------------------------------
 // Movement type totals — a quick roll-up of the audit trail by movement type
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Repair cost — for every product in the "Repair items" category, what's
+// actually been dispatched to Engineers and consumed, and what it cost. The
+// repair identity here is the product itself (its "Repair items" category
+// tag), not a separate job/reference number - the system has no such field,
+// and none is needed: an Engineering user requesting a repair item already
+// establishes the relationship. Every figure is a real aggregate of actual
+// stock_movements rows and the product's own catalogue price - nothing here
+// is a fixed/sample value.
+// ---------------------------------------------------------------------------
+
+export interface RepairCostRow {
+  sku: string;
+  productName: string;
+  barcode: string | null;
+  quantityIssued: number;
+  quantityUsed: number;
+  unitValue: number;
+  totalMaterialCost: number;
+}
+
+export function buildRepairCostReport(
+  movements: { productId: string; warehouseId: string; movementType: StockMovementType; quantity: number }[],
+  products: Product[],
+  categories: ProductCategory[],
+  warehouses: Warehouse[]
+): RepairCostRow[] {
+  const repairCategoryIds = new Set(
+    categories.filter((c) => c.name === 'Repair items').map((c) => c.id)
+  );
+  const repairProducts = products.filter((p) => p.categoryId && repairCategoryIds.has(p.categoryId));
+  if (repairProducts.length === 0) return [];
+
+  const engineerStationIds = new Set(warehouses.filter((w) => w.type === 'engineer_station').map((w) => w.id));
+
+  /*
+    "Issued" is stock that has actually landed at an Engineer's own station.
+    An Engineer accepting their own approved requisition posts a
+    transfer_out (source store) / transfer_in (their station) pair - see
+    salesOrderRepository.dispatch - so the positive transfer_in leg, filtered
+    to only those landing on an engineer_station, is what "issued" actually
+    means here. That filter is what excludes ordinary store-to-store
+    transfers and Returns-to-Store, which also use transfer_in but toward a
+    `store`, not an Engineer. `usage` is that Engineer consuming it from
+    their own station afterwards (Scan-to-Use). Both are summed as positive
+    units here regardless of how each was signed when posted.
+  */
+  const issuedByProduct = new Map<string, number>();
+  const usedByProduct = new Map<string, number>();
+  for (const m of movements) {
+    if (m.movementType === 'transfer_in' && m.quantity > 0 && engineerStationIds.has(m.warehouseId)) {
+      issuedByProduct.set(m.productId, (issuedByProduct.get(m.productId) ?? 0) + m.quantity);
+    } else if (m.movementType === 'usage') {
+      usedByProduct.set(m.productId, (usedByProduct.get(m.productId) ?? 0) + Math.abs(m.quantity));
+    }
+  }
+
+  return repairProducts
+    .map((p) => {
+      const quantityIssued = issuedByProduct.get(p.id) ?? 0;
+      const quantityUsed = usedByProduct.get(p.id) ?? 0;
+      const unitValue = p.unitPrice ?? 0;
+      return {
+        sku: p.sku,
+        productName: p.name,
+        barcode: p.barcode ?? null,
+        quantityIssued,
+        quantityUsed,
+        unitValue,
+        totalMaterialCost: Math.round(quantityUsed * unitValue * 100) / 100,
+      };
+    })
+    .sort((a, b) => b.totalMaterialCost - a.totalMaterialCost);
+}
 
 export interface MovementTypeTotalRow {
   movementType: string;

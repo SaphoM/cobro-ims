@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { setProductPriceAction, type PricingFormState } from '@/app/dashboard/pricing-actions';
 import { HIDDEN_COST } from '@/lib/ui/cost-display';
+import { formatCurrency } from '@/lib/ui/currency';
 
 const initialState: PricingFormState = { error: null, success: null };
 
@@ -52,7 +53,7 @@ export function PriceCell({
   }
 
   const display =
-    unitPrice === null ? <span className="text-text-faint">Not priced</span> : <>R {unitPrice.toFixed(2)}</>;
+    unitPrice === null ? <span className="text-text-faint">Not priced</span> : <>{formatCurrency(unitPrice)}</>;
 
   if (!canEdit) return <span className="text-text-muted">{display}</span>;
 

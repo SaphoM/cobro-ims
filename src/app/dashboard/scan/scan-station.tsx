@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CameraScanner } from '@/components/scanner/camera-scanner';
+import { formatCurrency } from '@/lib/ui/currency';
 import {
   lookupBarcodeAction,
   postScanAction,
@@ -506,7 +507,7 @@ export function ScanStation({
                           {row.quantityReserved.toLocaleString()}
                         </td>
                         <td className="px-5 py-3 text-right tabular-nums text-text-muted">
-                          R {row.weightedAverageCost.toFixed(2)}
+                          {formatCurrency(row.weightedAverageCost)}
                         </td>
                       </tr>
                     );

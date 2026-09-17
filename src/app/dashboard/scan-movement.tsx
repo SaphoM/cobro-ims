@@ -7,6 +7,7 @@ import { lookupBarcodeAction } from '@/app/dashboard/scan/actions';
 import { recordMovementAction } from '@/app/dashboard/actions';
 import { HIDDEN_COST } from '@/lib/ui/cost-display';
 import { beep } from '@/lib/ui/beep';
+import { formatCurrency } from '@/lib/ui/currency';
 
 interface Identified {
   id: string;
@@ -640,7 +641,7 @@ export function ScanMovement({
                     ) : product.unitPrice === null ? (
                       <span className="text-text-faint">Not priced</span>
                     ) : (
-                      `R ${product.unitPrice.toFixed(2)}`
+                      `${formatCurrency(product.unitPrice)}`
                     )}
                   </dd>
                 </div>
@@ -693,7 +694,7 @@ export function ScanMovement({
                     Unit cost (R) <span className="font-normal text-text-faint">from the catalogue</span>
                   </span>
                   <div className="text-right text-[1.15rem] font-bold tabular-nums text-accent-strong">
-                    {product.unitPrice != null ? `R ${product.unitPrice.toFixed(2)}` : 'No price set'}
+                    {product.unitPrice != null ? `${formatCurrency(product.unitPrice)}` : 'No price set'}
                   </div>
                 </div>
               ) : product.costsVisible ? (
@@ -754,9 +755,9 @@ export function ScanMovement({
                 </span>
                 <span className="font-display text-[1.3rem] font-bold tabular-nums text-accent-strong">
                   {product.costsVisible
-                    ? `R ${(
+                    ? `${formatCurrency((
                         (Number(quantity) || 0) * (Number(unitCost) || 0)
-                      ).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      ))}`
                     : HIDDEN_COST}
                 </span>
               </div>

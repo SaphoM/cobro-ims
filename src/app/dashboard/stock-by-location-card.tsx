@@ -7,6 +7,7 @@ import { ReturnToStoresButton } from '@/app/dashboard/return-to-stores-button';
 import { ReserveButton } from '@/app/dashboard/reserve-button';
 import { selectClass } from '@/lib/ui/form-control-classes';
 import type { Customer, ProductCategory, StockLedgerView } from '@/lib/domain/inventory';
+import { formatCurrency } from '@/lib/ui/currency';
 
 /** The stock views this card can show. What each one CONTAINS is decided on
  *  the server and varies by role (see dashboard/page.tsx) - this component
@@ -332,10 +333,10 @@ export function StockByLocationCard({
                   {showCosts && (
                     <>
                       <td className="px-5 py-3 text-right tabular-nums text-text-muted">
-                        R {row.weightedAverageCost.toFixed(2)}
+                        {formatCurrency(row.weightedAverageCost)}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text">
-                        R {row.stockValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatCurrency(row.stockValue)}
                       </td>
                     </>
                   )}

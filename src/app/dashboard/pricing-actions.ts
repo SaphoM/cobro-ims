@@ -14,6 +14,7 @@ import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
 import { auditLogRepository, productRepository, settingsRepository } from '@/lib/data';
 import { checkPermission } from '@/lib/permissions';
+import { formatCurrency } from '@/lib/ui/currency';
 
 export interface PricingFormState {
   error: string | null;
@@ -68,7 +69,7 @@ export async function setProductPriceAction(
       success:
         unitPrice === null
           ? `Cleared the price on ${product.sku}.`
-          : `${product.sku} price set to R ${unitPrice.toFixed(2)}.`,
+          : `${product.sku} price set to ${formatCurrency(unitPrice)}.`,
     };
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Could not update the price.', success: null };
