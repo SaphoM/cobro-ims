@@ -91,7 +91,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="flex items-center gap-2">
           <ThemeToggle className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-accent/50 bg-surface-2 px-3 py-2.5 text-[0.86rem] font-bold text-accent-strong transition-colors hover:border-accent hover:bg-accent/10" />
           <NotificationBell
-            items={notifications}
+            items={notifications.items}
+            persisted={notifications.persisted}
             buttonClassName="flex h-11 w-11 flex-none items-center justify-center rounded-xl border-2 border-accent/50 bg-surface-2 text-accent-strong transition-colors hover:border-accent hover:bg-accent/10"
             menuAlign="left"
           />
@@ -164,7 +165,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
               the header. */}
           <div className="ml-auto flex items-center gap-2">
             <NotificationBell
-              items={notifications}
+              items={notifications.items}
+              persisted={notifications.persisted}
               buttonClassName="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-accent/50 bg-surface-2 text-accent-strong transition-colors hover:border-accent hover:bg-accent/10"
               menuAlign="right"
             />

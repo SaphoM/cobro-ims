@@ -13,6 +13,7 @@
 import { randomUUID } from 'crypto';
 import type {
   AdjustmentReasonCode,
+  AppNotification,
   AuditLogEntry,
   CreditNote,
   Customer,
@@ -33,7 +34,7 @@ import type {
   User,
   Warehouse,
 } from '@/lib/domain/inventory';
-import { VAT_RATE } from '@/lib/domain/inventory';
+import { VAT_RATE, REPAIR_CATEGORY_ID } from '@/lib/domain/inventory';
 import type {
   AddBomLineInput,
   AdjustmentReasonRepository,
@@ -46,8 +47,10 @@ import type {
   CreateSupplierInput,
   CreateUserInput,
   CustomerRepository,
+  CreateReturnReminderInput,
   InitiateTransferInput,
   InvoiceRepository,
+  NotificationRepository,
   ProductRepository,
   PurchaseOrderRepository,
   PurchaseOrderWithLine,
@@ -103,6 +106,7 @@ const state = {
   creditNotes: [] as CreditNote[],
   auditLog: [] as AuditLogEntry[],
   bomLines: [] as ProductBomLine[],
+  notifications: [] as AppNotification[],
 };
 
 let poCounter = 1000;
@@ -749,6 +753,7 @@ export const mockSalesOrderRepository: SalesOrderRepository = {
       productId: input.productId,
       quantityOrdered: input.quantity,
       unitPrice: input.unitPrice,
+      description: input.description,
       status: 'draft',
       createdBy: input.createdBy,
       createdAt: new Date().toISOString(),
@@ -848,6 +853,39 @@ export const mockSalesOrderRepository: SalesOrderRepository = {
   },
   async getStatus(orderId) {
     return state.salesOrders.find((o) => o.id === orderId)?.status ?? null;
+  },
+};
+
+export const mockNotificationRepository: NotificationRepository = {
+  async listForUser(userId) {
+    return state.notifications
+      .filter((n) => n.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  async markRead(id, userId) {
+    const notification = state.notifications.find((n) => n.id === id && n.userId === userId);
+    if (!notification) return null;
+    if (!notification.readAt) notification.readAt = new Date().toISOString();
+    return notification;
+  },
+  async createReturnReminderIfMissing(input: CreateReturnReminderInput) {
+    const exists = state.notifications.some(
+      (n) => n.type === 'return_reminder' && n.userId === input.userId && n.salesOrderId === input.salesOrderId
+    );
+    if (exists) return null;
+    const notification: AppNotification = {
+      id: randomUUID(),
+      userId: input.userId,
+      type: 'return_reminder',
+      salesOrderId: input.salesOrderId,
+      title: input.title,
+      message: input.message,
+      href: input.href,
+      createdAt: new Date().toISOString(),
+      readAt: null,
+    };
+    state.notifications.push(notification);
+    return notification;
   },
 };
 
@@ -1105,10 +1143,6 @@ export const mockUserRepository: UserRepository = {
     return user;
   },
 };
-
-// Seeded category ids — stable across mock restarts so existing products in
-// seed data can reference them without a lookup.
-export const REPAIR_CATEGORY_ID = '00000000-0000-0000-0000-000000000001';
 
 export const mockCategoryRepository: CategoryRepository = {
   async list() {

@@ -6,15 +6,16 @@ import { TransferForm } from '@/app/dashboard/transfers/transfer-form';
 import { completeTransferAction } from '@/app/dashboard/transfers/actions';
 import { ScanToReceiveButton } from '@/app/dashboard/transfers/scan-to-receive-button';
 import type { Warehouse } from '@/lib/domain/inventory';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
-// Same name-for-a-station/code-for-a-store convention every other picker in
+// Same name-for-a-station/store-for-a-store convention every other picker in
 // the app uses - a station's auto-generated code (e.g. STA-A1B2C3D4) means
 // nothing in a history table where a Stores-initiated Engineer-station
 // return (see TransferForm's "From" picker) is exactly what this needs to
 // show clearly.
 function warehouseLabel(w: Warehouse | undefined): string {
   if (!w) return '-';
-  return w.type === 'engineer_station' ? w.name : w.code;
+  return formatWarehouseLabel(w);
 }
 
 export default async function TransfersPage() {

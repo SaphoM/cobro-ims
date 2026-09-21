@@ -7,7 +7,9 @@ import { ReturnToStoresButton } from '@/app/dashboard/return-to-stores-button';
 import { ReserveButton } from '@/app/dashboard/reserve-button';
 import { selectClass } from '@/lib/ui/form-control-classes';
 import type { Customer, ProductCategory, StockLedgerView } from '@/lib/domain/inventory';
+import { REPAIR_CATEGORY_ID } from '@/lib/domain/inventory';
 import { formatCurrency } from '@/lib/ui/currency';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 /** The stock views this card can show. What each one CONTAINS is decided on
  *  the server and varies by role (see dashboard/page.tsx) - this component
@@ -266,7 +268,7 @@ export function StockByLocationCard({
                         </span>
                       </>
                     ) : (
-                      row.warehouse.code
+                      formatWarehouseLabel(row.warehouse)
                     )}
                   </td>
                   {(canRequest || canReturn) && (
@@ -292,6 +294,7 @@ export function StockByLocationCard({
                             productId={row.productId}
                             productSku={row.product.sku}
                             productName={row.product.name}
+                            isRepairItem={row.product.categoryId === REPAIR_CATEGORY_ID}
                             unitOfMeasure={row.product.unitOfMeasure}
                             availableQty={row.quantityOnHand}
                             elsewhere={(locationsByProduct[row.productId] ?? []).filter(
@@ -300,9 +303,7 @@ export function StockByLocationCard({
                             unitPrice={showCosts ? row.product.unitPrice : null}
                             canEditPrice={canEditPrice}
                             warehouseId={row.warehouseId}
-                            warehouseLabel={
-                              row.warehouse.type === 'engineer_station' ? row.warehouse.name : row.warehouse.code
-                            }
+                            warehouseLabel={formatWarehouseLabel(row.warehouse)}
                             customers={customers}
                           />
                         )

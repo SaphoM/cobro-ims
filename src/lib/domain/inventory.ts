@@ -327,11 +327,47 @@ export interface SalesOrder {
   productId: UUID;
   quantityOrdered: number;
   unitPrice: number;
+  /**
+   * Manually entered by the requester. Mandatory when productId is a Repair
+   * items catalogue entry (explains where/why/for which asset the repair
+   * item is needed); optional and unused for normal product requisitions.
+   */
+  description: string | null;
   status: SalesOrderStatus;
   createdBy: UUID;
   createdAt: ISODateTime;
   confirmedAt: ISODateTime | null;
   dispatchedAt: ISODateTime | null;
+}
+
+/** Fixed seed id for the "Repair items" product category — see supabase/migrations/20260916120000_repair_category_seed.sql */
+export const REPAIR_CATEGORY_ID = '00000000-0000-0000-0000-000000000001';
+
+// ---------------------------------------------------------------------------
+// Notifications — persisted, addressable, one row per event (see
+// supabase/migrations/20260918120000_notifications.sql). 'return_reminder'
+// is the only type today: "this requisition's item has been outstanding at
+// your station for STOCK_RETURN_REMINDER_HOURS+ and should be returned or
+// used" (see src/lib/reminders.ts). Deliberately a single narrow union
+// rather than a free-text type column, so a typo can't silently create an
+// unrecognised notification kind.
+// ---------------------------------------------------------------------------
+
+export type NotificationType = 'return_reminder';
+
+export interface AppNotification {
+  id: UUID;
+  userId: UUID;
+  type: NotificationType;
+  /** The requisition (SalesOrder) this notification is about, if any. */
+  salesOrderId: UUID | null;
+  title: string;
+  message: string;
+  href: string | null;
+  /** When this notification was generated - never changes after insert. */
+  createdAt: ISODateTime;
+  /** Set once, the first time the recipient views it. Null = unread. */
+  readAt: ISODateTime | null;
 }
 
 // ---------------------------------------------------------------------------

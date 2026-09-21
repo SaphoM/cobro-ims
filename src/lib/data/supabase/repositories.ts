@@ -20,6 +20,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getServiceSupabase } from '@/lib/supabase/service';
 import type {
   AdjustmentReasonCode,
+  AppNotification,
   AuditLogEntry,
   CreditNote,
   Customer,
@@ -50,6 +51,7 @@ import type {
   CreateCustomerInput,
   CreateProductInput,
   CreatePurchaseOrderInput,
+  CreateReturnReminderInput,
   CreateSalesOrderInput,
   CreateSupplierInput,
   CreateUserInput,
@@ -57,6 +59,7 @@ import type {
   CustomerRepository,
   InitiateTransferInput,
   InvoiceRepository,
+  NotificationRepository,
   ProductRepository,
   PurchaseOrderRepository,
   PurchaseOrderWithLine,
@@ -1119,6 +1122,7 @@ export const sbSalesOrderRepository: SalesOrderRepository = {
         product_id: input.productId,
         quantity_ordered: input.quantity,
         unit_price: input.unitPrice,
+        description: input.description,
         status: 'draft',
         created_by: input.createdBy,
       })
@@ -1231,6 +1235,74 @@ export const sbSalesOrderRepository: SalesOrderRepository = {
   async getStatus(orderId) {
     const { data } = await (await createServerSupabaseClient()).from('sales_orders').select('status').eq('id', orderId).maybeSingle();
     return (data?.status as SalesOrder['status']) ?? null;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+export const sbNotificationRepository: NotificationRepository = {
+  async listForUser(userId) {
+    // User-scoped client: RLS (notifications_select_own) is the real backstop
+    // here, not just the .eq() filter - see the migration.
+    const { data, error } = await (await createServerSupabaseClient())
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return toCamelArray<AppNotification>(data);
+  },
+  async markRead(id, userId) {
+    const sb = await createServerSupabaseClient();
+    const { data: existing } = await sb.from('notifications').select('read_at').eq('id', id).eq('user_id', userId).maybeSingle();
+    if (!existing) return null;
+    if (existing.read_at) return toCamel<AppNotification>(existing); // already read - idempotent, don't overwrite read_at
+    const { data, error } = await sb
+      .from('notifications')
+      .update({ read_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return toCamel<AppNotification>(data);
+  },
+  async createReturnReminderIfMissing(input: CreateReturnReminderInput) {
+    // Service-role client: the caller whose page load triggers the reminder
+    // sweep (src/lib/services/reminder-generation.ts) is very often not
+    // input.userId, so this can't run as the requesting user's own session -
+    // see the migration's comment on why there's no self-authored insert
+    // policy for this table.
+    const sb = getServiceSupabase();
+    const { data: existing } = await sb
+      .from('notifications')
+      .select('id')
+      .eq('type', 'return_reminder')
+      .eq('user_id', input.userId)
+      .eq('sales_order_id', input.salesOrderId)
+      .maybeSingle();
+    if (existing) return null;
+    const { data, error } = await sb
+      .from('notifications')
+      .insert({
+        user_id: input.userId,
+        type: 'return_reminder',
+        sales_order_id: input.salesOrderId,
+        title: input.title,
+        message: input.message,
+        href: input.href,
+      })
+      .select()
+      .single();
+    if (error) {
+      // Unique-violation race (two concurrent sweeps) - another insert won,
+      // which is exactly the outcome we want, so treat it as "already exists".
+      if (error.code === '23505') return null;
+      throw new Error(error.message);
+    }
+    return toCamel<AppNotification>(data);
   },
 };
 

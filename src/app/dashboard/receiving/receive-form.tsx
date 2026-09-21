@@ -8,6 +8,7 @@ import { HIDDEN_COST } from '@/lib/ui/cost-display';
 import { parseScanPayload } from '@/lib/scan-payload';
 import type { Product, ProductCategory, Supplier, Warehouse } from '@/lib/domain/inventory';
 import { formatCurrency } from '@/lib/ui/currency';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 const initialState: ReceiveFormState = { error: null, success: null };
 
@@ -331,7 +332,7 @@ export function ReceiveForm({
           )}
           {scanMessage.ok && onlyStore && (
             <p className="text-[0.78rem] text-text-muted">
-              To <span className="font-bold text-accent-strong">{onlyStore.code}</span>
+              To <span className="font-bold text-accent-strong">{formatWarehouseLabel(onlyStore)}</span>
             </p>
           )}
         </div>
@@ -379,7 +380,7 @@ export function ReceiveForm({
             {onlyStore ? (
               <>
                 <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
-                  {onlyStore.code}
+                  {formatWarehouseLabel(onlyStore)}
                 </div>
                 <input type="hidden" name="warehouseId" value={onlyStore.id} />
               </>
@@ -387,7 +388,7 @@ export function ReceiveForm({
               <select name="warehouseId" required className={selectClass}>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
-                    {w.code}
+                    {formatWarehouseLabel(w)}
                   </option>
                 ))}
               </select>

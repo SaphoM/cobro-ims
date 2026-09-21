@@ -31,6 +31,9 @@ export interface CheckoutMatch {
   quantity: number;
   unitOfMeasure: string;
   fromLabel: string;
+  /** The requester's own reason for a Repair item requisition (see
+   *  SalesOrder.description) - null for normal product pickups. */
+  description: string | null;
 }
 
 function noMatch(message: string): CheckoutMatch {
@@ -44,6 +47,7 @@ function noMatch(message: string): CheckoutMatch {
     quantity: 0,
     unitOfMeasure: '',
     fromLabel: '',
+    description: null,
   };
 }
 
@@ -91,5 +95,6 @@ export async function findMyCheckoutAction(scannedValue: string): Promise<Checko
     quantity: match.quantityOrdered,
     unitOfMeasure: product.unitOfMeasure,
     fromLabel,
+    description: match.description,
   };
 }

@@ -31,6 +31,7 @@ import {
 import { checkPermission, type Permission } from '@/lib/permissions';
 import { canSeeCosts } from '@/lib/costs';
 import type { Product } from '@/lib/domain/inventory';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 export type ScanDirection = 'in' | 'out' | 'use';
 
@@ -127,14 +128,17 @@ function failure(message: string, barcode = '', extra: Partial<Pick<ScanResult, 
  */
 async function stockElsewhere(productId: string, excludeWarehouseId: string): Promise<string> {
   const [warehouses, ledger] = await Promise.all([warehouseRepository.list(), stockLedgerRepository.listAll()]);
-  const warehouseByCode = new Map(warehouses.map((w) => [w.id, w.code]));
+  const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
   const elsewhere = ledger
     .filter((e) => e.productId === productId && e.warehouseId !== excludeWarehouseId && e.quantityOnHand > 0)
-    .map((e) => ({ code: warehouseByCode.get(e.warehouseId) ?? e.warehouseId, quantityOnHand: e.quantityOnHand }))
+    .map((e) => {
+      const w = warehouseById.get(e.warehouseId);
+      return { label: w ? formatWarehouseLabel(w) : e.warehouseId, quantityOnHand: e.quantityOnHand };
+    })
     .sort((a, b) => b.quantityOnHand - a.quantityOnHand);
 
   if (elsewhere.length === 0) return 'No warehouse currently holds any stock of it.';
-  return `It does have stock at ${elsewhere.map((w) => `${w.code} (${w.quantityOnHand.toLocaleString()})`).join(', ')}.`;
+  return `It does have stock at ${elsewhere.map((w) => `${w.label} (${w.quantityOnHand.toLocaleString()})`).join(', ')}.`;
 }
 
 async function buildProductView(product: Product): Promise<ScanProductView> {
@@ -147,13 +151,16 @@ async function buildProductView(product: Product): Promise<ScanProductView> {
 
   const rows: ScanStockRow[] = ledger
     .filter((entry) => entry.productId === product.id)
-    .map((entry) => ({
-      warehouseId: entry.warehouseId,
-      warehouseCode: warehouseById.get(entry.warehouseId)?.code ?? entry.warehouseId,
-      quantityOnHand: entry.quantityOnHand,
-      quantityReserved: entry.quantityReserved,
-      weightedAverageCost: entry.weightedAverageCost,
-    }))
+    .map((entry) => {
+      const w = warehouseById.get(entry.warehouseId);
+      return {
+        warehouseId: entry.warehouseId,
+        warehouseCode: w ? formatWarehouseLabel(w) : entry.warehouseId,
+        quantityOnHand: entry.quantityOnHand,
+        quantityReserved: entry.quantityReserved,
+        weightedAverageCost: entry.weightedAverageCost,
+      };
+    })
     .sort((a, b) => a.warehouseCode.localeCompare(b.warehouseCode));
 
   // Costs are withheld at the source rather than hidden in the UI: if the
@@ -272,7 +279,7 @@ export async function postScanAction(input: PostScanInput): Promise<ScanResult> 
       unitCost = existing.weightedAverageCost;
     } else {
       return failure(
-        `${product.sku} has no stock at ${warehouse.code} yet, so there's no weighted-average cost to fall back on - enter a unit cost before scanning it in.`,
+        `${product.sku} has no stock at ${formatWarehouseLabel(warehouse)} yet, so there's no weighted-average cost to fall back on - enter a unit cost before scanning it in.`,
         barcode,
         { needsUnitCost: true }
       );
@@ -299,13 +306,13 @@ export async function postScanAction(input: PostScanInput): Promise<ScanResult> 
         return failure(
           input.direction === 'use'
             ? `Nothing of ${product.sku} is sitting at your station right now - there's nothing to record as used.`
-            : `${product.sku} has no stock at ${warehouse.code} - there's nothing here to scan out. Double-check ` +
-                `${warehouse.code} is the right warehouse before scanning again.${elsewhere}`,
+            : `${product.sku} has no stock at ${formatWarehouseLabel(warehouse)} - there's nothing here to scan out. Double-check ` +
+                `${formatWarehouseLabel(warehouse)} is the right warehouse before scanning again.${elsewhere}`,
           barcode
         );
       }
       return failure(
-        `Only ${onHand.toLocaleString()} ${product.unitOfMeasure} of ${product.sku} on hand at ${warehouse.code} - ` +
+        `Only ${onHand.toLocaleString()} ${product.unitOfMeasure} of ${product.sku} on hand at ${formatWarehouseLabel(warehouse)} - ` +
           `${verb === 'use' ? 'using' : 'scanning out'} ${quantity.toLocaleString()} would take it negative. Lower Qty ` +
           `per scan to ${onHand.toLocaleString()} or less, or split it across multiple scans.${elsewhere}`,
         barcode
@@ -343,7 +350,7 @@ export async function postScanAction(input: PostScanInput): Promise<ScanResult> 
     const directionLabel = input.direction === 'in' ? 'IN' : input.direction === 'use' ? 'USED' : 'OUT';
     return {
       ok: true,
-      message: `${directionLabel} ${quantity.toLocaleString()} ${product.unitOfMeasure} · ${product.sku} @ ${warehouse.code}`,
+      message: `${directionLabel} ${quantity.toLocaleString()} ${product.unitOfMeasure} · ${product.sku} @ ${formatWarehouseLabel(warehouse)}`,
       barcode,
       product: await buildProductView(product),
       notFound: false,
@@ -353,7 +360,7 @@ export async function postScanAction(input: PostScanInput): Promise<ScanResult> 
         direction: input.direction,
         quantity,
         warehouseId: warehouse.id,
-        warehouseCode: warehouse.code,
+        warehouseCode: formatWarehouseLabel(warehouse),
         unitCost,
         onHandAfter: ledger.quantityOnHand,
         wacAfter: ledger.weightedAverageCost,

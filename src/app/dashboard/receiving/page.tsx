@@ -11,6 +11,7 @@ import { hasPermission } from '@/lib/permissions';
 import { canSeeCosts } from '@/lib/costs';
 import { AccessDenied } from '@/components/access-denied';
 import { ReceiveForm } from '@/app/dashboard/receiving/receive-form';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 export default async function ReceivingPage({
   searchParams,
@@ -91,16 +92,19 @@ export default async function ReceivingPage({
                 </tr>
               </thead>
               <tbody>
-                {receipts.map((r) => (
+                {receipts.map((r) => {
+                  const warehouse = warehouseById.get(r.warehouseId);
+                  return (
                   <tr key={r.id} className="border-t border-accent/[0.08]">
                     <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{r.grnNumber}</td>
-                    <td className="px-5 py-3 text-text-muted">{warehouseById.get(r.warehouseId)?.code ?? '-'}</td>
+                    <td className="px-5 py-3 text-text-muted">{warehouse ? formatWarehouseLabel(warehouse) : '-'}</td>
                     <td className="px-5 py-3 text-text-muted capitalize">{r.status}</td>
                     <td className="px-5 py-3 text-text-muted">
                       {r.receivedAt ? new Date(r.receivedAt).toLocaleString('en-ZA') : '-'}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -137,6 +137,9 @@ export interface SalesSummaryRow {
   quantity: number;
   value: number;
   status: string;
+  /** The requester's manually entered reason - set for Repair item
+   *  requisitions, usually null otherwise. See SalesOrder.description. */
+  description: string | null;
 }
 
 export function buildSalesSummary(orders: SalesOrder[], products: Product[], customers: Customer[]): SalesSummaryRow[] {
@@ -151,6 +154,7 @@ export function buildSalesSummary(orders: SalesOrder[], products: Product[], cus
       quantity: o.quantityOrdered,
       value: Math.round(o.quantityOrdered * o.unitPrice * 100) / 100,
       status: o.status,
+      description: o.description,
     }))
     .sort((a, b) => b.orderNumber.localeCompare(a.orderNumber));
 }

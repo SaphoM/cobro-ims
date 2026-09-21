@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { createPurchaseOrderAction, type PurchaseOrderFormState } from '@/app/dashboard/purchase-orders/actions';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import type { Product, Supplier, Warehouse } from '@/lib/domain/inventory';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 const initialState: PurchaseOrderFormState = { error: null, success: null };
 
@@ -43,7 +44,7 @@ export function PurchaseOrderForm({
           <select name="warehouseId" required className={selectClass}>
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.code}
+                {formatWarehouseLabel(w)}
               </option>
             ))}
           </select>

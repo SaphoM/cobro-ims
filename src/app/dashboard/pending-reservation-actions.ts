@@ -21,6 +21,7 @@ import {
   warehouseRepository,
 } from '@/lib/data';
 import { requirePermission } from '@/lib/permissions';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 export interface PendingRequisition {
   orderId: string;
@@ -106,7 +107,7 @@ export async function getPendingReservationsAction(
     productName: product.name,
     productBarcode: product.barcode,
     unitOfMeasure: product.unitOfMeasure,
-    warehouseLabel: warehouse.type === 'engineer_station' ? warehouse.name : warehouse.code,
+    warehouseLabel: formatWarehouseLabel(warehouse),
     requisitions,
   };
 }

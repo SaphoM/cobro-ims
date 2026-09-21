@@ -36,6 +36,7 @@ export function QuickRequisitionButton({
   productId,
   productSku,
   productName,
+  isRepairItem,
   unitOfMeasure,
   availableQty,
   elsewhere,
@@ -48,6 +49,10 @@ export function QuickRequisitionButton({
   productId: string;
   productSku: string;
   productName: string;
+  /** True when this row's product is in the "Repair items" catalogue
+   *  category - drives the mandatory Description / Reason field below,
+   *  same rule as the full requisition form on /dashboard/sales. */
+  isRepairItem: boolean;
   unitOfMeasure: string;
   /** This row's current on-hand quantity at the source location - shown
    *  next to Quantity so the requester sees the ceiling before typing a
@@ -78,6 +83,7 @@ export function QuickRequisitionButton({
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(createSalesOrderAction, initialState);
+  const [description, setDescription] = useState('');
   const closeRef = useRef<HTMLButtonElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -101,6 +107,7 @@ export function QuickRequisitionButton({
     if (state.success && state.success !== lastHandledSuccess.current) {
       lastHandledSuccess.current = state.success;
       formRef.current?.reset();
+      setDescription('');
       setOpen(false);
     }
   }, [state.success]);
@@ -181,6 +188,21 @@ export function QuickRequisitionButton({
                   </p>
                 )}
               </div>
+
+              {isRepairItem && (
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[0.75rem] font-semibold text-text-muted">Description / Reason *</span>
+                  <input
+                    type="text"
+                    name="description"
+                    required
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="e.g. Machine No. 2"
+                    className={inputClass}
+                  />
+                </label>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1.5">

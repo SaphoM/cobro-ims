@@ -5,6 +5,7 @@ import { initiateTransferAction, type TransferFormState } from '@/app/dashboard/
 import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import type { Product, ProductCategory, Warehouse } from '@/lib/domain/inventory';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 const initialState: TransferFormState = { error: null, success: null };
 
@@ -104,7 +105,7 @@ export function TransferForm({
           <select name="fromWarehouseId" required className={selectClass}>
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.type === 'engineer_station' ? w.name : w.code}
+                {formatWarehouseLabel(w)}
               </option>
             ))}
           </select>
@@ -115,7 +116,7 @@ export function TransferForm({
           <select name="toWarehouseId" required defaultValue={warehouses[1]?.id} className={selectClass}>
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.type === 'engineer_station' ? w.name : w.code}
+                {formatWarehouseLabel(w)}
               </option>
             ))}
           </select>

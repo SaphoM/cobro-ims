@@ -10,6 +10,7 @@ import { hasPermission } from '@/lib/permissions';
 import { AccessDenied } from '@/components/access-denied';
 import { AdjustmentForm } from '@/app/dashboard/adjustments/adjustment-form';
 import { decideAdjustmentAction } from '@/app/dashboard/adjustments/actions';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 export default async function AdjustmentsPage({
   searchParams,
@@ -82,10 +83,12 @@ export default async function AdjustmentsPage({
                 </tr>
               </thead>
               <tbody>
-                {adjustments.map((a) => (
+                {adjustments.map((a) => {
+                  const warehouse = warehouseById.get(a.warehouseId);
+                  return (
                   <tr key={a.id} className="border-t border-accent/[0.08]">
                     <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{a.adjustmentNumber}</td>
-                    <td className="px-5 py-3 text-text-muted">{warehouseById.get(a.warehouseId)?.code}</td>
+                    <td className="px-5 py-3 text-text-muted">{warehouse ? formatWarehouseLabel(warehouse) : ''}</td>
                     <td className="px-5 py-3 text-text-muted">{reasonById.get(a.reasonCodeId)?.code}</td>
                     <td className="px-5 py-3">
                       <StatusPill status={a.status} />
@@ -107,7 +110,8 @@ export default async function AdjustmentsPage({
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

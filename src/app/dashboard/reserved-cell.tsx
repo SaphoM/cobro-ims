@@ -90,7 +90,7 @@ export function ReservedCell({
                 <p className="text-[0.83rem] text-text-muted">
                   {loading || !detail?.ok
                     ? 'Who this stock is promised to.'
-                    : `${detail.productSku} at ${detail.warehouseCode}`}
+                    : `${detail.productSku} at ${detail.warehouseLabel}`}
                 </p>
               </div>
               <button
@@ -124,7 +124,7 @@ export function ReservedCell({
                       <span className="text-text-muted">
                         Location:{' '}
                         <span className="text-text">
-                          {detail.warehouseCode} - {detail.warehouseName}
+                          {detail.warehouseLabel}
                         </span>
                       </span>
                       <span className="text-text-muted">

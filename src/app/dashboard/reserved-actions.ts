@@ -24,6 +24,7 @@ import {
   userRepository,
   warehouseRepository,
 } from '@/lib/data';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 export interface ReservationHolder {
   orderNumber: string;
@@ -43,6 +44,7 @@ export interface ReservationDetail {
   unitOfMeasure: string;
   warehouseCode: string;
   warehouseName: string;
+  warehouseLabel: string;
   /** The ledger's own reserved figure - the number the user clicked on. */
   totalReserved: number;
   holders: ReservationHolder[];
@@ -61,6 +63,7 @@ function empty(message: string): ReservationDetail {
     unitOfMeasure: '',
     warehouseCode: '',
     warehouseName: '',
+    warehouseLabel: '',
     totalReserved: 0,
     holders: [],
     attributed: 0,
@@ -121,6 +124,7 @@ export async function getReservationDetailAction(
     unitOfMeasure: product.unitOfMeasure,
     warehouseCode: warehouse.code,
     warehouseName: warehouse.name,
+    warehouseLabel: formatWarehouseLabel(warehouse),
     totalReserved,
     holders,
     attributed,

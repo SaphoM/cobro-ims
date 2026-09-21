@@ -12,6 +12,7 @@ import {
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import { beep } from '@/lib/ui/beep';
 import type { Warehouse } from '@/lib/domain/inventory';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 type Mode = 'lookup' | ScanDirection;
 
@@ -298,7 +299,7 @@ export function ScanStation({
             >
               {warehouses.map((w) => (
                 <option key={w.id} value={w.id}>
-                  {w.type === 'engineer_station' ? w.name : `${w.code} - ${w.name}`}
+                  {formatWarehouseLabel(w)}
                 </option>
               ))}
             </select>

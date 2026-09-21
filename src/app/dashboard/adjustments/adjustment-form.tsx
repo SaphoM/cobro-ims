@@ -5,6 +5,7 @@ import { requestAdjustmentAction, type AdjustmentFormState } from '@/app/dashboa
 import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import type { AdjustmentReasonCode, Product, ProductCategory, Warehouse } from '@/lib/domain/inventory';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 const initialState: AdjustmentFormState = { error: null, success: null };
 
@@ -110,7 +111,7 @@ export function AdjustmentForm({
           <select name="warehouseId" required className={selectClass}>
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.code}
+                {formatWarehouseLabel(w)}
               </option>
             ))}
           </select>

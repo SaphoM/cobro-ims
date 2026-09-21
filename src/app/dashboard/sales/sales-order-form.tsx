@@ -5,7 +5,9 @@ import { createSalesOrderAction, type SalesOrderFormState } from '@/app/dashboar
 import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import type { Customer, Product, ProductCategory, StockLedgerEntry, Warehouse } from '@/lib/domain/inventory';
+import { REPAIR_CATEGORY_ID } from '@/lib/domain/inventory';
 import { formatCurrency } from '@/lib/ui/currency';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 const initialState: SalesOrderFormState = { error: null, success: null };
 
@@ -48,6 +50,7 @@ export function SalesOrderForm({
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? '');
   const [productId, setProductId] = useState(products[0]?.id ?? '');
   const [quantity, setQuantity] = useState('');
+  const [description, setDescription] = useState('');
 
   // Keyed by "productId::warehouseId" so the counter below re-derives
   // instantly as either Product or Store changes, instead of needing its
@@ -64,6 +67,18 @@ export function SalesOrderForm({
   const selectedCategory = selectedProduct?.categoryId ? categoryById.get(selectedProduct.categoryId) : undefined;
   const selectedWarehouse = warehouses.find((w) => w.id === warehouseId);
   const availableQty = onHandByKey.get(`${productId}::${warehouseId}`) ?? 0;
+  const isRepairItem = selectedProduct?.categoryId === REPAIR_CATEGORY_ID;
+
+  // Switching away from a Repair item must not leave its description
+  // attached to whatever gets selected next - it's specific to the repair
+  // item that was selected when it was typed.
+  const wasRepairItem = useRef(isRepairItem);
+  useEffect(() => {
+    if (wasRepairItem.current && !isRepairItem) {
+      setDescription('');
+    }
+    wasRepairItem.current = isRepairItem;
+  }, [isRepairItem]);
 
   /*
     React 19 resets a <form action={fn}>'s fields via the browser's native
@@ -107,6 +122,7 @@ export function SalesOrderForm({
     if (state.success && state.success !== lastHandledSuccess.current) {
       lastHandledSuccess.current = state.success;
       setQuantity('');
+      setDescription('');
     }
   }, [state.success]);
 
@@ -206,7 +222,7 @@ export function SalesOrderForm({
           >
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.type === 'engineer_station' ? w.name : w.code}
+                {formatWarehouseLabel(w)}
               </option>
             ))}
           </select>
@@ -236,7 +252,7 @@ export function SalesOrderForm({
             className={`lg:col-span-6 text-[0.82rem] font-bold ${availableQty === 0 ? 'text-danger' : 'text-accent-strong'}`}
           >
             {availableQty.toLocaleString()} {selectedProduct?.unitOfMeasure ?? ''} available at{' '}
-            {selectedWarehouse ? (selectedWarehouse.type === 'engineer_station' ? selectedWarehouse.name : selectedWarehouse.code) : '—'}
+            {selectedWarehouse ? formatWarehouseLabel(selectedWarehouse) : '—'}
             {availableQty === 0 && ' - none on hand here'}
             {selectedCategory && (
               <span className="ml-2 rounded-full bg-accent/10 px-2 py-0.5 text-[0.68rem] font-semibold text-accent-strong">
@@ -244,6 +260,21 @@ export function SalesOrderForm({
               </span>
             )}
           </p>
+        )}
+
+        {isRepairItem && (
+          <label className="flex flex-col gap-1.5 lg:col-span-6">
+            <span className="text-[0.75rem] font-semibold text-text-muted">Description / Reason *</span>
+            <input
+              type="text"
+              name="description"
+              required
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Machine No. 2"
+              className={inputClass}
+            />
+          </label>
         )}
 
         <label className="flex flex-col gap-1.5">

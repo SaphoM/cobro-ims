@@ -11,6 +11,7 @@ import { PurchaseOrderForm } from '@/app/dashboard/purchase-orders/po-form';
 import { ReceiveLine } from '@/app/dashboard/purchase-orders/receive-line';
 import { issuePurchaseOrderAction } from '@/app/dashboard/purchase-orders/actions';
 import type { PoStatus } from '@/lib/domain/inventory';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 export default async function PurchaseOrdersPage() {
   const session = await getSession();
@@ -82,6 +83,7 @@ export default async function PurchaseOrdersPage() {
               <tbody>
                 {orders.map((po) => {
                   const product = productById.get(po.line.productId);
+                  const warehouse = warehouseById.get(po.warehouseId);
                   const remaining = po.line.quantityOrdered - po.line.quantityReceived;
                   return (
                     <tr key={po.id} className="border-t border-accent/[0.08]">
@@ -90,7 +92,7 @@ export default async function PurchaseOrdersPage() {
                       <td className="px-5 py-3 text-text-muted">
                         {product?.sku} <span className="text-text-faint">- {product?.name}</span>
                       </td>
-                      <td className="px-5 py-3 text-text-muted">{warehouseById.get(po.warehouseId)?.code}</td>
+                      <td className="px-5 py-3 text-text-muted">{warehouse ? formatWarehouseLabel(warehouse) : ''}</td>
                       <td className="px-5 py-3 text-right tabular-nums text-text">
                         {po.line.quantityOrdered.toLocaleString()} {product?.unitOfMeasure}
                       </td>

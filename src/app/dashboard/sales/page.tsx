@@ -14,6 +14,7 @@ import { SalesOrderForm } from '@/app/dashboard/sales/sales-order-form';
 import { RequisitionActionsCell } from '@/app/dashboard/sales/requisition-actions-cell';
 import type { SalesOrderStatus } from '@/lib/domain/inventory';
 import { formatCurrency } from '@/lib/ui/currency';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 export default async function SalesPage({
   searchParams,
@@ -168,9 +169,14 @@ export default async function SalesPage({
                             {categoryById.get(product.categoryId)!.name}
                           </span>
                         )}
+                        {o.description && (
+                          <div className="mt-0.5 text-[0.76rem] text-text-faint">
+                            Reason: {o.description}
+                          </div>
+                        )}
                       </td>
                       <td className="px-5 py-3 text-text-muted">
-                        {sourceWarehouse?.type === 'engineer_station' ? sourceWarehouse.name : sourceWarehouse?.code}
+                        {sourceWarehouse ? formatWarehouseLabel(sourceWarehouse) : ''}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text">
                         {o.quantityOrdered.toLocaleString()} {product?.unitOfMeasure}

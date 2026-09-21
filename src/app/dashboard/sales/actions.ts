@@ -12,6 +12,8 @@ import {
 } from '@/lib/data';
 import { hasPermission, requirePermission } from '@/lib/permissions';
 import type { User } from '@/lib/domain/inventory';
+import { REPAIR_CATEGORY_ID } from '@/lib/domain/inventory';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 export interface SalesOrderFormState {
   error: string | null;
@@ -21,14 +23,17 @@ export interface SalesOrderFormState {
 /** Where else this product actually has stock, for the no-ledger-entry message above. */
 async function stockElsewhere(productId: string, excludeWarehouseId: string): Promise<string> {
   const [warehouses, ledger] = await Promise.all([warehouseRepository.list(), stockLedgerRepository.listAll()]);
-  const warehouseByCode = new Map(warehouses.map((w) => [w.id, w.code]));
+  const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
   const elsewhere = ledger
     .filter((e) => e.productId === productId && e.warehouseId !== excludeWarehouseId && e.quantityOnHand > 0)
-    .map((e) => ({ code: warehouseByCode.get(e.warehouseId) ?? e.warehouseId, quantityOnHand: e.quantityOnHand }))
+    .map((e) => {
+      const w = warehouseById.get(e.warehouseId);
+      return { label: w ? formatWarehouseLabel(w) : e.warehouseId, quantityOnHand: e.quantityOnHand };
+    })
     .sort((a, b) => b.quantityOnHand - a.quantityOnHand);
 
   if (elsewhere.length === 0) return 'No store currently holds any stock of it.';
-  return `It does have stock at ${elsewhere.map((w) => `${w.code} (${w.quantityOnHand.toLocaleString()})`).join(', ')}.`;
+  return `It does have stock at ${elsewhere.map((w) => `${w.label} (${w.quantityOnHand.toLocaleString()})`).join(', ')}.`;
 }
 
 export async function createSalesOrderAction(
@@ -56,6 +61,8 @@ export async function createSalesOrderAction(
   const warehouseId = String(formData.get('warehouseId') ?? '');
   const productId = String(formData.get('productId') ?? '');
   const quantity = Number(formData.get('quantity'));
+  const descriptionRaw = formData.get('description');
+  const description = typeof descriptionRaw === 'string' ? descriptionRaw.trim() : '';
 
   if (!customerId || !warehouseId || !productId) {
     return { error: 'Requesting department, warehouse and product are required.', success: null };
@@ -82,6 +89,20 @@ export async function createSalesOrderAction(
   if (!product) return { error: 'That product could not be found.', success: null };
   if (!warehouse) return { error: 'That store could not be found.', success: null };
   /*
+    Repair items aren't a separate entity - they're catalogue products tagged
+    with the "Repair items" category (see REPAIR_CATEGORY_ID). Because the
+    catalogue name alone doesn't say where/why the repair is needed, a manual
+    description is required for this category only; normal product
+    requisitions are unaffected. Trimmed server-side so whitespace-only input
+    can't slip past a client-side check.
+  */
+  if (product.categoryId === REPAIR_CATEGORY_ID && description.length === 0) {
+    return {
+      error: 'Description / Reason is required for Repair Item requisitions - explain where or why the repair item is needed (e.g. "Machine No. 2").',
+      success: null,
+    };
+  }
+  /*
     Unit value is never taken from the client - the requester's own submitted
     unitPrice (whatever the form sent, tampered with or not) is ignored
     outright. The Product Catalogue is the sole source of truth for what a
@@ -102,7 +123,7 @@ export async function createSalesOrderAction(
   if (!existing) {
     const elsewhere = await stockElsewhere(productId, warehouseId);
     return {
-      error: `${product.sku} has no stock record at ${warehouse.code} - it can never be reserved there. ${elsewhere}`,
+      error: `${product.sku} has no stock record at ${formatWarehouseLabel(warehouse)} - it can never be reserved there. ${elsewhere}`,
       success: null,
     };
   }
@@ -115,6 +136,7 @@ export async function createSalesOrderAction(
       quantity,
       unitPrice,
       createdBy: session.id,
+      description: description.length > 0 ? description : null,
     });
     revalidatePath('/dashboard/sales');
     return { error: null, success: `${order.orderNumber} created as a draft. Approve it to reserve stock.` };

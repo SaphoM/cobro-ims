@@ -17,6 +17,7 @@ import {
   mockPurchaseOrderRepository,
   mockReceivingRepository,
   mockRoleRepository,
+  mockNotificationRepository,
   mockSalesOrderRepository,
   mockScanHandoffRepository,
   mockStockAdjustmentRepository,
@@ -39,6 +40,7 @@ import {
   sbPurchaseOrderRepository,
   sbReceivingRepository,
   sbRoleRepository,
+  sbNotificationRepository,
   sbSalesOrderRepository,
   sbScanHandoffRepository,
   sbStockAdjustmentRepository,
@@ -82,5 +84,6 @@ export const settingsRepository = useSb ? sbSettingsRepository : mockSettingsRep
 export const scanHandoffRepository = useSb ? sbScanHandoffRepository : mockScanHandoffRepository;
 
 export const categoryRepository = useSb ? sbCategoryRepository : mockCategoryRepository;
+export const notificationRepository = useSb ? sbNotificationRepository : mockNotificationRepository;
 
 export const isUsingMockData = DATA_SOURCE === 'mock';

@@ -1,13 +1,25 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { NotificationItem } from '@/lib/notifications';
+import type { AppNotification } from '@/lib/domain/inventory';
+import { markNotificationReadAction } from '@/app/dashboard/notification-actions';
 
 /**
- * The bell, its unread-style count badge, and the dropdown listing `items`
- * (see src/lib/notifications.ts for what's actually in it and why).
+ * The bell, its unread-style count badge, and the dropdown listing two
+ * different kinds of thing (see src/lib/notifications.ts's header comment
+ * for why they're not unified):
+ *
+ *  - `items`: live gauges - a plain link, no read state, unchanged from
+ *    before this file split its content in two.
+ *  - `persisted`: real per-user notification history - each with its own
+ *    created_at/read_at. Clicking one marks it read (via
+ *    markNotificationReadAction) and navigates; it stays in the list
+ *    afterwards, just visually demoted from "unread" to "read" - reading a
+ *    notification never removes it.
  *
  * Portalled to `document.body` and positioned with `fixed` coordinates read
  * off the button's own `getBoundingClientRect()`, rather than a plain
@@ -26,16 +38,18 @@ import type { NotificationItem } from '@/lib/notifications';
  * close-on-outside-click treatment those modals use.
  *
  * Rendered twice from dashboard/layout.tsx (desktop sidebar, mobile sticky
- * header) with the same `items` prop, same pattern ThemeToggle already
- * uses - only one is visible at a given width, so there's no double count or
- * double state to keep in sync.
+ * header) with the same props, same pattern ThemeToggle already uses - only
+ * one is visible at a given width, so there's no double count or double
+ * state to keep in sync.
  */
 export function NotificationBell({
   items,
+  persisted,
   buttonClassName,
   menuAlign,
 }: {
   items: NotificationItem[];
+  persisted: AppNotification[];
   buttonClassName: string;
   /** Which edge of the button the dropdown's own edge lines up with, so it
    *  opens into free space instead of off-screen. The desktop sidebar's bell
@@ -50,6 +64,20 @@ export function NotificationBell({
   const [menuPos, setMenuPos] = useState<{ top: number; left: number | null; right: number | null } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  // Optimistic read state: `persisted` only reflects the server as of the
+  // last render, and router.refresh() (below) takes a moment to land - this
+  // fills that gap so the badge/dot update the instant a notification is
+  // clicked rather than waiting on a round trip. Purely additive (ids only
+  // ever get added, never removed) and merged with `n.readAt` wherever read
+  // status is computed, so a stale/slow refresh can't un-read something the
+  // user already opened; a fresh `persisted` with the real read_at is a
+  // no-op once it arrives, since the id is already in this set.
+  const [optimisticReadIds, setOptimisticReadIds] = useState<ReadonlySet<string>>(new Set());
+  function isRead(n: AppNotification): boolean {
+    return n.readAt != null || optimisticReadIds.has(n.id);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -81,7 +109,24 @@ export function NotificationBell({
     setOpen((v) => !v);
   }
 
-  const count = items.length;
+  const unreadPersisted = persisted.filter((n) => !isRead(n));
+  // The badge is an UNREAD count, not a history length - reading a
+  // persisted notification must shrink this without shrinking `persisted`
+  // itself (see the module doc comment).
+  const count = items.length + unreadPersisted.length;
+
+  function openNotification(n: AppNotification) {
+    setOpen(false);
+    if (!isRead(n)) {
+      // Instant UI update: dot/badge reflect "read" this same tick, before
+      // the server action below even resolves.
+      setOptimisticReadIds((prev) => new Set(prev).add(n.id));
+      startTransition(() => {
+        markNotificationReadAction(n.id).then(() => router.refresh());
+      });
+    }
+    if (n.href) router.push(n.href);
+  }
 
   return (
     <>
@@ -90,7 +135,7 @@ export function NotificationBell({
           ref={buttonRef}
           type="button"
           onClick={toggleOpen}
-          aria-label={count > 0 ? `Notifications - ${count} need attention` : 'Notifications'}
+          aria-label={count > 0 ? `Notifications - ${count} unread` : 'Notifications'}
           aria-expanded={open}
           aria-haspopup="true"
           className={buttonClassName}
@@ -116,15 +161,15 @@ export function NotificationBell({
             role="menu"
             aria-label="Notifications"
             style={{ top: menuPos.top, left: menuPos.left ?? undefined, right: menuPos.right ?? undefined }}
-            className="fixed z-50 w-72 overflow-hidden rounded-xl border border-accent/[0.14] bg-surface shadow-lg"
+            className="fixed z-50 w-80 overflow-hidden rounded-xl border border-accent/[0.14] bg-surface shadow-lg"
           >
             <div className="border-b border-accent/[0.14] px-4 py-3">
               <h3 className="font-display text-[0.9rem] font-medium text-text">Notifications</h3>
             </div>
-            {count === 0 ? (
+            {items.length === 0 && persisted.length === 0 ? (
               <p className="px-4 py-6 text-center text-[0.82rem] text-text-faint">You&apos;re all caught up.</p>
             ) : (
-              <ul className="flex max-h-80 flex-col divide-y divide-accent/[0.08] overflow-y-auto">
+              <ul className="flex max-h-96 flex-col divide-y divide-accent/[0.08] overflow-y-auto">
                 {items.map((item) => (
                   <li key={item.id}>
                     <Link
@@ -142,6 +187,30 @@ export function NotificationBell({
                     </Link>
                   </li>
                 ))}
+                {persisted.map((n) => {
+                  const read = isRead(n);
+                  return (
+                    <li key={n.id}>
+                      <button
+                        type="button"
+                        onClick={() => openNotification(n)}
+                        className={`flex w-full items-start gap-2.5 px-4 py-3 text-left text-[0.83rem] transition-colors hover:bg-neutral-soft ${
+                          read ? 'text-text-muted' : 'text-text'
+                        }`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`mt-1.5 h-1.5 w-1.5 flex-none rounded-full ${read ? 'bg-transparent' : 'bg-danger'}`}
+                        />
+                        <span className="flex flex-1 flex-col gap-0.5">
+                          <span className={read ? '' : 'font-semibold'}>{n.title}</span>
+                          <span className="text-text-faint">{n.message}</span>
+                          <span className="text-[0.72rem] text-text-faint">{formatNotificationTimestamp(n.createdAt)}</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>,
@@ -149,6 +218,15 @@ export function NotificationBell({
         )}
     </>
   );
+}
+
+function formatNotificationTimestamp(iso: string): string {
+  return new Date(iso).toLocaleString('en-ZA', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function BellIcon() {

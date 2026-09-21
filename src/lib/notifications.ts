@@ -1,14 +1,22 @@
 /**
  * Role-relevant "what needs my attention right now" items for the header
- * bell. Deliberately NOT a persisted notification feed (no `notifications`
- * table, no read/unread state, no timestamps to say "2 hours ago") - there
- * is no backend to persist or push them yet (see docs/ARCHITECTURE.md), and
- * inventing one here would be a second, competing source of truth for
- * exactly the kind of state this app already derives live from the ledger
- * everywhere else (see StockLedgerView, the Reserved-cell popover, the
- * Overview stat tiles). Instead this recomputes a small, current snapshot
- * from the same repositories every render - "how many things need action
- * right now", not "what happened".
+ * bell, plus the user's persisted notification history.
+ *
+ * Two different kinds of thing live in the bell, deliberately not unified
+ * into one system:
+ *
+ *  - `items` (NotificationItem[]): live GAUGES, recomputed from the same
+ *    repositories every render (no persistence, no read state, no
+ *    timestamp) - "how many things need action right now" (low stock count,
+ *    requisitions awaiting approval, POs awaiting receiving). These aren't
+ *    discrete events a person "reads" - they're the same kind of number as
+ *    the Overview's stat tiles, just surfaced in the bell too.
+ *  - `persisted` (AppNotification[]): real, individually addressable EVENTS
+ *    - today just the Stores return reminder (src/lib/reminders.ts) - each
+ *    with its own created_at, read_at and requisition reference, fetched
+ *    from the `notifications` table (see supabase/migrations/
+ *    20260918120000_notifications.sql) via notificationRepository. These
+ *    are what "notification history" means: they survive being viewed.
  *
  * Content is scoped to what each role actually DOES in the confirmed Cobro
  * workflow, not to everything a permission technically allows. The clearest
@@ -20,6 +28,7 @@
  */
 
 import {
+  notificationRepository,
   productRepository,
   purchaseOrderRepository,
   roleRepository,
@@ -28,9 +37,10 @@ import {
   userRepository,
   warehouseRepository,
 } from '@/lib/data';
-import { countHeldStockReminders, getHeldStockReminders, STOCK_HELD_REMINDER_DAYS } from '@/lib/reminders';
+import { countStoresReturnReminders, STOCK_RETURN_REMINDER_HOURS } from '@/lib/reminders';
+import { ensureStoresReturnReminders } from '@/lib/services/reminder-generation';
 import { getNowMs } from '@/lib/now';
-import type { Product, StockLedgerEntry, User } from '@/lib/domain/inventory';
+import type { AppNotification, StockLedgerEntry, User } from '@/lib/domain/inventory';
 
 export interface NotificationItem {
   id: string;
@@ -42,30 +52,44 @@ export interface NotificationItem {
   tone: 'default' | 'warning';
 }
 
+export interface Notifications {
+  items: NotificationItem[];
+  persisted: AppNotification[];
+}
+
 function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
 
-export async function getNotifications(session: User): Promise<NotificationItem[]> {
+export async function getNotifications(session: User): Promise<Notifications> {
   const role = await roleRepository.getById(session.roleId);
   const roleName = role?.name;
-  if (!roleName) return [];
+  if (!roleName) return { items: [], persisted: [] };
 
   const items: NotificationItem[] = [];
+
+  // On-access sweep: creates any newly-eligible "Return item to Stores"
+  // reminders (idempotent - see reminder-generation.ts). This app has no
+  // cron/scheduled runtime, so an ordinary dashboard page load - which
+  // always calls getNotifications() - stands in for one.
+  const [, persisted] = await Promise.all([
+    ensureStoresReturnReminders(),
+    notificationRepository.listForUser(session.id),
+  ]);
 
   // Draft requisitions sourced from a real Store are Stores/Admin's to
   // approve (`manage_sales_orders`) - a peer-pickup draft sourced from an
   // Engineer's own station is that Engineer's to approve instead (see
   // requireApprovalRight in sales/actions.ts), so it's counted separately
   // below rather than here.
-  // How many (product, station) pairs across EVERY Engineer are currently
+  // How many requisitions across EVERY Engineer are currently
   // reminder-eligible - see src/lib/reminders.ts. `ledger`/`products` are
   // passed in rather than fetched here since the two callers below already
   // have them for their own low-stock/valuation checks.
-  async function countHeldStockReminderItems(ledger: StockLedgerEntry[], products: Product[]): Promise<number> {
-    const warehouses = await warehouseRepository.list();
+  async function countStoresReturnReminderItems(ledger: StockLedgerEntry[]): Promise<number> {
+    const [orders, warehouses] = await Promise.all([salesOrderRepository.list(), warehouseRepository.list()]);
     const stationIds = warehouses.filter((w) => w.type === 'engineer_station').map((w) => w.id);
-    return countHeldStockReminders(stationIds, ledger, products, getNowMs());
+    return countStoresReturnReminders(orders, ledger, warehouses, getNowMs(), stationIds);
   }
 
   async function countStoreSourcedApprovals(): Promise<number> {
@@ -105,11 +129,11 @@ export async function getNotifications(session: User): Promise<NotificationItem[
       });
     }
 
-    const heldStockCount = await countHeldStockReminderItems(ledger, products);
+    const heldStockCount = await countStoresReturnReminderItems(ledger);
     if (heldStockCount > 0) {
       items.push({
         id: 'held-stock-reminders',
-        message: `${plural(heldStockCount, 'item')} held by Engineers past ${STOCK_HELD_REMINDER_DAYS} days`,
+        message: `${plural(heldStockCount, 'requisition')} outstanding past ${STOCK_RETURN_REMINDER_HOURS} hours`,
         href: '/dashboard',
         tone: 'default',
       });
@@ -144,12 +168,12 @@ export async function getNotifications(session: User): Promise<NotificationItem[
     // is who initiates a return (see docs/ARCHITECTURE.md and
     // /dashboard/transfers), so they're who needs to know what's overdue
     // for one, not just each Engineer individually.
-    const [ledger, products] = await Promise.all([stockLedgerRepository.listAll(), productRepository.list()]);
-    const heldStockCount = await countHeldStockReminderItems(ledger, products);
+    const ledger = await stockLedgerRepository.listAll();
+    const heldStockCount = await countStoresReturnReminderItems(ledger);
     if (heldStockCount > 0) {
       items.push({
         id: 'held-stock-reminders',
-        message: `${plural(heldStockCount, 'item')} held by Engineers past ${STOCK_HELD_REMINDER_DAYS} days - use or return`,
+        message: `${plural(heldStockCount, 'requisition')} outstanding past ${STOCK_RETURN_REMINDER_HOURS} hours - use or return`,
         href: '/dashboard',
         tone: 'default',
       });
@@ -184,19 +208,9 @@ export async function getNotifications(session: User): Promise<NotificationItem[
       }
 
       // §21's actual ask: prompt THIS Engineer to use or have unused stock
-      // returned once it's sat on their own shelf a while - see
-      // src/lib/reminders.ts for what "a while" means and why it's a single
-      // named constant, not settled policy.
-      const [ledger, products] = await Promise.all([stockLedgerRepository.listAll(), productRepository.list()]);
-      const held = getHeldStockReminders(myStation.id, ledger, products, getNowMs());
-      if (held.length > 0) {
-        items.push({
-          id: 'held-stock-reminder',
-          message: `${plural(held.length, 'item')} held over ${STOCK_HELD_REMINDER_DAYS} days - use it, or ask Stores to arrange a return`,
-          href: '/dashboard',
-          tone: 'default',
-        });
-      }
+      // returned once it's sat on their own shelf a while - now a real,
+      // individually addressable notification per requisition (`persisted`,
+      // fetched above), not a rolled-up count - so it's not repeated here.
     }
   }
 
@@ -207,9 +221,9 @@ export async function getNotifications(session: User): Promise<NotificationItem[
   // View-only: it links to the Overview where they can see the detail, it
   // does not imply any action they can take themselves.
   if (roleName === 'supervisor' || roleName === 'mechanical_team_leader' || roleName === 'electrical_team_leader') {
-    const [ledger, products, warehouses, users] = await Promise.all([
+    const [orders, ledger, warehouses, users] = await Promise.all([
+      salesOrderRepository.list(),
       stockLedgerRepository.listAll(),
-      productRepository.list(),
       warehouseRepository.list(),
       userRepository.list(),
     ]);
@@ -221,19 +235,19 @@ export async function getNotifications(session: User): Promise<NotificationItem[
           (roleName === 'supervisor' || areaByOwnerId.get(w.ownerUserId ?? '') === session.area)
       )
       .map((w) => w.id);
-    const heldCount = countHeldStockReminders(stationIds, ledger, products, getNowMs());
+    const heldCount = countStoresReturnReminders(orders, ledger, warehouses, getNowMs(), stationIds);
     if (heldCount > 0) {
       items.push({
         id: 'held-stock-oversight',
         message:
           roleName === 'supervisor'
-            ? `${plural(heldCount, 'item')} held by Engineers past ${STOCK_HELD_REMINDER_DAYS} days`
-            : `${plural(heldCount, 'item')} held by your team past ${STOCK_HELD_REMINDER_DAYS} days`,
+            ? `${plural(heldCount, 'requisition')} outstanding past ${STOCK_RETURN_REMINDER_HOURS} hours`
+            : `${plural(heldCount, 'requisition')} outstanding past ${STOCK_RETURN_REMINDER_HOURS} hours in your team`,
         href: '/dashboard',
         tone: 'default',
       });
     }
   }
 
-  return items;
+  return { items, persisted };
 }

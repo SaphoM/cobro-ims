@@ -11,6 +11,7 @@
 import type {
   AdjustmentReasonCode,
   AdjustmentStatus,
+  AppNotification,
   AuditLogEntry,
   CreditNote,
   Customer,
@@ -332,6 +333,8 @@ export interface CreateSalesOrderInput {
   quantity: number;
   unitPrice: number;
   createdBy: string;
+  /** Mandatory (validated by the caller) when productId is a Repair item; otherwise optional. */
+  description: string | null;
 }
 
 /**
@@ -348,6 +351,33 @@ export interface SalesOrderRepository {
   dispatch(orderId: string, dispatchedBy: string): Promise<SalesOrder>;
   cancel(orderId: string): Promise<SalesOrder>;
   getStatus(orderId: string): Promise<SalesOrderStatus | null>;
+}
+
+export interface CreateReturnReminderInput {
+  userId: string;
+  salesOrderId: string;
+  title: string;
+  message: string;
+  href: string | null;
+}
+
+/**
+ * Persisted, per-user notifications (see supabase/migrations/
+ * 20260918120000_notifications.sql). `listForUser`/`markRead` run as the
+ * viewing user (RLS-scoped - a user can only ever see/mark their own rows).
+ * `createReturnReminderIfMissing` is the one privileged, cross-user write:
+ * whoever's dashboard triggers the reminder sweep (see
+ * src/lib/services/reminder-generation.ts) is very often not the
+ * notification's recipient, so this runs through the service-role client
+ * rather than the calling user's own session - and is idempotent per
+ * (userId, salesOrderId) regardless of how many times the sweep runs.
+ */
+export interface NotificationRepository {
+  listForUser(userId: string): Promise<AppNotification[]>;
+  /** No-ops (returns null) if `id` doesn't exist or doesn't belong to `userId`. Idempotent - marking an already-read notification read again just returns it unchanged. */
+  markRead(id: string, userId: string): Promise<AppNotification | null>;
+  /** Returns null (does nothing) if a `return_reminder` for this (userId, salesOrderId) already exists. */
+  createReturnReminderIfMissing(input: CreateReturnReminderInput): Promise<AppNotification | null>;
 }
 
 /**

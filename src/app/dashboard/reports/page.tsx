@@ -34,6 +34,7 @@ import { getNowMs } from '@/lib/now';
 import { ExportCsvButton } from '@/components/export-csv-button';
 import { getSession } from '@/lib/auth';
 import { formatCurrency } from '@/lib/ui/currency';
+import { formatStoreCode } from '@/lib/warehouse-label';
 
 // What each role sees on this page, beyond the underlying data access
 // already enforced elsewhere (`view_reports` gates the route itself - see
@@ -166,7 +167,7 @@ export default async function ReportsPage() {
           <tbody>
             {valuation.rows.map((r, i) => (
               <tr key={i} className="border-t border-accent/[0.08]">
-                <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
+                <td className="px-5 py-3 text-text-muted">{formatStoreCode(r.warehouseCode)}</td>
                 <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
                 <td className="px-5 py-3 text-text-muted">
                   {r.productName}
@@ -253,7 +254,7 @@ export default async function ReportsPage() {
             <tbody>
               {lowStock.map((r, i) => (
                 <tr key={i} className="border-t border-accent/[0.08]">
-                  <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
+                  <td className="px-5 py-3 text-text-muted">{formatStoreCode(r.warehouseCode)}</td>
                   <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
                   <td className="px-5 py-3 text-text-muted">
                     {r.productName}
@@ -329,7 +330,7 @@ export default async function ReportsPage() {
             <tbody>
               {dormantStock.map((r, i) => (
                 <tr key={i} className="border-t border-accent/[0.08]">
-                  <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
+                  <td className="px-5 py-3 text-text-muted">{formatStoreCode(r.warehouseCode)}</td>
                   <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
                   <td className="px-5 py-3 text-text-muted">
                     {r.productName}
@@ -362,6 +363,7 @@ export default async function ReportsPage() {
               <th className="px-5 py-2.5 text-right font-medium tabular-nums">Qty</th>
               <th className="px-5 py-2.5 text-right font-medium tabular-nums">Value</th>
               <th className="px-5 py-2.5 font-medium">Status</th>
+              <th className="px-5 py-2.5 font-medium">Description / Reason</th>
             </tr>
           </thead>
           <tbody>
@@ -378,6 +380,7 @@ export default async function ReportsPage() {
                   {formatCurrency(r.value)}
                 </td>
                 <td className="px-5 py-3 text-text-muted capitalize">{r.status}</td>
+                <td className="px-5 py-3 text-text-muted">{r.description ?? '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -451,7 +454,7 @@ export default async function ReportsPage() {
                     {r.productName}
                     <CategoryTag name={categoryNameBySku.get(r.sku)} />
                   </td>
-                  <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
+                  <td className="px-5 py-3 text-text-muted">{formatStoreCode(r.warehouseCode)}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
                     {r.quantity.toLocaleString()} {r.unitOfMeasure}
                   </td>
@@ -621,7 +624,7 @@ export default async function ReportsPage() {
                     {r.sku}
                     <CategoryTag name={categoryNameBySku.get(r.sku)} />
                   </td>
-                  <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
+                  <td className="px-5 py-3 text-text-muted">{formatStoreCode(r.warehouseCode)}</td>
                   <td className="px-5 py-3 text-text-muted capitalize">{r.movementType.replace('_', ' ')}</td>
                   <td className={`px-5 py-3 text-right tabular-nums ${r.quantity < 0 ? 'text-danger' : 'text-text'}`}>
                     {r.quantity > 0 ? '+' : ''}
@@ -668,7 +671,7 @@ export default async function ReportsPage() {
                     {r.productName}
                     <CategoryTag name={categoryNameBySku.get(r.sku)} />
                   </td>
-                  <td className="px-5 py-3 text-text-muted">{r.warehouseCode}</td>
+                  <td className="px-5 py-3 text-text-muted">{formatStoreCode(r.warehouseCode)}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantity.toLocaleString()}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">{formatCurrency(r.unitCost)}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">

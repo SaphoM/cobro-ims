@@ -19,6 +19,7 @@ import { EngineerScanCard } from '@/app/dashboard/engineer-scan-card';
 import { StockByLocationCard, type StockView } from '@/app/dashboard/stock-by-location-card';
 import type { StockLedgerView } from '@/lib/domain/inventory';
 import { formatCurrency } from '@/lib/ui/currency';
+import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
 export default async function DashboardOverviewPage() {
   const [products, warehouses, ledgerEntries, customers, suppliers, salesOrders, users, categories, session] = await Promise.all([
@@ -88,7 +89,7 @@ export default async function DashboardOverviewPage() {
   >();
   for (const row of ledgerView) {
     if (row.quantityOnHand <= 0) continue;
-    const label = row.warehouse.type === 'engineer_station' ? row.warehouse.name : row.warehouse.code;
+    const label = formatWarehouseLabel(row.warehouse);
     const list = locationsByProduct.get(row.productId) ?? [];
     list.push({ warehouseId: row.warehouseId, label, qty: row.quantityOnHand });
     locationsByProduct.set(row.productId, list);

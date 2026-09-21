@@ -183,6 +183,11 @@ export function EngineerScanCard({
                 <span>
                   Requisition: <span className="font-mono-brand text-text">{pendingCheckout.orderNumber}</span>
                 </span>
+                {pendingCheckout.description && (
+                  <span>
+                    Reason: <span className="font-semibold text-text">{pendingCheckout.description}</span>
+                  </span>
+                )}
               </div>
             </div>
             <div className="mt-4 flex justify-end gap-3">
