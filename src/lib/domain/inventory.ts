@@ -101,7 +101,39 @@ export interface Product {
   name: string;
   description: string | null;
   categoryId: UUID | null;
+  /**
+   * The unit in which stock is tracked and transacted (e.g. "ea", "bolt",
+   * "kg", "m2"). For packaged products this is the BASE unit — the smallest
+   * meaningful countable or measurable quantity — not the packaging unit.
+   * All stock movements, ledger quantities, and WAC are denominated in this
+   * unit. For non-packaged products this is also the purchase/receiving unit.
+   */
   unitOfMeasure: string;
+  /**
+   * The packaging unit in which the product is purchased or stored
+   * (e.g. "box", "bag", "roll", "drum"). Null for products that are not
+   * packaged — they are received and transacted directly in `unitOfMeasure`.
+   * When set, `qtyPerPackage` must also be set.
+   */
+  packagingUom: string | null;
+  /**
+   * How many stock units (`unitOfMeasure`) are contained in one package
+   * (`packagingUom`). Must be a positive number when `packagingUom` is set.
+   * Null when `packagingUom` is null.
+   * Example: bolt box → 100 (one box contains 100 bolts).
+   */
+  qtyPerPackage: number | null;
+  /**
+   * Explicitly entered cost per individual stock unit (`unitOfMeasure`),
+   * captured at product creation as the initial costing reference.
+   * Distinct from `unitPrice` (the selling price) and from the WAC
+   * (which is derived from actual receipt transactions). This value is the
+   * starting point for costing before any receipts have been posted, and
+   * remains traceable as the "product setup cost" even after WAC diverges.
+   * Null until set. For packaged products, this is the cost per base unit
+   * (e.g. cost per bolt, NOT cost per box).
+   */
+  defaultUnitCost: number | null;
   barcode: string | null;
   reorderPoint: number | null;
   reorderQuantity: number | null;

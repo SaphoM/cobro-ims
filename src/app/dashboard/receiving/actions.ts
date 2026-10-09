@@ -60,15 +60,18 @@ export async function receiveStockAction(
       productRepository.getById(productId),
       stockLedgerRepository.get(productId, warehouseId),
     ]);
+    // Cost resolution order for non-Admin: unit price → default unit cost (new) → existing WAC → error
     if (product?.unitPrice != null && product.unitPrice > 0) {
       unitCost = product.unitPrice;
+    } else if (product?.defaultUnitCost != null && product.defaultUnitCost > 0) {
+      unitCost = product.defaultUnitCost;
     } else if (existing && existing.weightedAverageCost > 0) {
       unitCost = existing.weightedAverageCost;
     } else {
       return {
         error: costsVisible
-          ? 'This item has no catalogue price and no stock at this store yet, so there is no cost to receive it at. Ask an administrator to set the price first.'
-          : 'This is the first stock of this item at this store, so it needs a unit cost - and prices are hidden for your role. Ask an administrator to post this receipt, or to make prices visible.',
+          ? 'This item has no catalogue price, no default unit cost, and no existing stock at this store. Ask an administrator to set the price or default unit cost first.'
+          : 'This is the first stock of this item at this store, so it needs a unit cost — and prices are hidden for your role. Ask an administrator to post this receipt, or to make prices visible.',
         success: null,
       };
     }

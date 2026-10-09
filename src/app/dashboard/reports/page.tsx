@@ -176,7 +176,10 @@ export default async function ReportsPage() {
                 <td className="px-5 py-3 text-right tabular-nums text-text">
                   {r.quantityOnHand.toLocaleString()} {r.unitOfMeasure}
                 </td>
-                <td className="px-5 py-3 text-right tabular-nums text-text-muted">{formatCurrency(r.weightedAverageCost)}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text-muted">
+                  {formatCurrency(r.weightedAverageCost)}
+                  <span className="ml-1 text-[0.68rem] text-text-faint">/ {r.unitOfMeasure}</span>
+                </td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
                   {formatCurrency(r.value)}
                 </td>

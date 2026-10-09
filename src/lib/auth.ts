@@ -22,6 +22,14 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
  * not just at login, because this gate runs on every protected page and action.
  */
 export async function getSession(): Promise<User | null> {
+  // In mock data-source mode there is no real Supabase project, so auth
+  // calls will always fail. Return the seeded demo-admin user so every
+  // protected page renders without requiring real credentials.
+  if (process.env.DATA_SOURCE === 'mock') {
+    const profile = await userRepository.getById('user-demo');
+    return profile ?? null;
+  }
+
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -77,6 +85,9 @@ export async function getMfaStepUpState(): Promise<{
   aal2: boolean;
   stepUpPending: boolean;
 }> {
+  if (process.env.DATA_SOURCE === 'mock') {
+    return { enrolled: false, aal2: false, stepUpPending: false };
+  }
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (error || !data) return { enrolled: false, aal2: false, stepUpPending: false };

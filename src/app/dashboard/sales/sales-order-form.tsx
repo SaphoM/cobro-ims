@@ -8,6 +8,7 @@ import type { Customer, Product, ProductCategory, StockLedgerEntry, Warehouse } 
 import { REPAIR_CATEGORY_ID } from '@/lib/domain/inventory';
 import { formatCurrency } from '@/lib/ui/currency';
 import { formatWarehouseLabel } from '@/lib/warehouse-label';
+import { PACKAGING_UOM_LABELS } from '@/lib/uom';
 
 const initialState: SalesOrderFormState = { error: null, success: null };
 
@@ -248,18 +249,26 @@ export function SalesOrderForm({
         </label>
 
         {ledger && (
-          <p
-            className={`lg:col-span-6 text-[0.82rem] font-bold ${availableQty === 0 ? 'text-danger' : 'text-accent-strong'}`}
-          >
-            {availableQty.toLocaleString()} {selectedProduct?.unitOfMeasure ?? ''} available at{' '}
-            {selectedWarehouse ? formatWarehouseLabel(selectedWarehouse) : '—'}
-            {availableQty === 0 && ' - none on hand here'}
-            {selectedCategory && (
-              <span className="ml-2 rounded-full bg-accent/10 px-2 py-0.5 text-[0.68rem] font-semibold text-accent-strong">
-                {selectedCategory.name}
-              </span>
+          <div className="lg:col-span-6 flex flex-col gap-0.5">
+            <p
+              className={`text-[0.82rem] font-bold ${availableQty === 0 ? 'text-danger' : 'text-accent-strong'}`}
+            >
+              {availableQty.toLocaleString()} {selectedProduct?.unitOfMeasure ?? ''} available at{' '}
+              {selectedWarehouse ? formatWarehouseLabel(selectedWarehouse) : '—'}
+              {availableQty === 0 && ' — none on hand here'}
+              {selectedCategory && (
+                <span className="ml-2 rounded-full bg-accent/10 px-2 py-0.5 text-[0.68rem] font-semibold text-accent-strong">
+                  {selectedCategory.name}
+                </span>
+              )}
+            </p>
+            {selectedProduct?.packagingUom && selectedProduct.qtyPerPackage != null && (
+              <p className="text-[0.72rem] text-text-faint">
+                Purchased in {PACKAGING_UOM_LABELS[selectedProduct.packagingUom] ?? selectedProduct.packagingUom}s of {selectedProduct.qtyPerPackage}.
+                {' '}Enter quantity in individual {selectedProduct.unitOfMeasure}s (e.g. {selectedProduct.qtyPerPackage} = 1 {PACKAGING_UOM_LABELS[selectedProduct.packagingUom] ?? selectedProduct.packagingUom}).
+              </p>
             )}
-          </p>
+          </div>
         )}
 
         {isRepairItem && (

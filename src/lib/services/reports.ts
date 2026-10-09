@@ -35,6 +35,10 @@ export interface StockValuationRow {
   sku: string;
   productName: string;
   unitOfMeasure: string;
+  /** Packaging unit (e.g. 'box'), or null for unpackaged products. */
+  packagingUom: string | null;
+  /** Stock units per package, or null for unpackaged products. */
+  qtyPerPackage: number | null;
   quantityOnHand: number;
   weightedAverageCost: number;
   value: number;
@@ -64,6 +68,8 @@ export function buildStockValuationReport(
         sku: product.sku,
         productName: product.name,
         unitOfMeasure: product.unitOfMeasure,
+        packagingUom: product.packagingUom ?? null,
+        qtyPerPackage: product.qtyPerPackage ?? null,
         quantityOnHand: entry.quantityOnHand,
         weightedAverageCost: entry.weightedAverageCost,
         value: stockValue(entry),

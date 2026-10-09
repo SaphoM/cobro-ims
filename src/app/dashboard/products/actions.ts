@@ -4,10 +4,14 @@ import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
 import { auditLogRepository, productRepository } from '@/lib/data';
 import { hasPermission } from '@/lib/permissions';
+import { generateUniqueBarcode } from '@/lib/barcode-gen';
 
 export interface CreateProductFormState {
   error: string | null;
   success: string | null;
+  /** The barcode that ended up on the product — either the one the user
+   *  supplied or the one the system generated. Populated on success only. */
+  assignedBarcode?: string | null;
 }
 
 export async function createProductAction(
@@ -24,13 +28,38 @@ export async function createProductAction(
   const name = String(formData.get('name') ?? '').trim();
   const unitOfMeasure = String(formData.get('unitOfMeasure') ?? '').trim();
   const categoryId = String(formData.get('categoryId') ?? '').trim() || null;
-  const barcode = String(formData.get('barcode') ?? '').trim();
+  const barcodeInput = String(formData.get('barcode') ?? '').trim();
   const reorderPointRaw = formData.get('reorderPoint');
   const reorderQuantityRaw = formData.get('reorderQuantity');
   const unitPriceRaw = String(formData.get('unitPrice') ?? '').trim();
+  const packagingUom = String(formData.get('packagingUom') ?? '').trim() || null;
+  const qtyPerPackageRaw = String(formData.get('qtyPerPackage') ?? '').trim();
+  const defaultUnitCostRaw = String(formData.get('defaultUnitCost') ?? '').trim();
 
   if (!sku || !name || !unitOfMeasure) {
     return { error: 'SKU, name and unit of measure are required.', success: null };
+  }
+
+  // Packaging validation
+  if (packagingUom && !qtyPerPackageRaw) {
+    return { error: `When a packaging unit is set, the number of ${unitOfMeasure}s per ${packagingUom} is required.`, success: null };
+  }
+  const qtyPerPackage = qtyPerPackageRaw ? Number(qtyPerPackageRaw) : null;
+  if (qtyPerPackage !== null && (!Number.isFinite(qtyPerPackage) || qtyPerPackage <= 0)) {
+    return { error: 'Quantity per package must be a positive number.', success: null };
+  }
+  const defaultUnitCost = defaultUnitCostRaw === '' ? null : Number(defaultUnitCostRaw);
+  if (defaultUnitCost !== null && (!Number.isFinite(defaultUnitCost) || defaultUnitCost < 0)) {
+    return { error: 'Default unit cost must be zero or a positive number.', success: null };
+  }
+
+  // Auto-generate a barcode when the user hasn't supplied one. Read the
+  // existing catalogue first so the generator can guarantee uniqueness.
+  let barcode: string | null = barcodeInput || null;
+  if (!barcode) {
+    const existing = await productRepository.list();
+    const usedBarcodes = new Set(existing.flatMap((p) => (p.barcode ? [p.barcode] : [])));
+    barcode = generateUniqueBarcode(usedBarcodes);
   }
 
   try {
@@ -38,8 +67,11 @@ export async function createProductAction(
       sku,
       name,
       unitOfMeasure,
+      packagingUom,
+      qtyPerPackage,
+      defaultUnitCost,
       categoryId,
-      barcode: barcode || null,
+      barcode,
       reorderPoint: reorderPointRaw ? Number(reorderPointRaw) : null,
       reorderQuantity: reorderQuantityRaw ? Number(reorderQuantityRaw) : null,
       unitPrice: unitPriceRaw === '' ? null : Number(unitPriceRaw),
@@ -52,7 +84,12 @@ export async function createProductAction(
       after: product,
     });
     revalidatePath('/dashboard/products');
-    return { error: null, success: `Added ${product.sku} - ${product.name}.` };
+    const wasGenerated = !barcodeInput;
+    return {
+      error: null,
+      success: `Added ${product.sku} - ${product.name}.${wasGenerated ? ` Barcode auto-assigned: ${product.barcode}` : ''}`,
+      assignedBarcode: product.barcode,
+    };
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Could not create product.', success: null };
   }
@@ -75,14 +112,32 @@ export async function updateProductAction(
   const reorderPointRaw = formData.get('reorderPoint');
   const reorderQuantityRaw = formData.get('reorderQuantity');
   const categoryId = String(formData.get('categoryId') ?? '').trim() || null;
+  const packagingUom = String(formData.get('packagingUom') ?? '').trim() || null;
+  const qtyPerPackageRaw = String(formData.get('qtyPerPackage') ?? '').trim();
+  const defaultUnitCostRaw = String(formData.get('defaultUnitCost') ?? '').trim();
 
   if (!id) return { error: 'Missing product reference.', success: null };
   if (!name || !unitOfMeasure) return { error: 'Name and unit of measure are required.', success: null };
+
+  if (packagingUom && !qtyPerPackageRaw) {
+    return { error: `When a packaging unit is set, the number of ${unitOfMeasure}s per ${packagingUom} is required.`, success: null };
+  }
+  const qtyPerPackage = qtyPerPackageRaw ? Number(qtyPerPackageRaw) : null;
+  if (qtyPerPackage !== null && (!Number.isFinite(qtyPerPackage) || qtyPerPackage <= 0)) {
+    return { error: 'Quantity per package must be a positive number.', success: null };
+  }
+  const defaultUnitCost = defaultUnitCostRaw === '' ? null : Number(defaultUnitCostRaw);
+  if (defaultUnitCost !== null && (!Number.isFinite(defaultUnitCost) || defaultUnitCost < 0)) {
+    return { error: 'Default unit cost must be zero or a positive number.', success: null };
+  }
 
   try {
     const product = await productRepository.update(id, {
       name,
       unitOfMeasure,
+      packagingUom,
+      qtyPerPackage,
+      defaultUnitCost,
       barcode: barcode || null,
       reorderPoint: reorderPointRaw ? Number(reorderPointRaw) : null,
       reorderQuantity: reorderQuantityRaw ? Number(reorderQuantityRaw) : null,

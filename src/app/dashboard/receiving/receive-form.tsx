@@ -9,6 +9,7 @@ import { parseScanPayload } from '@/lib/scan-payload';
 import type { Product, ProductCategory, Supplier, Warehouse } from '@/lib/domain/inventory';
 import { formatCurrency } from '@/lib/ui/currency';
 import { formatWarehouseLabel } from '@/lib/warehouse-label';
+import { PACKAGING_UOM_LABELS } from '@/lib/uom';
 
 const initialState: ReceiveFormState = { error: null, success: null };
 
@@ -401,12 +402,20 @@ export function ReceiveForm({
               {selectedProduct && <span className="ml-1 font-normal text-text-faint">from the scan</span>}
             </span>
             {selectedProduct ? (
-              <div className="flex h-9 items-center gap-1.5 text-[0.95rem] font-bold text-accent-strong">
-                {selectedProduct.sku} - {selectedProduct.name}
-                {selectedCategory && (
-                  <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[0.68rem] font-semibold">
-                    {selectedCategory.name}
-                  </span>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-1.5 text-[0.95rem] font-bold text-accent-strong">
+                  {selectedProduct.sku} - {selectedProduct.name}
+                  {selectedCategory && (
+                    <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[0.68rem] font-semibold">
+                      {selectedCategory.name}
+                    </span>
+                  )}
+                </div>
+                {selectedProduct.packagingUom && selectedProduct.qtyPerPackage != null && (
+                  <div className="text-[0.72rem] text-text-faint">
+                    Packaged: {selectedProduct.qtyPerPackage} {selectedProduct.unitOfMeasure} per {PACKAGING_UOM_LABELS[selectedProduct.packagingUom] ?? selectedProduct.packagingUom}.
+                    {' '}Count received as individual {selectedProduct.unitOfMeasure}s.
+                  </div>
                 )}
               </div>
             ) : (
@@ -461,14 +470,25 @@ export function ReceiveForm({
                     selected product's catalogue price, which is what
                     receiveStockAction will post for this user regardless of
                     what the form sends. */}
-                <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
-                  {!showCosts
-                    ? HIDDEN_COST
-                    : selectedProduct?.unitPrice != null
-                      ? `${formatCurrency(selectedProduct.unitPrice)}`
-                      : 'No price set'}
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+                    {!showCosts
+                      ? HIDDEN_COST
+                      : selectedProduct?.unitPrice != null
+                        ? `${formatCurrency(selectedProduct.unitPrice)} / ${selectedProduct.unitOfMeasure}`
+                        : selectedProduct?.defaultUnitCost != null
+                          ? `${formatCurrency(selectedProduct.defaultUnitCost)} / ${selectedProduct.unitOfMeasure} (default)`
+                          : 'No price set'}
+                  </div>
+                  {showCosts && selectedProduct?.packagingUom && selectedProduct.qtyPerPackage != null && (
+                    <div className="text-[0.72rem] text-text-faint">
+                      Cost is per individual {selectedProduct.unitOfMeasure}, not per {PACKAGING_UOM_LABELS[selectedProduct.packagingUom] ?? selectedProduct.packagingUom}.
+                    </div>
+                  )}
                 </div>
-                <input type="hidden" name="unitCost" value={selectedProduct?.unitPrice ?? 0} />
+                <input type="hidden" name="unitCost" value={
+                  selectedProduct?.unitPrice ?? selectedProduct?.defaultUnitCost ?? 0
+                } />
               </>
             )}
           </label>

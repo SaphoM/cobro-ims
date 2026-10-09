@@ -308,12 +308,16 @@ export const sbProductRepository: ProductRepository = {
     return data ? toCamel<Product>(data) : null;
   },
   async create(input: CreateProductInput) {
+    const qtyPerPackage = (input.packagingUom && input.qtyPerPackage != null) ? input.qtyPerPackage : null;
     const { data, error } = await (await createServerSupabaseClient())
       .from('products')
       .insert({
         sku: input.sku,
         name: input.name,
         unit_of_measure: input.unitOfMeasure,
+        packaging_uom: input.packagingUom ?? null,
+        qty_per_package: qtyPerPackage,
+        default_unit_cost: input.defaultUnitCost ?? null,
         category_id: input.categoryId ?? null,
         barcode: input.barcode ?? null,
         reorder_point: input.reorderPoint ?? null,
@@ -351,11 +355,15 @@ export const sbProductRepository: ProductRepository = {
     return toCamel<Product>(data);
   },
   async update(id, input) {
+    const qtyPerPackage = (input.packagingUom && input.qtyPerPackage != null) ? input.qtyPerPackage : null;
     const { data, error } = await (await createServerSupabaseClient())
       .from('products')
       .update({
         name: input.name,
         unit_of_measure: input.unitOfMeasure,
+        packaging_uom: input.packagingUom ?? null,
+        qty_per_package: qtyPerPackage,
+        ...('defaultUnitCost' in input ? { default_unit_cost: input.defaultUnitCost ?? null } : {}),
         ...('categoryId' in input ? { category_id: input.categoryId ?? null } : {}),
         barcode: input.barcode ?? null,
         reorder_point: input.reorderPoint ?? null,

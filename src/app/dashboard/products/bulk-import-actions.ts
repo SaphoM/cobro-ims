@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth';
 import { auditLogRepository, productRepository, stockMovementRepository, warehouseRepository } from '@/lib/data';
 import { hasPermission } from '@/lib/permissions';
 import { parseCsv } from '@/lib/csv';
+import { generateUniqueBarcode } from '@/lib/barcode-gen';
 
 /**
  * Server-side halves of the two upload forms in bulk-import-form.tsx - see
@@ -148,8 +149,23 @@ export async function importProductsAction(
     };
   }
 
+  // Auto-assign barcodes for rows that didn't supply one. Build a combined
+  // set of all existing + already-assigned-in-this-batch barcodes so each
+  // generated code is unique across the whole import run, not just against
+  // the catalogue at the time of the check.
+  const allUsedBarcodes = new Set([
+    ...existingBarcodes,
+    ...toCreate.flatMap((r) => (r.barcode ? [r.barcode] : [])),
+  ]);
+  const toCreateWithBarcodes = toCreate.map((row) => {
+    if (row.barcode) return row;
+    const generated = generateUniqueBarcode(allUsedBarcodes);
+    allUsedBarcodes.add(generated);
+    return { ...row, barcode: generated };
+  });
+
   const created = [];
-  for (const input of toCreate) {
+  for (const input of toCreateWithBarcodes) {
     created.push(await productRepository.create(input));
   }
 
