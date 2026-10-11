@@ -72,7 +72,7 @@ export function buildStockValuationReport(
         qtyPerPackage: product.qtyPerPackage ?? null,
         quantityOnHand: entry.quantityOnHand,
         weightedAverageCost: entry.weightedAverageCost,
-        value: stockValue(entry),
+        value: stockValue(entry, product),
       };
     })
     .filter((r): r is StockValuationRow => r !== null)
@@ -190,7 +190,7 @@ export function buildPurchaseOrderSummary(
   return orders
     .map((po) => ({
       poNumber: po.poNumber,
-      supplierName: supplierById.get(po.supplierId)?.name ?? 'Unknown',
+      supplierName: (po.supplierId ? supplierById.get(po.supplierId)?.name : null) ?? 'Unknown',
       sku: productById.get(po.line.productId)?.sku ?? 'Unknown',
       quantityOrdered: po.line.quantityOrdered,
       quantityReceived: po.line.quantityReceived,
@@ -446,12 +446,16 @@ export function buildSupplierSummary(
   const bySupplier = new Map<string, SupplierSummaryRow>();
 
   for (const po of orders) {
-    const name = supplierById.get(po.supplierId)?.name ?? 'Unknown';
-    const row = bySupplier.get(po.supplierId) ?? { supplierName: name, orderCount: 0, totalOrderedValue: 0, totalReceivedValue: 0 };
+    // Ad-hoc GRN receipts (receiveStockAction) can carry no supplier at all -
+    // grouped under a stable sentinel key rather than dropped from the
+    // summary, so that stock still counts somewhere.
+    const key = po.supplierId ?? '__no_supplier__';
+    const name = (po.supplierId ? supplierById.get(po.supplierId)?.name : null) ?? 'Unknown';
+    const row = bySupplier.get(key) ?? { supplierName: name, orderCount: 0, totalOrderedValue: 0, totalReceivedValue: 0 };
     row.orderCount += 1;
     row.totalOrderedValue = Math.round((row.totalOrderedValue + po.line.quantityOrdered * po.line.unitCost) * 100) / 100;
     row.totalReceivedValue = Math.round((row.totalReceivedValue + po.line.quantityReceived * po.line.unitCost) * 100) / 100;
-    bySupplier.set(po.supplierId, row);
+    bySupplier.set(key, row);
   }
 
   return [...bySupplier.values()].sort((a, b) => b.totalOrderedValue - a.totalOrderedValue);
@@ -613,7 +617,7 @@ export function buildWarehouseSummary(
     if (!row) continue;
     const product = productById.get(entry.productId);
     row.skuCount += 1;
-    row.totalValue = Math.round((row.totalValue + stockValue(entry)) * 100) / 100;
+    row.totalValue = Math.round((row.totalValue + stockValue(entry, product)) * 100) / 100;
     if (product?.reorderPoint != null && entry.quantityOnHand < product.reorderPoint) {
       row.lowStockCount += 1;
     }
@@ -653,7 +657,7 @@ export function buildOpenPurchaseOrders(
       const daysOpen = po.orderedAt ? Math.floor((nowMs - new Date(po.orderedAt).getTime()) / (24 * 60 * 60 * 1000)) : null;
       return {
         poNumber: po.poNumber,
-        supplierName: supplierById.get(po.supplierId)?.name ?? 'Unknown',
+        supplierName: (po.supplierId ? supplierById.get(po.supplierId)?.name : null) ?? 'Unknown',
         sku: productById.get(po.line.productId)?.sku ?? 'Unknown',
         quantityOutstanding: outstanding,
         outstandingValue: Math.round(outstanding * po.line.unitCost * 100) / 100,
@@ -698,7 +702,7 @@ export function buildDormantStock(
       sku: productById.get(entry.productId)?.sku ?? 'Unknown',
       productName: productById.get(entry.productId)?.name ?? 'Unknown',
       quantityOnHand: entry.quantityOnHand,
-      value: stockValue(entry),
+      value: stockValue(entry, productById.get(entry.productId)),
     }))
     .sort((a, b) => b.value - a.value);
 }

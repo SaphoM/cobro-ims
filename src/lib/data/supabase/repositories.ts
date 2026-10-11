@@ -8,12 +8,20 @@
  *     (createServerSupabaseClient) so auth.uid() resolves and RLS applies as
  *     a real backstop underneath the Server Action permission checks.
  *   - A SMALL set of trusted, privileged operations use the service-role
- *     client (getServiceSupabase): the stock ledger/movement writer and
- *     reservation adjuster (those tables have no user-writable RLS policy by
- *     design), global document-number generation (must see every row, not
- *     just the caller's), Auth Admin user creation, the app-settings singleton
- *     write, and the cross-device scan-handoff token flow. Each is invoked
- *     only after the Server Action layer has already authorised the caller.
+ *     client (getServiceSupabase): the reservation adjuster (stock_ledger has
+ *     no user-writable UPDATE policy by design), Auth Admin user creation,
+ *     the app-settings singleton write, and the cross-device scan-handoff
+ *     token flow. Each is invoked only after the Server Action layer has
+ *     already authorised the caller.
+ *
+ * Business operations (receiving, PO lifecycle, adjustments, transfers,
+ * requisitions, invoicing) call the matching Postgres function via
+ * `sb.rpc(...)` rather than reimplementing WAC math, document numbering and
+ * status transitions here — that logic already lives, tested, in the
+ * database (see each method below for which function it calls). Pure
+ * reads/list/get and CRUD with no RPC equivalent (products, suppliers,
+ * customers, warehouses, categories, users, settings, notifications) stay as
+ * direct `.select()`/`.insert()`/`.update()` calls under RLS.
  */
 
 import { createServerSupabaseClient } from '@/lib/supabase/server';
@@ -41,7 +49,6 @@ import type {
   User,
   Warehouse,
 } from '@/lib/domain/inventory';
-import { VAT_RATE } from '@/lib/domain/inventory';
 import type {
   AddBomLineInput,
   AdjustmentReasonRepository,
@@ -81,8 +88,10 @@ import type {
   WarehouseRepository,
   WriteAuditEntryInput,
 } from '@/lib/data/repositories';
-import { applyMovement } from '@/lib/services/inventory-engine';
 import { generateTemporaryPassword } from '@/lib/temp-password';
+// Note: VAT and invoice-outstanding math now lives inside the live
+// generate_invoice_from_sales_order/record_invoice_payment/issue_credit_note
+// Postgres functions, not here — see sbInvoiceRepository below.
 
 // ---------------------------------------------------------------------------
 // Helpers: snake_case DB rows ↔ camelCase domain objects
@@ -102,93 +111,6 @@ function toCamel<T>(row: Record<string, unknown>): T {
 
 function toCamelArray<T>(rows: Record<string, unknown>[]): T[] {
   return rows.map((r) => toCamel<T>(r));
-}
-
-/**
- * Generate the next sequential document number by reading the current max
- * from the table. Adequate for <20 concurrent users; the DB RPC functions
- * exist for truly atomic generation when needed later.
- */
-async function nextDocNumber(
-  table: string,
-  column: string,
-  prefix: string,
-  startAt = 1001
-): Promise<string> {
-  const sb = getServiceSupabase();
-  const { data } = await sb
-    .from(table)
-    .select(column)
-    .order(column, { ascending: false })
-    .limit(1);
-
-  if (!data || data.length === 0) return `${prefix}-${startAt}`;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const last = (data[0] as any)[column] as string;
-  const m = last.match(/(\d+)$/);
-  return `${prefix}-${m ? parseInt(m[1], 10) + 1 : startAt}`;
-}
-
-/**
- * Central stock-movement writer: reads the current ledger, applies the WAC
- * engine (the same pure `applyMovement` function the mock layer uses), then
- * upserts the ledger and inserts the movement row.
- */
-async function postMovement(input: RecordMovementInput): Promise<{ movement: StockMovement; ledger: StockLedgerEntry }> {
-  const sb = getServiceSupabase();
-
-  // 1. Current ledger snapshot
-  const { data: ledgerRow } = await sb
-    .from('stock_ledger')
-    .select('*')
-    .eq('product_id', input.productId)
-    .eq('warehouse_id', input.warehouseId)
-    .maybeSingle();
-
-  const current: StockLedgerEntry | null = ledgerRow ? toCamel<StockLedgerEntry>(ledgerRow) : null;
-
-  // 2. WAC calculation via existing pure engine
-  const newLedger = applyMovement(current, {
-    productId: input.productId,
-    warehouseId: input.warehouseId,
-    movementType: input.movementType,
-    quantity: input.quantity,
-    unitCost: input.unitCost,
-  });
-
-  // 3. Upsert ledger
-  const { error: ledgerErr } = await sb.from('stock_ledger').upsert(
-    {
-      product_id: input.productId,
-      warehouse_id: input.warehouseId,
-      quantity_on_hand: newLedger.quantityOnHand,
-      quantity_reserved: newLedger.quantityReserved,
-      weighted_average_cost: newLedger.weightedAverageCost,
-      updated_at: newLedger.updatedAt,
-    },
-    { onConflict: 'product_id,warehouse_id' }
-  );
-  if (ledgerErr) throw new Error(`Ledger update failed: ${ledgerErr.message}`);
-
-  // 4. Insert movement
-  const { data: movRow, error: movErr } = await sb
-    .from('stock_movements')
-    .insert({
-      product_id: input.productId,
-      warehouse_id: input.warehouseId,
-      movement_type: input.movementType,
-      quantity: input.quantity,
-      unit_cost: input.unitCost,
-      reference_type: input.referenceType ?? null,
-      reference_id: input.referenceId ?? null,
-      batch_ref: input.batchRef?.trim() ? input.batchRef.trim() : null,
-      created_by: input.createdBy,
-    })
-    .select()
-    .single();
-  if (movErr) throw new Error(`Movement insert failed: ${movErr.message}`);
-
-  return { movement: toCamel<StockMovement>(movRow), ledger: newLedger };
 }
 
 // ---------------------------------------------------------------------------
@@ -286,29 +208,56 @@ export const sbAuditLogRepository: AuditLogRepository = {
 // Product
 // ---------------------------------------------------------------------------
 
+/**
+ * Translate a raw `products` row into the domain `Product` type, mapping the
+ * live database's own packaging columns onto this app's simpler
+ * `qtyPerPackage`/`defaultUnitCost` fields — see
+ * supabase/migrations/20261011090000_purchase_order_supplier_nullable.sql's
+ * sibling discussion: the live `products` table never had `qty_per_package`/
+ * `default_unit_cost` columns, it has `items_per_package`/`unit_value`
+ * (plus `package_value` and a dimensions model this app doesn't use). Rather
+ * than add a second, redundant pair of packaging columns, this is the one
+ * place that reconciles the two — every other file in the app only ever
+ * touches the `Product` TS type, never these raw column names.
+ */
+function toProduct(row: Record<string, unknown>): Product {
+  const product = toCamel<Product>(row);
+  return {
+    ...product,
+    qtyPerPackage: (row.items_per_package as number | null) ?? null,
+    defaultUnitCost: (row.unit_value as number | null) ?? null,
+  };
+}
+
+function toProductArray(rows: Record<string, unknown>[]): Product[] {
+  return rows.map(toProduct);
+}
+
 export const sbProductRepository: ProductRepository = {
   async list() {
     const { data, error } = await (await createServerSupabaseClient()).from('products').select('*').order('created_at');
     if (error) throw new Error(error.message);
-    return toCamelArray<Product>(data);
+    return toProductArray(data);
   },
   async getById(id) {
     const { data, error } = await (await createServerSupabaseClient()).from('products').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(error.message);
-    return data ? toCamel<Product>(data) : null;
+    return data ? toProduct(data) : null;
   },
   async getBySku(sku) {
     const { data, error } = await (await createServerSupabaseClient()).from('products').select('*').ilike('sku', sku).maybeSingle();
     if (error) throw new Error(error.message);
-    return data ? toCamel<Product>(data) : null;
+    return data ? toProduct(data) : null;
   },
   async getByBarcode(barcode) {
     const { data, error } = await (await createServerSupabaseClient()).from('products').select('*').eq('barcode', barcode).maybeSingle();
     if (error) throw new Error(error.message);
-    return data ? toCamel<Product>(data) : null;
+    return data ? toProduct(data) : null;
   },
   async create(input: CreateProductInput) {
-    const qtyPerPackage = (input.packagingUom && input.qtyPerPackage != null) ? input.qtyPerPackage : null;
+    const itemsPerPackage = (input.packagingUom && input.qtyPerPackage != null) ? input.qtyPerPackage : null;
+    const unitValue = input.defaultUnitCost ?? null;
+    const packageValue = itemsPerPackage != null && unitValue != null ? Math.round(itemsPerPackage * unitValue * 100) / 100 : null;
     const { data, error } = await (await createServerSupabaseClient())
       .from('products')
       .insert({
@@ -316,8 +265,9 @@ export const sbProductRepository: ProductRepository = {
         name: input.name,
         unit_of_measure: input.unitOfMeasure,
         packaging_uom: input.packagingUom ?? null,
-        qty_per_package: qtyPerPackage,
-        default_unit_cost: input.defaultUnitCost ?? null,
+        items_per_package: itemsPerPackage,
+        unit_value: unitValue,
+        package_value: packageValue,
         category_id: input.categoryId ?? null,
         barcode: input.barcode ?? null,
         reorder_point: input.reorderPoint ?? null,
@@ -339,7 +289,7 @@ export const sbProductRepository: ProductRepository = {
       }
       throw new Error(error.message);
     }
-    return toCamel<Product>(data);
+    return toProduct(data);
   },
   async setUnitPrice(productId, unitPrice) {
     if (unitPrice !== null && (!Number.isFinite(unitPrice) || unitPrice < 0)) {
@@ -352,18 +302,20 @@ export const sbProductRepository: ProductRepository = {
       .select()
       .single();
     if (error) throw new Error('That product could not be found.');
-    return toCamel<Product>(data);
+    return toProduct(data);
   },
   async update(id, input) {
-    const qtyPerPackage = (input.packagingUom && input.qtyPerPackage != null) ? input.qtyPerPackage : null;
+    const itemsPerPackage = (input.packagingUom && input.qtyPerPackage != null) ? input.qtyPerPackage : null;
+    const unitValue = 'defaultUnitCost' in input ? (input.defaultUnitCost ?? null) : undefined;
+    const packageValue = itemsPerPackage != null && typeof unitValue === 'number' ? Math.round(itemsPerPackage * unitValue * 100) / 100 : null;
     const { data, error } = await (await createServerSupabaseClient())
       .from('products')
       .update({
         name: input.name,
         unit_of_measure: input.unitOfMeasure,
         packaging_uom: input.packagingUom ?? null,
-        qty_per_package: qtyPerPackage,
-        ...('defaultUnitCost' in input ? { default_unit_cost: input.defaultUnitCost ?? null } : {}),
+        items_per_package: itemsPerPackage,
+        ...(unitValue !== undefined ? { unit_value: unitValue, package_value: packageValue } : {}),
         ...('categoryId' in input ? { category_id: input.categoryId ?? null } : {}),
         barcode: input.barcode ?? null,
         reorder_point: input.reorderPoint ?? null,
@@ -379,7 +331,7 @@ export const sbProductRepository: ProductRepository = {
       }
       throw new Error('That product could not be found or updated.');
     }
-    return toCamel<Product>(data);
+    return toProduct(data);
   },
   async delete(id) {
     const { data, error } = await (await createServerSupabaseClient())
@@ -518,7 +470,28 @@ export const sbStockMovementRepository: StockMovementRepository = {
     return toCamelArray<StockMovement>(data);
   },
   async record(input: RecordMovementInput) {
-    return postMovement(input);
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('post_stock_movement', {
+      p_product_id: input.productId,
+      p_warehouse_id: input.warehouseId,
+      p_movement_type: input.movementType,
+      p_quantity: input.quantity,
+      p_unit_cost: input.unitCost,
+      p_reference_type: input.referenceType ?? null,
+      p_reference_id: input.referenceId ?? null,
+      p_batch_ref: input.batchRef?.trim() ? input.batchRef.trim() : null,
+      p_created_by: input.createdBy,
+    });
+    if (error) throw new Error(error.message);
+    const movRow = Array.isArray(data) ? data[0] : data;
+    const { data: ledgerRow, error: ledgerErr } = await sb
+      .from('stock_ledger')
+      .select('*')
+      .eq('product_id', input.productId)
+      .eq('warehouse_id', input.warehouseId)
+      .single();
+    if (ledgerErr) throw new Error(ledgerErr.message);
+    return { movement: toCamel<StockMovement>(movRow), ledger: toCamel<StockLedgerEntry>(ledgerRow) };
   },
 };
 
@@ -652,66 +625,25 @@ export const sbReceivingRepository: ReceivingRepository = {
   },
 
   async quickReceive(input: QuickReceiveInput) {
-    const sb = (await createServerSupabaseClient());
-    const now = new Date().toISOString();
-    const poNumber = await nextDocNumber('purchase_orders', 'po_number', 'PO');
-    const grnNumber = await nextDocNumber('goods_receipts', 'grn_number', 'GRN');
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('quick_receive', {
+      p_supplier_id: input.supplierId,
+      p_warehouse_id: input.warehouseId,
+      p_product_id: input.productId,
+      p_quantity: input.quantity,
+      p_unit_cost: input.unitCost,
+    });
+    if (error) throw new Error(error.message);
+    const row = Array.isArray(data) ? data[0] : data;
 
-    // Create PO (immediately 'received')
-    const { data: poRow, error: poErr } = await sb
-      .from('purchase_orders')
-      .insert({
-        po_number: poNumber,
-        supplier_id: input.supplierId,
-        warehouse_id: input.warehouseId,
-        status: 'received',
-        ordered_at: now,
-        created_by: input.receivedBy,
-      })
-      .select()
-      .single();
+    const [{ data: poRow, error: poErr }, { data: grnRow, error: grnErr }] = await Promise.all([
+      sb.from('purchase_orders').select('*').eq('id', row.purchase_order_id).single(),
+      sb.from('goods_receipts').select('*').eq('id', row.goods_receipt_id).single(),
+    ]);
     if (poErr) throw new Error(poErr.message);
-    const po = toCamel<PurchaseOrder>(poRow);
-
-    // Create PO line
-    const { error: lineErr } = await sb.from('purchase_order_lines').insert({
-      purchase_order_id: po.id,
-      product_id: input.productId,
-      quantity_ordered: Math.abs(input.quantity),
-      quantity_received: Math.abs(input.quantity),
-      unit_cost: input.unitCost,
-    });
-    if (lineErr) throw new Error(lineErr.message);
-
-    // Create GRN
-    const { data: grnRow, error: grnErr } = await sb
-      .from('goods_receipts')
-      .insert({
-        grn_number: grnNumber,
-        purchase_order_id: po.id,
-        warehouse_id: input.warehouseId,
-        status: 'posted',
-        received_by: input.receivedBy,
-        received_at: now,
-      })
-      .select()
-      .single();
     if (grnErr) throw new Error(grnErr.message);
-    const grn = toCamel<GoodsReceipt>(grnRow);
 
-    // Post stock movement
-    await postMovement({
-      productId: input.productId,
-      warehouseId: input.warehouseId,
-      movementType: 'receipt',
-      quantity: Math.abs(input.quantity),
-      unitCost: input.unitCost,
-      referenceType: 'goods_receipt',
-      referenceId: grn.id,
-      createdBy: input.receivedBy,
-    });
-
-    return { purchaseOrder: po, goodsReceipt: grn };
+    return { purchaseOrder: toCamel<PurchaseOrder>(poRow), goodsReceipt: toCamel<GoodsReceipt>(grnRow) };
   },
 };
 
@@ -745,115 +677,43 @@ export const sbPurchaseOrderRepository: PurchaseOrderRepository = {
     return results;
   },
   async create(input: CreatePurchaseOrderInput) {
-    const sb = (await createServerSupabaseClient());
-    const poNumber = await nextDocNumber('purchase_orders', 'po_number', 'PO');
-    const now = new Date().toISOString();
-
-    const { data: poRow, error: poErr } = await sb
-      .from('purchase_orders')
-      .insert({
-        po_number: poNumber,
-        supplier_id: input.supplierId,
-        warehouse_id: input.warehouseId,
-        status: 'draft',
-        created_by: input.createdBy,
-      })
-      .select()
-      .single();
-    if (poErr) throw new Error(poErr.message);
-
-    const { error: lineErr } = await sb.from('purchase_order_lines').insert({
-      purchase_order_id: poRow.id,
-      product_id: input.productId,
-      quantity_ordered: input.quantity,
-      quantity_received: 0,
-      unit_cost: input.unitCost,
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('create_purchase_order', {
+      p_supplier_id: input.supplierId,
+      p_warehouse_id: input.warehouseId,
+      p_product_id: input.productId,
+      p_quantity: input.quantity,
+      p_unit_cost: input.unitCost,
     });
-    if (lineErr) throw new Error(lineErr.message);
-
+    if (error) throw new Error(error.message);
+    const poRow = Array.isArray(data) ? data[0] : data;
     return poWithLine(poRow);
   },
   async issue(poId) {
-    const sb = (await createServerSupabaseClient());
-    const { data: existing } = await sb.from('purchase_orders').select('status').eq('id', poId).single();
-    if (!existing) throw new Error('Purchase order not found.');
-    if (existing.status !== 'draft') throw new Error(`Purchase order is already ${existing.status}.`);
-
-    const { data: poRow, error } = await sb
-      .from('purchase_orders')
-      .update({ status: 'issued', ordered_at: new Date().toISOString() })
-      .eq('id', poId)
-      .select()
-      .single();
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('issue_purchase_order', { p_po_id: poId });
     if (error) throw new Error(error.message);
+    const poRow = Array.isArray(data) ? data[0] : data;
     return poWithLine(poRow);
   },
-  async receive(poId, quantity, receivedBy) {
-    const sb = (await createServerSupabaseClient());
-    const { data: poRow } = await sb.from('purchase_orders').select('*').eq('id', poId).single();
-    if (!poRow) throw new Error('Purchase order not found.');
-    if (poRow.status !== 'issued' && poRow.status !== 'partially_received') {
-      throw new Error(`Purchase order must be issued before it can be received (currently ${poRow.status}).`);
-    }
-    const { data: lineRow } = await sb
-      .from('purchase_order_lines')
-      .select('*')
-      .eq('purchase_order_id', poId)
-      .limit(1)
-      .single();
-    if (!lineRow) throw new Error('Purchase order line not found.');
+  async receive(poId, quantity, _receivedBy) {
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('receive_purchase_order', {
+      p_po_id: poId,
+      p_quantity: quantity,
+    });
+    if (error) throw new Error(error.message);
+    const row = Array.isArray(data) ? data[0] : data;
 
-    const remaining = lineRow.quantity_ordered - lineRow.quantity_received;
-    if (quantity <= 0) throw new Error('Quantity received must be a positive number.');
-    if (quantity > remaining + 1e-9) {
-      throw new Error(`Cannot receive more than the ${remaining} units still outstanding on this order.`);
-    }
-
-    const grnNumber = await nextDocNumber('goods_receipts', 'grn_number', 'GRN');
-    const now = new Date().toISOString();
-
-    const { data: grnRow, error: grnErr } = await sb
-      .from('goods_receipts')
-      .insert({
-        grn_number: grnNumber,
-        purchase_order_id: poId,
-        warehouse_id: poRow.warehouse_id,
-        status: 'posted',
-        received_by: receivedBy,
-        received_at: now,
-      })
-      .select()
-      .single();
+    const [{ data: poRow, error: poErr }, { data: grnRow, error: grnErr }] = await Promise.all([
+      sb.from('purchase_orders').select('*').eq('id', row.purchase_order_id).single(),
+      sb.from('goods_receipts').select('*').eq('id', row.goods_receipt_id).single(),
+    ]);
+    if (poErr) throw new Error(poErr.message);
     if (grnErr) throw new Error(grnErr.message);
 
-    await postMovement({
-      productId: lineRow.product_id,
-      warehouseId: poRow.warehouse_id,
-      movementType: 'receipt',
-      quantity: Math.abs(quantity),
-      unitCost: lineRow.unit_cost,
-      referenceType: 'goods_receipt',
-      referenceId: grnRow.id,
-      createdBy: receivedBy,
-    });
-
-    const newReceived = Math.round((lineRow.quantity_received + quantity) * 1000) / 1000;
-    const newStatus = newReceived >= lineRow.quantity_ordered - 1e-9 ? 'received' : 'partially_received';
-
-    await sb
-      .from('purchase_order_lines')
-      .update({ quantity_received: newReceived })
-      .eq('id', lineRow.id);
-
-    const { data: updatedPo } = await sb
-      .from('purchase_orders')
-      .update({ status: newStatus })
-      .eq('id', poId)
-      .select()
-      .single();
-
     return {
-      purchaseOrder: await poWithLine(updatedPo ?? poRow),
+      purchaseOrder: await poWithLine(poRow),
       goodsReceipt: toCamel<GoodsReceipt>(grnRow),
     };
   },
@@ -877,107 +737,23 @@ export const sbTransferRepository: TransferRepository = {
     return toCamelArray<InterWarehouseTransfer>(data);
   },
   async initiate(input: InitiateTransferInput) {
-    if (input.fromWarehouseId === input.toWarehouseId) {
-      throw new Error('Source and destination warehouse must differ.');
-    }
-    const sb = (await createServerSupabaseClient());
-
-    const { data: ledgerRow } = await sb
-      .from('stock_ledger')
-      .select('*')
-      .eq('product_id', input.productId)
-      .eq('warehouse_id', input.fromWarehouseId)
-      .maybeSingle();
-    const sourceLedger = ledgerRow ? toCamel<StockLedgerEntry>(ledgerRow) : null;
-
-    if (!sourceLedger || sourceLedger.quantityOnHand < input.quantity) {
-      throw new Error('Not enough stock on hand at the source warehouse to transfer that quantity.');
-    }
-
-    const transferNumber = await nextDocNumber('inter_warehouse_transfers', 'transfer_number', 'XFR');
-
-    const { data: xfrRow, error: xfrErr } = await sb
-      .from('inter_warehouse_transfers')
-      .insert({
-        transfer_number: transferNumber,
-        from_warehouse_id: input.fromWarehouseId,
-        to_warehouse_id: input.toWarehouseId,
-        status: 'in_transit',
-        initiated_by: input.initiatedBy,
-      })
-      .select()
-      .single();
-    if (xfrErr) throw new Error(xfrErr.message);
-
-    // Store line for complete()
-    const { error: lineErr } = await sb.from('inter_warehouse_transfer_lines').insert({
-      transfer_id: xfrRow.id,
-      product_id: input.productId,
-      quantity: Math.abs(input.quantity),
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('initiate_transfer', {
+      p_from_warehouse_id: input.fromWarehouseId,
+      p_to_warehouse_id: input.toWarehouseId,
+      p_product_id: input.productId,
+      p_quantity: input.quantity,
     });
-    if (lineErr) throw new Error(lineErr.message);
-
-    // Post transfer_out
-    await postMovement({
-      productId: input.productId,
-      warehouseId: input.fromWarehouseId,
-      movementType: 'transfer_out',
-      quantity: -Math.abs(input.quantity),
-      unitCost: sourceLedger.weightedAverageCost,
-      referenceType: 'inter_warehouse_transfer',
-      referenceId: xfrRow.id,
-      createdBy: input.initiatedBy,
-    });
-
-    return toCamel<InterWarehouseTransfer>(xfrRow);
-  },
-  async complete(transferId, completedBy) {
-    const sb = (await createServerSupabaseClient());
-    const { data: xfrRow } = await sb
-      .from('inter_warehouse_transfers')
-      .select('*')
-      .eq('id', transferId)
-      .single();
-    if (!xfrRow) throw new Error('Transfer not found.');
-    if (xfrRow.status !== 'in_transit') throw new Error(`Transfer is already ${xfrRow.status}.`);
-
-    const { data: lineRow } = await sb
-      .from('inter_warehouse_transfer_lines')
-      .select('*')
-      .eq('transfer_id', transferId)
-      .limit(1)
-      .single();
-    if (!lineRow) throw new Error('Transfer line details missing - cannot complete.');
-
-    // Look up the unit cost from the transfer_out movement that was posted on initiate
-    const { data: outMov } = await sb
-      .from('stock_movements')
-      .select('unit_cost')
-      .eq('reference_id', transferId)
-      .eq('movement_type', 'transfer_out')
-      .limit(1)
-      .single();
-    const unitCost = outMov?.unit_cost ?? 0;
-
-    await postMovement({
-      productId: lineRow.product_id,
-      warehouseId: xfrRow.to_warehouse_id,
-      movementType: 'transfer_in',
-      quantity: Number(lineRow.quantity),
-      unitCost,
-      referenceType: 'inter_warehouse_transfer',
-      referenceId: transferId,
-      createdBy: completedBy,
-    });
-
-    const { data: updated, error } = await sb
-      .from('inter_warehouse_transfers')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', transferId)
-      .select()
-      .single();
     if (error) throw new Error(error.message);
-    return toCamel<InterWarehouseTransfer>(updated);
+    const row = Array.isArray(data) ? data[0] : data;
+    return toCamel<InterWarehouseTransfer>(row);
+  },
+  async complete(transferId, _completedBy) {
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('complete_transfer', { p_transfer_id: transferId });
+    if (error) throw new Error(error.message);
+    const row = Array.isArray(data) ? data[0] : data;
+    return toCamel<InterWarehouseTransfer>(row);
   },
   async getStatus(transferId) {
     const { data } = await (await createServerSupabaseClient())
@@ -1026,77 +802,27 @@ export const sbStockAdjustmentRepository: StockAdjustmentRepository = {
     return toCamelArray<StockAdjustment>(data);
   },
   async request(input: RequestAdjustmentInput) {
-    const sb = (await createServerSupabaseClient());
-    const adjNumber = await nextDocNumber('stock_adjustments', 'adjustment_number', 'ADJ');
-
-    const { data: adjRow, error: adjErr } = await sb
-      .from('stock_adjustments')
-      .insert({
-        adjustment_number: adjNumber,
-        warehouse_id: input.warehouseId,
-        reason_code_id: input.reasonCodeId,
-        status: 'pending_approval',
-        requested_by: input.requestedBy,
-      })
-      .select()
-      .single();
-    if (adjErr) throw new Error(adjErr.message);
-
-    // Store line for decide()
-    await sb.from('stock_adjustment_lines').insert({
-      stock_adjustment_id: adjRow.id,
-      product_id: input.productId,
-      quantity_delta: input.quantityDelta,
-      unit_cost: input.unitCost,
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('request_adjustment', {
+      p_warehouse_id: input.warehouseId,
+      p_reason_code_id: input.reasonCodeId,
+      p_product_id: input.productId,
+      p_quantity_delta: input.quantityDelta,
+      p_unit_cost: input.unitCost,
     });
-
-    return toCamel<StockAdjustment>(adjRow);
-  },
-  async decide(adjustmentId, decision, decidedBy) {
-    const sb = (await createServerSupabaseClient());
-    const { data: adjRow } = await sb
-      .from('stock_adjustments')
-      .select('*')
-      .eq('id', adjustmentId)
-      .single();
-    if (!adjRow) throw new Error('Adjustment not found.');
-    if (adjRow.status !== 'pending_approval') {
-      throw new Error(`Adjustment is already ${adjRow.status}.`);
-    }
-
-    if (decision === 'approved') {
-      const { data: lineRow } = await sb
-        .from('stock_adjustment_lines')
-        .select('*')
-        .eq('stock_adjustment_id', adjustmentId)
-        .limit(1)
-        .single();
-      if (!lineRow) throw new Error('Adjustment line details missing - cannot approve.');
-
-      await postMovement({
-        productId: lineRow.product_id,
-        warehouseId: adjRow.warehouse_id,
-        movementType: lineRow.quantity_delta >= 0 ? 'adjustment' : 'write_off',
-        quantity: Number(lineRow.quantity_delta),
-        unitCost: Number(lineRow.unit_cost),
-        referenceType: 'stock_adjustment',
-        referenceId: adjustmentId,
-        createdBy: decidedBy,
-      });
-    }
-
-    const { data: updated, error } = await sb
-      .from('stock_adjustments')
-      .update({
-        status: decision,
-        approved_by: decidedBy,
-        approved_at: new Date().toISOString(),
-      })
-      .eq('id', adjustmentId)
-      .select()
-      .single();
     if (error) throw new Error(error.message);
-    return toCamel<StockAdjustment>(updated);
+    const row = Array.isArray(data) ? data[0] : data;
+    return toCamel<StockAdjustment>(row);
+  },
+  async decide(adjustmentId, decision, _decidedBy) {
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('decide_adjustment', {
+      p_adjustment_id: adjustmentId,
+      p_decision: decision,
+    });
+    if (error) throw new Error(error.message);
+    const row = Array.isArray(data) ? data[0] : data;
+    return toCamel<StockAdjustment>(row);
   },
 };
 
@@ -1119,126 +845,51 @@ export const sbSalesOrderRepository: SalesOrderRepository = {
     return data ? toCamel<SalesOrder>(data) : null;
   },
   async create(input: CreateSalesOrderInput) {
-    const orderNumber = await nextDocNumber('sales_orders', 'order_number', 'REQ');
-
-    const { data, error } = await (await createServerSupabaseClient())
-      .from('sales_orders')
-      .insert({
-        order_number: orderNumber,
-        customer_id: input.customerId,
-        warehouse_id: input.warehouseId,
-        product_id: input.productId,
-        quantity_ordered: input.quantity,
-        unit_price: input.unitPrice,
-        description: input.description,
-        status: 'draft',
-        created_by: input.createdBy,
-      })
-      .select()
-      .single();
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('create_sales_order', {
+      p_customer_id: input.customerId,
+      p_warehouse_id: input.warehouseId,
+      p_product_id: input.productId,
+      p_quantity: input.quantity,
+      p_unit_price: input.unitPrice,
+    });
     if (error) throw new Error(error.message);
-    return toCamel<SalesOrder>(data);
+    let row = Array.isArray(data) ? data[0] : data;
+
+    // create_sales_order has no description parameter (Repair Item
+    // requisitions need one) — set it with a follow-up update when supplied.
+    if (input.description) {
+      const { data: updated, error: updErr } = await sb
+        .from('sales_orders')
+        .update({ description: input.description })
+        .eq('id', row.id)
+        .select()
+        .single();
+      if (updErr) throw new Error(updErr.message);
+      row = updated;
+    }
+    return toCamel<SalesOrder>(row);
   },
   async confirm(orderId) {
-    const sb = (await createServerSupabaseClient());
-    const { data: row } = await sb.from('sales_orders').select('*').eq('id', orderId).single();
-    if (!row) throw new Error('Sales order not found.');
-    if (row.status !== 'draft') throw new Error(`Order is already ${row.status}.`);
-
-    await sbStockLedgerRepository.adjustReserved(row.product_id, row.warehouse_id, Number(row.quantity_ordered));
-
-    const { data: updated, error } = await sb
-      .from('sales_orders')
-      .update({ status: 'confirmed', confirmed_at: new Date().toISOString() })
-      .eq('id', orderId)
-      .select()
-      .single();
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('confirm_sales_order', { p_order_id: orderId });
     if (error) throw new Error(error.message);
-    return toCamel<SalesOrder>(updated);
+    const row = Array.isArray(data) ? data[0] : data;
+    return toCamel<SalesOrder>(row);
   },
-  async dispatch(orderId, dispatchedBy) {
-    const sb = (await createServerSupabaseClient());
-    const { data: row } = await sb.from('sales_orders').select('*').eq('id', orderId).single();
-    if (!row) throw new Error('Sales order not found.');
-    if (row.status !== 'confirmed') throw new Error('Only confirmed orders can be dispatched.');
-
-    const { data: ledgerRow } = await sb
-      .from('stock_ledger')
-      .select('*')
-      .eq('product_id', row.product_id)
-      .eq('warehouse_id', row.warehouse_id)
-      .single();
-    if (!ledgerRow) throw new Error('No stock ledger entry for this product/warehouse.');
-    const ledger = toCamel<StockLedgerEntry>(ledgerRow);
-
-    // Release reservation
-    await sbStockLedgerRepository.adjustReserved(row.product_id, row.warehouse_id, -Number(row.quantity_ordered));
-
-    // Check if the requester has a personal station (Engineer)
-    const destination = await sbWarehouseRepository.getByOwner(row.created_by);
-    if (destination && destination.id !== row.warehouse_id) {
-      // Transfer to Engineer's station
-      await postMovement({
-        productId: row.product_id,
-        warehouseId: row.warehouse_id,
-        movementType: 'transfer_out',
-        quantity: -Math.abs(Number(row.quantity_ordered)),
-        unitCost: ledger.weightedAverageCost,
-        referenceType: 'sales_order',
-        referenceId: orderId,
-        createdBy: dispatchedBy,
-      });
-      await postMovement({
-        productId: row.product_id,
-        warehouseId: destination.id,
-        movementType: 'transfer_in',
-        quantity: Math.abs(Number(row.quantity_ordered)),
-        unitCost: ledger.weightedAverageCost,
-        referenceType: 'sales_order',
-        referenceId: orderId,
-        createdBy: dispatchedBy,
-      });
-    } else {
-      // Plain outbound dispatch
-      await postMovement({
-        productId: row.product_id,
-        warehouseId: row.warehouse_id,
-        movementType: 'dispatch',
-        quantity: -Math.abs(Number(row.quantity_ordered)),
-        unitCost: ledger.weightedAverageCost,
-        referenceType: 'sales_order',
-        referenceId: orderId,
-        createdBy: dispatchedBy,
-      });
-    }
-
-    const { data: updated, error } = await sb
-      .from('sales_orders')
-      .update({ status: 'dispatched', dispatched_at: new Date().toISOString() })
-      .eq('id', orderId)
-      .select()
-      .single();
+  async dispatch(orderId, _dispatchedBy) {
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('dispatch_sales_order', { p_order_id: orderId });
     if (error) throw new Error(error.message);
-    return toCamel<SalesOrder>(updated);
+    const row = Array.isArray(data) ? data[0] : data;
+    return toCamel<SalesOrder>(row);
   },
   async cancel(orderId) {
-    const sb = (await createServerSupabaseClient());
-    const { data: row } = await sb.from('sales_orders').select('*').eq('id', orderId).single();
-    if (!row) throw new Error('Sales order not found.');
-    if (row.status === 'dispatched' || row.status === 'cancelled') {
-      throw new Error(`Order is already ${row.status}.`);
-    }
-    if (row.status === 'confirmed') {
-      await sbStockLedgerRepository.adjustReserved(row.product_id, row.warehouse_id, -Number(row.quantity_ordered));
-    }
-    const { data: updated, error } = await sb
-      .from('sales_orders')
-      .update({ status: 'cancelled' })
-      .eq('id', orderId)
-      .select()
-      .single();
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('cancel_sales_order', { p_order_id: orderId });
     if (error) throw new Error(error.message);
-    return toCamel<SalesOrder>(updated);
+    const row = Array.isArray(data) ? data[0] : data;
+    return toCamel<SalesOrder>(row);
   },
   async getStatus(orderId) {
     const { data } = await (await createServerSupabaseClient()).from('sales_orders').select('status').eq('id', orderId).maybeSingle();
@@ -1318,12 +969,6 @@ export const sbNotificationRepository: NotificationRepository = {
 // Invoices (dormant per §1.1 — still implemented against the real tables)
 // ---------------------------------------------------------------------------
 
-const INVOICE_PAYMENT_TERMS_DAYS = 30;
-
-function invoiceOutstanding(inv: Invoice): number {
-  return Math.round((inv.total - inv.amountPaid - inv.creditedAmount) * 100) / 100;
-}
-
 export const sbInvoiceRepository: InvoiceRepository = {
   async list() {
     const { data, error } = await (await createServerSupabaseClient())
@@ -1342,80 +987,34 @@ export const sbInvoiceRepository: InvoiceRepository = {
     if (error) throw new Error(error.message);
     return data ? toCamel<Invoice>(data) : null;
   },
-  async generateFromSalesOrder(salesOrderId, createdBy) {
-    const sb = (await createServerSupabaseClient());
-    const { data: orderRow } = await sb.from('sales_orders').select('*').eq('id', salesOrderId).single();
-    if (!orderRow) throw new Error('Sales order not found.');
-    if (orderRow.status !== 'dispatched') throw new Error('Only dispatched orders can be invoiced.');
-
-    const { data: existing } = await sb.from('invoices').select('id').eq('sales_order_id', salesOrderId).maybeSingle();
-    if (existing) throw new Error('This order already has an invoice.');
-
-    const invNumber = await nextDocNumber('invoices', 'invoice_number', 'INV');
-    const subtotal = Math.round(orderRow.quantity_ordered * orderRow.unit_price * 100) / 100;
-    const vatAmount = Math.round(subtotal * VAT_RATE * 100) / 100;
-    const total = Math.round((subtotal + vatAmount) * 100) / 100;
-    const issuedAt = new Date();
-    const dueAt = new Date(issuedAt.getTime() + INVOICE_PAYMENT_TERMS_DAYS * 24 * 60 * 60 * 1000);
-
-    const { data, error } = await sb
-      .from('invoices')
-      .insert({
-        invoice_number: invNumber,
-        sales_order_id: salesOrderId,
-        customer_id: orderRow.customer_id,
-        subtotal,
-        vat_amount: vatAmount,
-        total,
-        amount_paid: 0,
-        credited_amount: 0,
-        status: 'unpaid',
-        issued_at: issuedAt.toISOString(),
-        due_at: dueAt.toISOString(),
-        created_by: createdBy,
-      })
-      .select()
-      .single();
+  async generateFromSalesOrder(salesOrderId, _createdBy) {
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('generate_invoice_from_sales_order', {
+      p_sales_order_id: salesOrderId,
+    });
     if (error) throw new Error(error.message);
-    return toCamel<Invoice>(data);
+    const row = Array.isArray(data) ? data[0] : data;
+    return toCamel<Invoice>(row);
   },
-  async recordPayment(invoiceId, amount, recordedBy) {
-    const sb = (await createServerSupabaseClient());
-    const { data: invRow } = await sb.from('invoices').select('*').eq('id', invoiceId).single();
-    if (!invRow) throw new Error('Invoice not found.');
-    const invoice = toCamel<Invoice>(invRow);
-    if (invoice.status === 'paid' || invoice.status === 'cancelled') {
-      throw new Error(`Invoice is already ${invoice.status}.`);
-    }
-    if (amount <= 0) throw new Error('Payment amount must be positive.');
-    const outstanding = invoiceOutstanding(invoice);
-    if (amount > outstanding + 1e-9) {
-      throw new Error(`Cannot pay more than the R${outstanding.toFixed(2)} outstanding on this invoice.`);
-    }
+  async recordPayment(invoiceId, amount, _recordedBy) {
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('record_invoice_payment', {
+      p_invoice_id: invoiceId,
+      p_amount: amount,
+    });
+    if (error) throw new Error(error.message);
+    const invRow = Array.isArray(data) ? data[0] : data;
 
     const { data: payRow, error: payErr } = await sb
       .from('invoice_payments')
-      .insert({
-        invoice_id: invoiceId,
-        amount,
-        recorded_by: recordedBy,
-      })
-      .select()
+      .select('*')
+      .eq('invoice_id', invoiceId)
+      .order('paid_at', { ascending: false })
+      .limit(1)
       .single();
     if (payErr) throw new Error(payErr.message);
 
-    const newPaid = Math.round((invoice.amountPaid + amount) * 100) / 100;
-    const newStatus = invoiceOutstanding({ ...invoice, amountPaid: newPaid }) <= 1e-9 ? 'paid' : 'partially_paid';
-
-    const { data: updatedInv, error: updErr } = await sb
-      .from('invoices')
-      .update({ amount_paid: newPaid, status: newStatus })
-      .eq('id', invoiceId)
-      .select()
-      .single();
-    if (updErr) throw new Error(updErr.message);
-
-    return { invoice: toCamel<Invoice>(updatedInv), payment: toCamel<InvoicePayment>(payRow) };
+    return { invoice: toCamel<Invoice>(invRow), payment: toCamel<InvoicePayment>(payRow) };
   },
   async listPayments(invoiceId) {
     const { data, error } = await (await createServerSupabaseClient())
@@ -1425,49 +1024,24 @@ export const sbInvoiceRepository: InvoiceRepository = {
     if (error) throw new Error(error.message);
     return toCamelArray<InvoicePayment>(data);
   },
-  async issueCreditNote(invoiceId, amount, reason, issuedBy) {
-    const sb = (await createServerSupabaseClient());
-    const { data: invRow } = await sb.from('invoices').select('*').eq('id', invoiceId).single();
-    if (!invRow) throw new Error('Invoice not found.');
-    const invoice = toCamel<Invoice>(invRow);
-    if (invoice.status === 'paid' || invoice.status === 'cancelled') {
-      throw new Error(`Invoice is already ${invoice.status}.`);
-    }
-    if (amount <= 0) throw new Error('Credit note amount must be positive.');
-    if (!reason.trim()) throw new Error('A reason is required.');
-    const outstanding = invoiceOutstanding(invoice);
-    if (amount > outstanding + 1e-9) {
-      throw new Error(`Cannot credit more than the R${outstanding.toFixed(2)} outstanding on this invoice.`);
-    }
+  async issueCreditNote(invoiceId, amount, reason, _issuedBy) {
+    const sb = await createServerSupabaseClient();
+    const { data, error } = await sb.rpc('issue_credit_note', {
+      p_invoice_id: invoiceId,
+      p_amount: amount,
+      p_reason: reason,
+    });
+    if (error) throw new Error(error.message);
+    const cnRow = Array.isArray(data) ? data[0] : data;
 
-    const cnNumber = await nextDocNumber('credit_notes', 'credit_note_number', 'CN');
-
-    const { data: cnRow, error: cnErr } = await sb
-      .from('credit_notes')
-      .insert({
-        credit_note_number: cnNumber,
-        invoice_id: invoiceId,
-        amount,
-        reason: reason.trim(),
-        issued_by: issuedBy,
-      })
-      .select()
-      .single();
-    if (cnErr) throw new Error(cnErr.message);
-
-    const newCredited = Math.round((invoice.creditedAmount + amount) * 100) / 100;
-    const newStatus =
-      invoiceOutstanding({ ...invoice, creditedAmount: newCredited }) <= 1e-9 ? 'paid' : 'partially_paid';
-
-    const { data: updatedInv, error: updErr } = await sb
+    const { data: invRow, error: invErr } = await sb
       .from('invoices')
-      .update({ credited_amount: newCredited, status: newStatus })
+      .select('*')
       .eq('id', invoiceId)
-      .select()
       .single();
-    if (updErr) throw new Error(updErr.message);
+    if (invErr) throw new Error(invErr.message);
 
-    return { invoice: toCamel<Invoice>(updatedInv), creditNote: toCamel<CreditNote>(cnRow) };
+    return { invoice: toCamel<Invoice>(invRow), creditNote: toCamel<CreditNote>(cnRow) };
   },
   async listCreditNotes(invoiceId) {
     const { data, error } = await (await createServerSupabaseClient())

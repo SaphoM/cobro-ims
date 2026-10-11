@@ -19,7 +19,6 @@ export function ReceiveForm({
   products,
   categories,
   initialBarcode,
-  canEditPrice,
   showCosts,
   centerSubmit = false,
 }: {
@@ -28,11 +27,6 @@ export function ReceiveForm({
   products: Product[];
   categories: ProductCategory[];
   initialBarcode?: string;
-  /** `manage_pricing` - Admin only. Everyone else sees the cost as read-only
-   *  bold text (the catalogue price), and the server discards whatever unit
-   *  cost their form submits - see receiveStockAction. Same rule the
-   *  Overview's stock-movement form follows. */
-  canEditPrice: boolean;
   /** Stores profiles get the submit centred and sized like the Overview's
    *  Scan button - same height, same width (it takes the middle grid column,
    *  exactly as Scan does), full width once the grid collapses. Admin keeps
@@ -84,17 +78,23 @@ export function ReceiveForm({
     tally as e.g. "90/100" - it is display only, never enforced, since a
     delivery legitimately can arrive short or over.
   */
+  /*
+    receiveByPackages: when the matched product has a packagingUom+qtyPerPackage,
+    each scan (or manual entry) counts one PACKAGE, not one individual unit. The
+    hidden `quantity` field always carries the individual-unit total so the server
+    action and the WAC engine never see a package-level number.
+  */
+  const [receiveByPackages, setReceiveByPackages] = useState(false);
   const [receivedCount, setReceivedCount] = useState(0);
   const [expectedQuantity, setExpectedQuantity] = useState<number | null>(null);
 
-  // Product and Supplier now only ever come from the scan (see those fields
-  // below) - so posting is blocked until the scan has actually supplied
-  // both, and at least one unit has been counted, rather than submitting an
-  // empty productId/supplierId/quantity the server would just reject anyway.
+  // Posting requires a matched product and at least one unit counted.
+  // Supplier is optional — set via a Cobro delivery label scan when available,
+  // but ad-hoc receipts without a label are permitted.
   // Store isn't gated here: it's either the one real store (shown as a fact)
   // or, if a second store ever exists, an ordinary picker with a valid
   // default.
-  const canPost = Boolean(selectedProductId) && Boolean(scannedSupplierId) && receivedCount > 0;
+  const canPost = Boolean(selectedProductId) && receivedCount > 0;
   const scanFormRef = useRef<HTMLFormElement>(null);
   const scanBarcodeRef = useRef<HTMLInputElement>(null);
 
@@ -135,7 +135,14 @@ export function ReceiveForm({
     // two deliveries into one count.
     const isSameProduct = match.id === selectedProductId;
     setSelectedProductId(match.id);
-    const newCount = isSameProduct ? receivedCount + 1 : 1;
+
+    // When switching to a packaged product, default to "receive by packages"
+    // mode so operators scan/enter box-counts rather than bolt-counts.
+    const hasPackaging = !!(match.packagingUom && match.qtyPerPackage);
+    if (!isSameProduct) setReceiveByPackages(hasPackaging);
+    const currentReceiveByPackages = isSameProduct ? receiveByPackages : hasPackaging;
+    const increment = currentReceiveByPackages && match.qtyPerPackage ? match.qtyPerPackage : 1;
+    const newCount = isSameProduct ? receivedCount + increment : increment;
     setReceivedCount(newCount);
 
     // Only trust a supplier the scan actually carried, and only one this
@@ -179,6 +186,15 @@ export function ReceiveForm({
     barcodeInput.focus();
   }
 
+  // Derived packaging info for the currently selected product
+  const pkgUom = selectedProduct?.packagingUom ?? null;
+  const qtyPerPkg = selectedProduct?.qtyPerPackage ?? null;
+  const hasPackaging = !!(pkgUom && qtyPerPkg);
+  const pkgLabel = pkgUom ? (PACKAGING_UOM_LABELS[pkgUom] ?? pkgUom) : '';
+  // In package mode: receivedCount is already in individual units (each scan adds qtyPerPkg)
+  const packageCount = hasPackaging && receiveByPackages && qtyPerPkg ? receivedCount / qtyPerPkg : null;
+  const removeAmount = receiveByPackages && qtyPerPkg ? qtyPerPkg : 1;
+
   /*
     What the operator sees INSIDE the camera overlay while it stays open
     across scans - same reasoning as the Overview's Scan dialog: the overlay
@@ -210,22 +226,30 @@ export function ReceiveForm({
               <div className="truncate font-mono-brand text-[0.68rem] text-text-faint">{selectedProduct.sku}</div>
               <div
                 aria-live="polite"
-                aria-label={`Received: ${receivedCount}${expectedQuantity != null ? ` of ${expectedQuantity}` : ''}`}
+                aria-label={`Received: ${receivedCount} ${selectedProduct.unitOfMeasure}${expectedQuantity != null ? ` of ${expectedQuantity}` : ''}`}
                 className="mt-0.5 font-display text-[1.7rem] font-bold leading-tight tabular-nums text-text"
               >
-                {receivedCount}
+                {packageCount != null ? packageCount : receivedCount}
+                <span className="ml-1 text-[0.95rem] font-semibold text-text-muted">
+                  {packageCount != null ? pkgLabel + (packageCount !== 1 ? 's' : '') : selectedProduct.unitOfMeasure}
+                </span>
                 {expectedQuantity != null && (
                   <span className="ml-1 text-[0.95rem] font-semibold text-text-faint">/ {expectedQuantity}</span>
                 )}
               </div>
+              {packageCount != null && (
+                <div className="text-[0.72rem] text-text-faint">
+                  = {receivedCount.toLocaleString()} {selectedProduct.unitOfMeasure}s
+                </div>
+              )}
             </div>
             {receivedCount > 0 && (
               <button
                 type="button"
-                onClick={() => setReceivedCount((count) => Math.max(0, count - 1))}
+                onClick={() => setReceivedCount((count) => Math.max(0, count - removeAmount))}
                 className="flex-none rounded-md border border-accent/30 px-2 py-1 text-[0.72rem] font-semibold text-text-muted transition-colors hover:border-accent/50 hover:text-accent-strong"
               >
-                Remove 1
+                {receiveByPackages && hasPackaging ? `Remove 1 ${pkgLabel}` : 'Remove 1'}
               </button>
             )}
           </div>
@@ -427,70 +451,84 @@ export function ReceiveForm({
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[0.75rem] font-semibold text-text-muted">Quantity received</span>
+            <span className="text-[0.75rem] font-semibold text-text-muted">
+              {hasPackaging && receiveByPackages
+                ? `${pkgLabel}s received`
+                : `Quantity received (${selectedProduct?.unitOfMeasure ?? 'units'})`}
+            </span>
             {/*
-              Text, not an input - the count comes from scanning (re-scan the
-              same barcode to add one), same as the Overview's Scan dialog.
-              Shown as "received/expected" when the label carried an expected
-              quantity, updating live as each scan lands; just the received
-              count when it didn't, since there is nothing to compare against.
-              "Remove 1" is the only way to correct a miscount.
+              Text, not an input — the count comes from scanning (re-scan the
+              same barcode to add one). In package mode each scan counts as one
+              package (= qtyPerPackage individual units); in individual mode each
+              scan counts as one unit. "Remove 1" removes one package/unit.
             */}
-            <div className="flex h-9 items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-[0.95rem] font-bold tabular-nums text-accent-strong">
-                {receivedCount}
+                {packageCount != null ? packageCount : receivedCount}
+                <span className="ml-1 text-[0.78rem] font-normal text-text-muted">
+                  {packageCount != null ? pkgLabel + (packageCount !== 1 ? 's' : '') : selectedProduct?.unitOfMeasure}
+                </span>
                 {expectedQuantity != null && <span className="text-text-faint"> / {expectedQuantity}</span>}
               </span>
+              {packageCount != null && (
+                <span className="text-[0.72rem] text-text-faint">= {receivedCount.toLocaleString()} {selectedProduct?.unitOfMeasure}s</span>
+              )}
               {receivedCount > 0 && (
                 <button
                   type="button"
-                  onClick={() => setReceivedCount((count) => Math.max(0, count - 1))}
+                  onClick={() => setReceivedCount((count) => Math.max(0, count - removeAmount))}
                   className="rounded-md border border-accent/30 px-2 py-0.5 text-[0.72rem] font-semibold text-text-muted transition-colors hover:border-accent/50 hover:text-accent-strong"
                 >
-                  Remove 1
+                  {receiveByPackages && hasPackaging ? `Remove 1 ${pkgLabel}` : 'Remove 1'}
                 </button>
               )}
             </div>
+            {hasPackaging && (
+              <button
+                type="button"
+                onClick={() => {
+                  setReceiveByPackages((v) => !v);
+                  setReceivedCount(0);
+                }}
+                className="w-fit text-[0.68rem] font-semibold text-accent-strong hover:underline"
+              >
+                Switch to {receiveByPackages ? `individual ${selectedProduct?.unitOfMeasure}s` : `${pkgLabel} count`}
+              </button>
+            )}
+            {/* Always submit in individual units — the WAC engine never sees package counts */}
             <input type="hidden" name="quantity" value={receivedCount} />
           </label>
 
           <label className="flex flex-col gap-1.5">
             <span className="text-[0.75rem] font-semibold text-text-muted">
               Unit cost (R)
-              {!canEditPrice && showCosts && (
-                <span className="ml-1 font-normal text-text-faint">from the catalogue</span>
-              )}
+              {showCosts && <span className="ml-1 font-normal text-text-faint">from the catalogue</span>}
             </span>
-            {canEditPrice ? (
-              <input type="number" name="unitCost" min="0" step="0.01" required placeholder="0.00" className={inputClass} />
-            ) : (
-              <>
-                {/* Display-only for every role except Admin - plain bold text,
-                    not an input drawn to look unavailable. The figure is the
-                    selected product's catalogue price, which is what
-                    receiveStockAction will post for this user regardless of
-                    what the form sends. */}
-                <div className="flex flex-col gap-0.5">
-                  <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
-                    {!showCosts
-                      ? HIDDEN_COST
-                      : selectedProduct?.unitPrice != null
-                        ? `${formatCurrency(selectedProduct.unitPrice)} / ${selectedProduct.unitOfMeasure}`
-                        : selectedProduct?.defaultUnitCost != null
-                          ? `${formatCurrency(selectedProduct.defaultUnitCost)} / ${selectedProduct.unitOfMeasure} (default)`
-                          : 'No price set'}
-                  </div>
-                  {showCosts && selectedProduct?.packagingUom && selectedProduct.qtyPerPackage != null && (
-                    <div className="text-[0.72rem] text-text-faint">
-                      Cost is per individual {selectedProduct.unitOfMeasure}, not per {PACKAGING_UOM_LABELS[selectedProduct.packagingUom] ?? selectedProduct.packagingUom}.
-                    </div>
-                  )}
+            {/*
+              Always read-only, for every role including Admin - the Product
+              Catalogue's Price column is the only place a product's cost can
+              be changed (see products/price-cell.tsx). This figure is the
+              selected product's catalogue price, which is exactly what
+              receiveStockAction posts the receipt at regardless of what, if
+              anything, this form submits - there is no unitCost field to
+              submit any more.
+            */}
+            <div className="flex flex-col gap-0.5">
+              <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+                {!showCosts
+                  ? HIDDEN_COST
+                  : selectedProduct?.unitPrice != null
+                    ? `${formatCurrency(selectedProduct.unitPrice)} / ${selectedProduct.unitOfMeasure}`
+                    : selectedProduct?.defaultUnitCost != null
+                      ? `${formatCurrency(selectedProduct.defaultUnitCost)} / ${selectedProduct.unitOfMeasure} (default)`
+                      : 'No price set'}
+              </div>
+              {showCosts && selectedProduct?.packagingUom && selectedProduct.qtyPerPackage != null && (
+                <div className="text-[0.72rem] text-text-faint">
+                  Cost is per individual {selectedProduct.unitOfMeasure}, not per {PACKAGING_UOM_LABELS[selectedProduct.packagingUom] ?? selectedProduct.packagingUom}.
                 </div>
-                <input type="hidden" name="unitCost" value={
-                  selectedProduct?.unitPrice ?? selectedProduct?.defaultUnitCost ?? 0
-                } />
-              </>
-            )}
+              )}
+            </div>
           </label>
 
           <div
@@ -506,7 +544,7 @@ export function ReceiveForm({
             <button
               type="submit"
               disabled={pending || !canPost}
-              title={canPost ? undefined : 'Scan a Cobro delivery label to set the product and supplier first'}
+              title={canPost ? undefined : 'Scan a product barcode to select a product first'}
               className={
                 centerSubmit
                   ? 'flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-[0.85rem] font-bold text-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50'

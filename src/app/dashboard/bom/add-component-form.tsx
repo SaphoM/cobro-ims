@@ -1,14 +1,21 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { addBomLineAction, type AddBomLineFormState } from '@/app/dashboard/bom/actions';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import type { Product } from '@/lib/domain/inventory';
+import { PACKAGING_UOM_LABELS } from '@/lib/uom';
 
 const initialState: AddBomLineFormState = { error: null, success: null };
 
 export function AddComponentForm({ parentProductId, componentOptions }: { parentProductId: string; componentOptions: Product[] }) {
   const [state, formAction, pending] = useActionState(addBomLineAction, initialState);
+  const [selectedId, setSelectedId] = useState(componentOptions[0]?.id ?? '');
+  const selected = componentOptions.find((p) => p.id === selectedId);
+  const pkgUom = selected?.packagingUom ?? null;
+  const qtyPerPkg = selected?.qtyPerPackage ?? null;
+  const hasPackaging = !!(pkgUom && qtyPerPkg);
+  const pkgLabel = pkgUom ? (PACKAGING_UOM_LABELS[pkgUom] ?? pkgUom) : '';
 
   return (
     <div>
@@ -16,7 +23,13 @@ export function AddComponentForm({ parentProductId, componentOptions }: { parent
         <input type="hidden" name="parentProductId" value={parentProductId} />
         <label className="flex flex-1 min-w-[220px] flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">Component product</span>
-          <select name="componentProductId" required className={selectClass}>
+          <select
+            name="componentProductId"
+            required
+            className={selectClass}
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+          >
             {componentOptions.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.sku} - {p.name}
@@ -25,8 +38,15 @@ export function AddComponentForm({ parentProductId, componentOptions }: { parent
           </select>
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Quantity per unit</span>
+          <span className="text-[0.75rem] font-semibold text-text-muted">
+            Quantity per unit{selected ? ` (${selected.unitOfMeasure})` : ''}
+          </span>
           <input type="number" name="quantity" min="0.001" step="0.001" required placeholder="0" className={`${inputClass} w-32`} />
+          {hasPackaging && (
+            <span className="text-[0.72rem] text-text-faint">
+              Individual {selected!.unitOfMeasure}s — {qtyPerPkg} = 1 {pkgLabel}
+            </span>
+          )}
         </label>
         <button
           type="submit"

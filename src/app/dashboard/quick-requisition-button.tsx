@@ -5,6 +5,7 @@ import { createSalesOrderAction, type SalesOrderFormState } from '@/app/dashboar
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import type { Customer } from '@/lib/domain/inventory';
 import { formatCurrency } from '@/lib/ui/currency';
+import { PACKAGING_UOM_LABELS } from '@/lib/uom';
 
 const initialState: SalesOrderFormState = { error: null, success: null };
 
@@ -41,10 +42,11 @@ export function QuickRequisitionButton({
   availableQty,
   elsewhere,
   unitPrice,
-  canEditPrice,
   warehouseId,
   warehouseLabel,
   customers,
+  packagingUom = null,
+  qtyPerPackage = null,
 }: {
   productId: string;
   productSku: string;
@@ -72,14 +74,11 @@ export function QuickRequisitionButton({
    *  costs at all (withheld at the source, not just hidden - see
    *  dashboard/page.tsx). */
   unitPrice: number | null;
-  /** Only Admin (`manage_pricing`) can override this quick requisition's
-   *  Unit value - everyone else gets the catalogue price as read-only
-   *  display, submitted as-is. Setting requisition value is a pricing
-   *  decision, the same authority that sets it on the catalogue itself. */
-  canEditPrice: boolean;
   warehouseId: string;
   warehouseLabel: string;
   customers: Customer[];
+  packagingUom?: string | null;
+  qtyPerPackage?: number | null;
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(createSalesOrderAction, initialState);
@@ -218,6 +217,12 @@ export function QuickRequisitionButton({
                     placeholder="0"
                     className={inputClass}
                   />
+                  {packagingUom && qtyPerPackage && (
+                    <span className="text-[0.72rem] text-text-faint">
+                      Individual {unitOfMeasure}s — {qtyPerPackage} = 1{' '}
+                      {PACKAGING_UOM_LABELS[packagingUom] ?? packagingUom}
+                    </span>
+                  )}
                 </label>
                 <label className="flex flex-col gap-1.5">
                   <span className="text-[0.75rem] font-semibold text-text-muted">
@@ -226,32 +231,19 @@ export function QuickRequisitionButton({
                       <span className="ml-1 font-normal text-text-faint">from the catalogue</span>
                     )}
                   </span>
-                  {canEditPrice ? (
-                    <input
-                      type="number"
-                      name="unitPrice"
-                      min="0"
-                      step="0.01"
-                      required
-                      defaultValue={unitPrice != null ? unitPrice : undefined}
-                      placeholder="0.00"
-                      className={inputClass}
-                    />
-                  ) : (
-                    <>
-                      {/* Display-only for every role except Admin - setting
-                          a requisition's value is a pricing decision, the
-                          same authority `manage_pricing` already gates on
-                          the catalogue itself. Still submitted with the
-                          form via the hidden input below. Plain text, not
-                          styled as a control, since there's nothing here to
-                          interact with. */}
-                      <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
-                        {unitPrice != null ? `${formatCurrency(unitPrice)}` : 'No price set'}
-                      </div>
-                      <input type="hidden" name="unitPrice" value={unitPrice ?? 0} />
-                    </>
-                  )}
+                  {/*
+                    Always read-only, for every role including Admin - setting
+                    a requisition's value is a pricing decision, the same
+                    authority `manage_pricing` already gates on the catalogue
+                    itself (see products/price-cell.tsx), and the server
+                    ignores whatever this form submits regardless (see
+                    sales/actions.ts's createSalesOrderAction). Plain text,
+                    not styled as a control, since there's nothing here to
+                    interact with.
+                  */}
+                  <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+                    {unitPrice != null ? `${formatCurrency(unitPrice)}` : 'No price set'}
+                  </div>
                 </label>
               </div>
 

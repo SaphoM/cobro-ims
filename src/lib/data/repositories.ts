@@ -234,7 +234,7 @@ export interface CustomerRepository {
 }
 
 export interface QuickReceiveInput {
-  supplierId: string;
+  supplierId: string | null;
   warehouseId: string;
   productId: string;
   quantity: number;

@@ -6,6 +6,7 @@ import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import type { Product, ProductCategory, Warehouse } from '@/lib/domain/inventory';
 import { formatWarehouseLabel } from '@/lib/warehouse-label';
+import { PACKAGING_UOM_LABELS } from '@/lib/uom';
 
 const initialState: TransferFormState = { error: null, success: null };
 
@@ -21,10 +22,13 @@ export function TransferForm({
   const categoryById = new Map(categories.map((c) => [c.id, c]));
   const [state, formAction, pending] = useActionState(initiateTransferAction, initialState);
   const [scanMessage, setScanMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState(products[0]?.id ?? '');
   const productSelectRef = useRef<HTMLSelectElement>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
   const scanFormRef = useRef<HTMLFormElement>(null);
   const scanBarcodeRef = useRef<HTMLInputElement>(null);
+
+  const selectedProduct = products.find((p) => p.id === selectedProductId);
 
   function handleBarcodeSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -33,8 +37,9 @@ export function TransferForm({
     if (!barcode) return;
 
     const match = products.find((p) => p.barcode === barcode);
-    if (match && productSelectRef.current) {
-      productSelectRef.current.value = match.id;
+    if (match) {
+      setSelectedProductId(match.id);
+      if (productSelectRef.current) productSelectRef.current.value = match.id;
       setScanMessage({ text: `Matched ${match.sku} - ${match.name}.`, ok: true });
       quantityRef.current?.focus();
     } else {
@@ -124,7 +129,14 @@ export function TransferForm({
 
         <label className="flex flex-col gap-1.5 lg:col-span-2">
           <span className="text-[0.75rem] font-semibold text-text-muted">Product</span>
-          <select name="productId" required ref={productSelectRef} className={selectClass}>
+          <select
+            name="productId"
+            required
+            ref={productSelectRef}
+            value={selectedProductId}
+            onChange={(e) => setSelectedProductId(e.target.value)}
+            className={selectClass}
+          >
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.sku} - {p.name}
@@ -135,7 +147,12 @@ export function TransferForm({
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Quantity</span>
+          <span className="text-[0.75rem] font-semibold text-text-muted">
+            Quantity
+            {selectedProduct && (
+              <span className="ml-1 font-normal text-text-faint">({selectedProduct.unitOfMeasure})</span>
+            )}
+          </span>
           <input
             ref={quantityRef}
             type="number"
@@ -146,6 +163,12 @@ export function TransferForm({
             placeholder="0"
             className={inputClass}
           />
+          {selectedProduct?.packagingUom && selectedProduct.qtyPerPackage != null && (
+            <span className="text-[0.68rem] text-text-faint">
+              Enter in individual {selectedProduct.unitOfMeasure}s — {selectedProduct.qtyPerPackage} = 1{' '}
+              {PACKAGING_UOM_LABELS[selectedProduct.packagingUom] ?? selectedProduct.packagingUom}
+            </span>
+          )}
         </label>
 
         <div className="flex items-end lg:col-span-5">

@@ -153,38 +153,54 @@ export default async function ReportsPage() {
         exportFilename="stock-valuation"
         rows={valuation.rows}
       >
-        <table className="w-full min-w-[720px] border-collapse text-[0.86rem]">
+        <table className="w-full min-w-[820px] border-collapse text-[0.86rem]">
           <thead>
             <tr className="text-left text-text-faint">
               <th className="px-5 py-2.5 font-medium">Store</th>
               <th className="px-5 py-2.5 font-medium">SKU</th>
               <th className="px-5 py-2.5 font-medium">Product</th>
-              <th className="px-5 py-2.5 text-right font-medium tabular-nums">On hand</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">On hand (units)</th>
+              <th className="px-5 py-2.5 text-right font-medium tabular-nums">Packages</th>
               <th className="px-5 py-2.5 text-right font-medium tabular-nums">WAC</th>
               <th className="px-5 py-2.5 text-right font-medium tabular-nums">Value</th>
             </tr>
           </thead>
           <tbody>
-            {valuation.rows.map((r, i) => (
-              <tr key={i} className="border-t border-accent/[0.08]">
-                <td className="px-5 py-3 text-text-muted">{formatStoreCode(r.warehouseCode)}</td>
-                <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
-                <td className="px-5 py-3 text-text-muted">
-                  {r.productName}
-                  <CategoryTag name={categoryNameBySku.get(r.sku)} />
-                </td>
-                <td className="px-5 py-3 text-right tabular-nums text-text">
-                  {r.quantityOnHand.toLocaleString()} {r.unitOfMeasure}
-                </td>
-                <td className="px-5 py-3 text-right tabular-nums text-text-muted">
-                  {formatCurrency(r.weightedAverageCost)}
-                  <span className="ml-1 text-[0.68rem] text-text-faint">/ {r.unitOfMeasure}</span>
-                </td>
-                <td className="px-5 py-3 text-right tabular-nums text-text">
-                  {formatCurrency(r.value)}
-                </td>
-              </tr>
-            ))}
+            {valuation.rows.map((r, i) => {
+              const pkgEquiv =
+                r.packagingUom && r.qtyPerPackage && r.qtyPerPackage > 0
+                  ? (r.quantityOnHand / r.qtyPerPackage).toFixed(2)
+                  : null;
+              return (
+                <tr key={i} className="border-t border-accent/[0.08]">
+                  <td className="px-5 py-3 text-text-muted">{formatStoreCode(r.warehouseCode)}</td>
+                  <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
+                  <td className="px-5 py-3 text-text-muted">
+                    {r.productName}
+                    <CategoryTag name={categoryNameBySku.get(r.sku)} />
+                  </td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">
+                    {r.quantityOnHand.toLocaleString()} {r.unitOfMeasure}
+                  </td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">
+                    {pkgEquiv != null ? (
+                      <span title={`${r.qtyPerPackage} ${r.unitOfMeasure} / ${r.packagingUom}`}>
+                        {pkgEquiv} {r.packagingUom}
+                      </span>
+                    ) : (
+                      <span className="text-text-faint">—</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">
+                    {formatCurrency(r.weightedAverageCost)}
+                    <span className="ml-1 text-[0.68rem] text-text-faint">/ {r.unitOfMeasure}</span>
+                  </td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">
+                    {formatCurrency(r.value)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </ReportSection>

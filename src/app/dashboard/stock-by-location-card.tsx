@@ -49,7 +49,6 @@ export function StockByLocationCard({
   canRequest,
   canReturn,
   showCosts,
-  canEditPrice,
   sessionUserId,
   customers,
   locationsByProduct,
@@ -83,7 +82,6 @@ export function StockByLocationCard({
    *  the button below only ever appears on that one row per table. */
   canReturn: boolean;
   showCosts: boolean;
-  canEditPrice: boolean;
   sessionUserId: string | null;
   customers: Customer[];
   /** productId -> every location holding it, for the Quick requisition
@@ -285,6 +283,8 @@ export function StockByLocationCard({
                             productName={row.product.name}
                             unitOfMeasure={row.product.unitOfMeasure}
                             returnableQty={Math.max(row.quantityOnHand - row.quantityReserved, 0)}
+                            packagingUom={row.product.packagingUom ?? null}
+                            qtyPerPackage={row.product.qtyPerPackage ?? null}
                           />
                         )
                       ) : (
@@ -301,10 +301,11 @@ export function StockByLocationCard({
                               (l) => l.warehouseId !== row.warehouseId
                             )}
                             unitPrice={showCosts ? row.product.unitPrice : null}
-                            canEditPrice={canEditPrice}
                             warehouseId={row.warehouseId}
                             warehouseLabel={formatWarehouseLabel(row.warehouse)}
                             customers={customers}
+                            packagingUom={row.product.packagingUom ?? null}
+                            qtyPerPackage={row.product.qtyPerPackage ?? null}
                           />
                         )
                       )}

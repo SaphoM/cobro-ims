@@ -12,6 +12,7 @@
  * rest of the app (route protection, "who am I", audit created_by) is unchanged.
  */
 
+import { cookies } from 'next/headers';
 import { userRepository } from '@/lib/data';
 import type { User } from '@/lib/domain/inventory';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
@@ -26,7 +27,9 @@ export async function getSession(): Promise<User | null> {
   // calls will always fail. Return the seeded demo-admin user so every
   // protected page renders without requiring real credentials.
   if (process.env.DATA_SOURCE === 'mock') {
-    const profile = await userRepository.getById('user-demo');
+    const jar = await cookies();
+    const userId = jar.get('mock_user_id')?.value ?? 'user-demo';
+    const profile = await userRepository.getById(userId);
     return profile ?? null;
   }
 

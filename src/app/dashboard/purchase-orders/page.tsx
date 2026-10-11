@@ -6,6 +6,7 @@ import {
 } from '@/lib/data';
 import { getSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
+import { canSeeCosts } from '@/lib/costs';
 import { AccessDenied } from '@/components/access-denied';
 import { PurchaseOrderForm } from '@/app/dashboard/purchase-orders/po-form';
 import { ReceiveLine } from '@/app/dashboard/purchase-orders/receive-line';
@@ -36,6 +37,7 @@ export default async function PurchaseOrdersPage() {
     productRepository.list(),
     purchaseOrderRepository.list(),
   ]);
+  const showCosts = await canSeeCosts(session);
 
   const supplierById = new Map(suppliers.map((s) => [s.id, s]));
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
@@ -57,7 +59,12 @@ export default async function PurchaseOrdersPage() {
 
       {/* Real physical stores only - a supplier delivery is never ordered
           straight into an Engineer's personal station. */}
-      <PurchaseOrderForm suppliers={suppliers} warehouses={warehouses.filter((w) => w.type === 'store')} products={products} />
+      <PurchaseOrderForm
+        suppliers={suppliers}
+        warehouses={warehouses.filter((w) => w.type === 'store')}
+        products={products}
+        showCosts={showCosts}
+      />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">
@@ -88,7 +95,7 @@ export default async function PurchaseOrdersPage() {
                   return (
                     <tr key={po.id} className="border-t border-accent/[0.08]">
                       <td className="px-5 py-3 font-mono-brand text-[0.78rem] text-text">{po.poNumber}</td>
-                      <td className="px-5 py-3 text-text-muted">{supplierById.get(po.supplierId)?.name}</td>
+                      <td className="px-5 py-3 text-text-muted">{po.supplierId ? supplierById.get(po.supplierId)?.name : '—'}</td>
                       <td className="px-5 py-3 text-text-muted">
                         {product?.sku} <span className="text-text-faint">- {product?.name}</span>
                       </td>
@@ -111,7 +118,13 @@ export default async function PurchaseOrdersPage() {
                           </form>
                         )}
                         {(po.status === 'issued' || po.status === 'partially_received') && (
-                          <ReceiveLine poId={po.id} remaining={remaining} unit={product?.unitOfMeasure ?? 'ea'} />
+                          <ReceiveLine
+                            poId={po.id}
+                            remaining={remaining}
+                            unit={product?.unitOfMeasure ?? 'ea'}
+                            packagingUom={product?.packagingUom ?? null}
+                            qtyPerPackage={product?.qtyPerPackage ?? null}
+                          />
                         )}
                       </td>
                     </tr>

@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import { createProductAction, type CreateProductFormState } from '@/app/dashboard/products/actions';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
 import { formatCurrency } from '@/lib/ui/currency';
+import { InfoTooltip } from '@/components/info-tooltip';
 import type { ProductCategory } from '@/lib/domain/inventory';
 import { STOCK_UOMS, PACKAGING_UOMS, PACKAGING_UOM_LABELS, supportsPackaging, calcPackageValue } from '@/lib/uom';
 
@@ -41,7 +42,10 @@ export function NewProductForm({ categories }: { categories: ProductCategory[] }
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Stock unit of measure</span>
+          <span className="text-[0.75rem] font-semibold text-text-muted">
+            Stock unit of measure
+            {uomDef && <InfoTooltip text={uomDef.hint} />}
+          </span>
           <select
             name="unitOfMeasure"
             value={selectedUom}
@@ -72,9 +76,6 @@ export function NewProductForm({ categories }: { categories: ProductCategory[] }
               ))}
             </optgroup>
           </select>
-          {uomDef && (
-            <span className="text-[0.7rem] text-text-faint">{uomDef.hint}</span>
-          )}
         </label>
 
         <label className="flex flex-col gap-1.5">
@@ -135,8 +136,10 @@ export function NewProductForm({ categories }: { categories: ProductCategory[] }
         {/* ── Individual-unit cost (default costing reference) ── */}
         <label className="flex flex-col gap-1.5">
           <span className="text-[0.75rem] font-semibold text-text-muted">
-            Default unit cost (R)
-            <span className="ml-1 font-normal text-text-faint">per {selectedUom}</span>
+            Unit cost (R)
+            <InfoTooltip
+              text={`Initial costing reference per ${selectedUom}. Not the selling price. Actual WAC is derived from receipts.`}
+            />
           </span>
           <input
             type="number"
@@ -148,9 +151,6 @@ export function NewProductForm({ categories }: { categories: ProductCategory[] }
             onChange={(e) => setUnitCostRaw(e.target.value)}
             className={inputClass}
           />
-          <span className="text-[0.7rem] text-text-faint">
-            Initial costing reference per {selectedUom}. Not the selling price. Actual WAC is derived from receipts.
-          </span>
         </label>
 
         {/* ── Calculated package value (display only) ── */}
@@ -170,15 +170,19 @@ export function NewProductForm({ categories }: { categories: ProductCategory[] }
         )}
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Selling price (R)</span>
+          <span className="text-[0.75rem] font-semibold text-text-muted">
+            Selling price (R)
+            <InfoTooltip text="Price charged to customers. Separate from unit cost." />
+          </span>
           <input type="number" name="unitPrice" min="0" step="0.01" placeholder="Optional" className={inputClass} />
-          <span className="text-[0.7rem] text-text-faint">Price charged to customers. Separate from unit cost.</span>
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Barcode</span>
+          <span className="text-[0.75rem] font-semibold text-text-muted">
+            Barcode
+            <InfoTooltip text="Leave blank to auto-generate an internal EAN-13 barcode." />
+          </span>
           <input name="barcode" placeholder="Auto-assigned if left blank" className={inputClass} />
-          <span className="text-[0.7rem] text-text-faint">Leave blank to auto-generate an internal EAN-13 barcode.</span>
         </label>
 
         <label className="flex flex-col gap-1.5">

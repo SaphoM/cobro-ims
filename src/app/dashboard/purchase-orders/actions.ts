@@ -2,8 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
-import { auditLogRepository, purchaseOrderRepository } from '@/lib/data';
+import { auditLogRepository, productRepository, purchaseOrderRepository, stockLedgerRepository } from '@/lib/data';
 import { hasPermission, requirePermission } from '@/lib/permissions';
+import { canSeeCosts } from '@/lib/costs';
+import { resolveCatalogueUnitCost } from '@/lib/services/inventory-engine';
 
 export interface PurchaseOrderFormState {
   error: string | null;
@@ -24,7 +26,6 @@ export async function createPurchaseOrderAction(
   const warehouseId = String(formData.get('warehouseId') ?? '');
   const productId = String(formData.get('productId') ?? '');
   const quantity = Number(formData.get('quantity'));
-  const unitCost = Number(formData.get('unitCost'));
 
   if (!supplierId || !warehouseId || !productId) {
     return { error: 'Supplier, warehouse and product are required.', success: null };
@@ -32,8 +33,28 @@ export async function createPurchaseOrderAction(
   if (!Number.isFinite(quantity) || quantity <= 0) {
     return { error: 'Quantity must be a positive number.', success: null };
   }
-  if (!Number.isFinite(unitCost) || unitCost < 0) {
-    return { error: 'Unit cost must be zero or a positive number.', success: null };
+
+  /*
+    Unit cost is never taken from the form, for any role: the Product
+    Catalogue's Price column is the only place a product's cost can be
+    changed (see pricing-actions.ts's setProductPriceAction), so every PO
+    line - Admin's included - is costed from the catalogue, never from
+    whatever this request happened to submit. Resolution order: catalogue
+    price → default unit cost → this warehouse's existing WAC.
+  */
+  const costsVisible = await canSeeCosts(session);
+  const [product, existing] = await Promise.all([
+    productRepository.getById(productId),
+    stockLedgerRepository.get(productId, warehouseId),
+  ]);
+  const unitCost = resolveCatalogueUnitCost(product, existing);
+  if (unitCost === null) {
+    return {
+      error: costsVisible
+        ? 'This item has no catalogue price, no default unit cost, and no existing stock at this store. Ask an administrator to set the price or default unit cost first.'
+        : 'This item has no catalogue price set yet, and prices are hidden for your role. Ask an administrator to set the price first.',
+      success: null,
+    };
   }
 
   try {

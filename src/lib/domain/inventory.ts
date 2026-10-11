@@ -172,7 +172,7 @@ export type PoStatus = 'draft' | 'issued' | 'partially_received' | 'received' | 
 export interface PurchaseOrder {
   id: UUID;
   poNumber: string;
-  supplierId: UUID;
+  supplierId: UUID | null;
   warehouseId: UUID;
   status: PoStatus;
   orderedAt: ISODateTime | null;

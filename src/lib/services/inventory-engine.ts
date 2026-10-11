@@ -13,7 +13,7 @@
  * costing math can be unit-tested in isolation from persistence.
  */
 
-import type { StockLedgerEntry, StockMovementType } from '@/lib/domain/inventory';
+import type { Product, StockLedgerEntry, StockMovementType } from '@/lib/domain/inventory';
 
 export interface MovementInput {
   productId: string;
@@ -86,8 +86,40 @@ export function applyMovement(
   };
 }
 
-export function stockValue(entry: StockLedgerEntry): number {
-  return round2(entry.quantityOnHand * entry.weightedAverageCost);
+/**
+ * The single source of truth for what a unit of stock costs when posting a
+ * movement or valuing stock on hand — the Product Catalogue's price is
+ * authoritative everywhere else in the app, never a value typed into a
+ * receiving/PO/adjustment/scan form.
+ *
+ * Resolution order: catalogue price (`unitPrice`, the Price column on the
+ * Product Catalogue) → catalogue default unit cost (the per-base-unit cost
+ * captured at product setup, mainly for packaged products) → this location's
+ * existing weighted-average cost (so stock already on the ledger doesn't
+ * revalue to zero the moment a price is missing). Returns null only when
+ * none of the three exist — there is truly no cost to post or value at.
+ */
+export function resolveCatalogueUnitCost(
+  product: Pick<Product, 'unitPrice' | 'defaultUnitCost'> | null | undefined,
+  existingLedgerEntry: Pick<StockLedgerEntry, 'weightedAverageCost'> | null | undefined
+): number | null {
+  if (product?.unitPrice != null && product.unitPrice > 0) return product.unitPrice;
+  if (product?.defaultUnitCost != null && product.defaultUnitCost > 0) return product.defaultUnitCost;
+  if (existingLedgerEntry && existingLedgerEntry.weightedAverageCost > 0) return existingLedgerEntry.weightedAverageCost;
+  return null;
+}
+
+/**
+ * Stock on hand valued at the Product Catalogue's current price, not the
+ * ledger's own (historical) weighted-average cost — so a price change in the
+ * catalogue is reflected immediately, without waiting for a new receipt.
+ * Falls back to the ledger's WAC only when the product has no catalogue
+ * price at all, so already-stocked, never-priced items don't revalue to
+ * zero.
+ */
+export function stockValue(entry: StockLedgerEntry, product?: Pick<Product, 'unitPrice' | 'defaultUnitCost'>): number {
+  const unitCost = resolveCatalogueUnitCost(product, entry) ?? 0;
+  return round2(entry.quantityOnHand * unitCost);
 }
 
 function round2(n: number) {
