@@ -67,7 +67,6 @@ export function ScanStation({
   const [mode, setMode] = useState<Mode>('lookup');
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? '');
   const [quantity, setQuantity] = useState('1');
-  const [unitCost, setUnitCost] = useState('');
   const [soundOn, setSoundOn] = useState(true);
   const [busy, setBusy] = useState(false);
   const [queuedCount, setQueuedCount] = useState(0);
@@ -76,20 +75,21 @@ export function ScanStation({
   const [successFeedback, setSuccessFeedback] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const unitCostRef = useRef<HTMLInputElement>(null);
-  // Set when a scan fails specifically for lack of a unit cost, and read
-  // once the queue drains: without this, the barcode field gets refocused
-  // as usual and the operator's only path forward is rescanning the exact
-  // same code, which fails identically every time - a real repeated-failure
-  // loop, not hypothetical. Sending focus to Unit cost instead breaks that
-  // loop at the point it actually needs breaking.
+  // Set when a scan-in fails specifically for lack of a catalogue price, and
+  // read once the queue drains: without this, the barcode field gets
+  // refocused as usual and the operator's only path forward is rescanning
+  // the exact same code, which fails identically every time - a real
+  // repeated-failure loop, not hypothetical. An admin has to set the price
+  // before this item can be scanned in at all, so there's nothing to focus
+  // here any more - just a flag the queue can use to skip the normal re-scan
+  // prompt and leave the failure message on screen.
   const needsUnitCostRef = useRef(false);
   const lastScanRef = useRef<{ code: string; mode: Mode; at: number }>({ code: '', mode: 'lookup', at: 0 });
   // Mirrors of the settings, so the scan handler stays stable and the camera
   // overlay never captures a stale mode/quantity between renders.
-  const settingsRef = useRef({ mode, warehouseId, quantity, unitCost, soundOn });
+  const settingsRef = useRef({ mode, warehouseId, quantity, soundOn });
   useEffect(() => {
-    settingsRef.current = { mode, warehouseId, quantity, unitCost, soundOn };
+    settingsRef.current = { mode, warehouseId, quantity, soundOn };
   });
 
   // Every scan goes through this queue rather than firing its own request
@@ -110,7 +110,7 @@ export function ScanStation({
   }, []);
 
   const processOne = useCallback(async (code: string) => {
-    const { mode: m, warehouseId: wid, quantity: qty, unitCost: cost, soundOn: sound } = settingsRef.current;
+    const { mode: m, warehouseId: wid, quantity: qty, soundOn: sound } = settingsRef.current;
     setBusy(true);
     try {
       const res =
@@ -121,7 +121,6 @@ export function ScanStation({
               direction: m,
               warehouseId: wid,
               quantity: Number(qty),
-              unitCost: m === 'in' && cost.trim() !== '' ? Number(cost) : null,
             });
 
       setResult(res);
@@ -195,12 +194,10 @@ export function ScanStation({
       // never has to wait for a request to resolve before the field is ready
       // for the next physical scan. This just re-asserts focus once the
       // queue empties, in case anything stole it in the meantime - unless
-      // the queue's last word was "needs a unit cost", in which case that
-      // field is where focus actually needs to go.
-      if (needsUnitCostRef.current) {
-        unitCostRef.current?.focus();
-        unitCostRef.current?.select();
-      } else {
+      // the queue's last word was "needs a catalogue price", which an admin
+      // has to fix elsewhere, so re-focusing the barcode field would just
+      // invite the exact same failing re-scan.
+      if (!needsUnitCostRef.current) {
         focusInput();
       }
     }
@@ -323,20 +320,33 @@ export function ScanStation({
             <label className="flex flex-col gap-1.5">
               <span className="text-[0.75rem] font-semibold text-text-muted">
                 Unit cost (R)
-                {result?.needsUnitCost && <span className="ml-1.5 font-bold text-danger-text">required</span>}
+                {result?.product?.costsVisible && (
+                  <span className="ml-1 font-normal text-text-faint">from the catalogue</span>
+                )}
+                {result?.needsUnitCost && <span className="ml-1.5 font-bold text-danger-text">no price set</span>}
               </span>
-              <input
-                ref={unitCostRef}
-                type="number"
-                min="0"
-                step="0.01"
-                value={unitCost}
-                onChange={(e) => setUnitCost(e.target.value)}
-                placeholder="use current WAC"
-                className={`${inputClass} w-44 ${
-                  result?.needsUnitCost ? 'border-danger focus:border-danger focus:ring-danger/25' : ''
+              {/*
+                Read-only for every role - the Product Catalogue's Price
+                column is the only place a product's cost can be changed (see
+                products/price-cell.tsx). This figure is what postScanAction
+                posts the scan-in at regardless; there is nothing to type any
+                more.
+              */}
+              <div
+                className={`flex h-9 w-44 items-center rounded-lg border px-3 text-[0.88rem] font-bold text-accent-strong ${
+                  result?.needsUnitCost ? 'border-danger' : 'border-accent/30'
                 }`}
-              />
+              >
+                {!result?.product
+                  ? '—'
+                  : !result.product.costsVisible
+                    ? 'Hidden'
+                    : result.product.unitPrice != null
+                      ? formatCurrency(result.product.unitPrice)
+                      : result.product.defaultUnitCost != null
+                        ? `${formatCurrency(result.product.defaultUnitCost)} (default)`
+                        : 'No price set'}
+              </div>
             </label>
           )}
 
