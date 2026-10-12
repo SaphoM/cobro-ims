@@ -2,9 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
-import { auditLogRepository, productRepository, stockMovementRepository, warehouseRepository } from '@/lib/data';
+import { auditLogRepository, productRepository, stockLedgerRepository, stockMovementRepository, warehouseRepository } from '@/lib/data';
 import { hasPermission } from '@/lib/permissions';
 import { parseCsv } from '@/lib/csv';
+import { generateUniqueBarcode } from '@/lib/barcode-gen';
+import { resolveCatalogueUnitCost } from '@/lib/services/inventory-engine';
 
 /**
  * Server-side halves of the two upload forms in bulk-import-form.tsx - see
@@ -87,6 +89,9 @@ export async function importProductsAction(
     barcode: string | null;
     reorderPoint: number | null;
     reorderQuantity: number | null;
+    packagingUom: string | null;
+    qtyPerPackage: number | null;
+    defaultUnitCost: number | null;
   }[] = [];
 
   rows.forEach((row, i) => {
@@ -97,6 +102,9 @@ export async function importProductsAction(
     const barcode = row.barcode?.trim() || null;
     const reorderPointRaw = row.reorder_point?.trim();
     const reorderQuantityRaw = row.reorder_quantity?.trim();
+    const packagingUom = row.packaging_uom?.trim() || null;
+    const qtyPerPackageRaw = row.qty_per_package?.trim();
+    const defaultUnitCostRaw = row.default_unit_cost?.trim();
 
     if (!sku) rowErrors.push(`Row ${rowNumber}: sku is required.`);
     if (!name) rowErrors.push(`Row ${rowNumber}: name is required.`);
@@ -137,7 +145,28 @@ export async function importProductsAction(
       }
     }
 
-    toCreate.push({ sku, name, unitOfMeasure, barcode, reorderPoint, reorderQuantity });
+    // Packaging validation: qty_per_package is required when packaging_uom is set.
+    let qtyPerPackage: number | null = null;
+    if (packagingUom && !qtyPerPackageRaw) {
+      rowErrors.push(`Row ${rowNumber}: qty_per_package is required when packaging_uom is set.`);
+    } else if (qtyPerPackageRaw) {
+      qtyPerPackage = Number(qtyPerPackageRaw);
+      if (!Number.isFinite(qtyPerPackage) || qtyPerPackage <= 0) {
+        rowErrors.push(`Row ${rowNumber}: qty_per_package must be a positive number, got "${qtyPerPackageRaw}".`);
+        qtyPerPackage = null;
+      }
+    }
+
+    let defaultUnitCost: number | null = null;
+    if (defaultUnitCostRaw) {
+      defaultUnitCost = Number(defaultUnitCostRaw);
+      if (!Number.isFinite(defaultUnitCost) || defaultUnitCost < 0) {
+        rowErrors.push(`Row ${rowNumber}: default_unit_cost must be zero or a positive number, got "${defaultUnitCostRaw}".`);
+        defaultUnitCost = null;
+      }
+    }
+
+    toCreate.push({ sku, name, unitOfMeasure, barcode, reorderPoint, reorderQuantity, packagingUom, qtyPerPackage, defaultUnitCost });
   });
 
   if (rowErrors.length > 0) {
@@ -148,9 +177,29 @@ export async function importProductsAction(
     };
   }
 
+  // Auto-assign barcodes for rows that didn't supply one. Build a combined
+  // set of all existing + already-assigned-in-this-batch barcodes so each
+  // generated code is unique across the whole import run, not just against
+  // the catalogue at the time of the check.
+  const allUsedBarcodes = new Set([
+    ...existingBarcodes,
+    ...toCreate.flatMap((r) => (r.barcode ? [r.barcode] : [])),
+  ]);
+  const toCreateWithBarcodes = toCreate.map((row) => {
+    if (row.barcode) return row;
+    const generated = generateUniqueBarcode(allUsedBarcodes);
+    allUsedBarcodes.add(generated);
+    return { ...row, barcode: generated };
+  });
+
   const created = [];
-  for (const input of toCreate) {
-    created.push(await productRepository.create(input));
+  for (const input of toCreateWithBarcodes) {
+    created.push(await productRepository.create({
+      ...input,
+      packagingUom: input.packagingUom ?? null,
+      qtyPerPackage: input.qtyPerPackage ?? null,
+      defaultUnitCost: input.defaultUnitCost ?? null,
+    }));
   }
 
   await auditLogRepository.write({
@@ -179,7 +228,7 @@ export async function importOpeningStockAction(
   if (readError) return { error: readError, success: null };
 
   const { headers, rows } = parseCsv(text);
-  const required = ['sku', 'warehouse_code', 'quantity_on_hand', 'unit_cost'];
+  const required = ['sku', 'warehouse_code', 'quantity_on_hand'];
   const missingColumns = required.filter((c) => !headers.includes(c));
   if (missingColumns.length > 0) {
     return {
@@ -191,9 +240,14 @@ export async function importOpeningStockAction(
     return { error: 'That file has no data rows to import - only a header (or nothing at all).', success: null };
   }
 
-  const [products, warehouses] = await Promise.all([productRepository.list(), warehouseRepository.list()]);
+  const [products, warehouses, ledger] = await Promise.all([
+    productRepository.list(),
+    warehouseRepository.list(),
+    stockLedgerRepository.listAll(),
+  ]);
   const productBySku = new Map(products.map((p) => [p.sku, p]));
   const warehouseByCode = new Map(warehouses.map((w) => [w.code, w]));
+  const ledgerByPair = new Map(ledger.map((entry) => [`${entry.productId}::${entry.warehouseId}`, entry]));
   const seenPairsInFile = new Map<string, number>(); // "sku|warehouseCode" -> first row number
 
   const rowErrors: string[] = [];
@@ -204,13 +258,16 @@ export async function importOpeningStockAction(
     const sku = row.sku?.trim();
     const warehouseCode = row.warehouse_code?.trim();
     const quantityRaw = row.quantity_on_hand?.trim();
-    const unitCostRaw = row.unit_cost?.trim();
+    const qtyInPackagesRaw = row.quantity_in_packages?.trim();
 
     if (!sku) rowErrors.push(`Row ${rowNumber}: sku is required.`);
     if (!warehouseCode) rowErrors.push(`Row ${rowNumber}: warehouse_code is required.`);
-    if (!quantityRaw) rowErrors.push(`Row ${rowNumber}: quantity_on_hand is required.`);
-    if (!unitCostRaw) rowErrors.push(`Row ${rowNumber}: unit_cost is required.`);
-    if (!sku || !warehouseCode || !quantityRaw || !unitCostRaw) return;
+    // Must supply exactly one of quantity_on_hand or quantity_in_packages, not both.
+    if (quantityRaw && qtyInPackagesRaw) {
+      rowErrors.push(`Row ${rowNumber}: supply either quantity_on_hand (individual units) or quantity_in_packages, not both.`);
+    }
+    if (!quantityRaw && !qtyInPackagesRaw) rowErrors.push(`Row ${rowNumber}: quantity_on_hand (or quantity_in_packages) is required.`);
+    if (!sku || !warehouseCode || (!quantityRaw && !qtyInPackagesRaw)) return;
 
     const product = productBySku.get(sku);
     if (!product) {
@@ -221,13 +278,26 @@ export async function importOpeningStockAction(
       rowErrors.push(`Row ${rowNumber}: warehouse_code "${warehouseCode}" doesn't match any store - check the confirmed location codes with X Spark.`);
     }
 
-    const quantity = Number(quantityRaw);
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      rowErrors.push(`Row ${rowNumber}: quantity_on_hand must be a positive number, got "${quantityRaw}".`);
-    }
-    const unitCost = Number(unitCostRaw);
-    if (!Number.isFinite(unitCost) || unitCost < 0) {
-      rowErrors.push(`Row ${rowNumber}: unit_cost must be zero or a positive number, got "${unitCostRaw}".`);
+    let quantity: number;
+    if (qtyInPackagesRaw) {
+      // quantity_in_packages convenience: convert packages → individual units using the product's qtyPerPackage.
+      const pkgs = Number(qtyInPackagesRaw);
+      if (!Number.isFinite(pkgs) || pkgs <= 0) {
+        rowErrors.push(`Row ${rowNumber}: quantity_in_packages must be a positive number, got "${qtyInPackagesRaw}".`);
+        return;
+      }
+      if (!product) return; // already reported above
+      if (!product.qtyPerPackage || product.qtyPerPackage <= 0) {
+        rowErrors.push(`Row ${rowNumber}: quantity_in_packages was supplied but "${sku}" has no qty_per_package configured — use quantity_on_hand in individual units instead.`);
+        return;
+      }
+      quantity = Math.round(pkgs * product.qtyPerPackage * 1000) / 1000;
+    } else {
+      quantity = Number(quantityRaw);
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        rowErrors.push(`Row ${rowNumber}: quantity_on_hand must be a positive number, got "${quantityRaw}".`);
+        return;
+      }
     }
 
     const pairKey = `${sku}|${warehouseCode}`;
@@ -239,7 +309,25 @@ export async function importOpeningStockAction(
       seenPairsInFile.set(pairKey, rowNumber);
     }
 
-    if (product && warehouse && Number.isFinite(quantity) && quantity > 0 && Number.isFinite(unitCost) && unitCost >= 0) {
+    if (!product || !warehouse) return;
+
+    /*
+      Unit cost is never read from this file: the Product Catalogue's Price
+      column is the only place a product's cost can be changed (see
+      pricing-actions.ts's setProductPriceAction), so opening stock is costed
+      from the catalogue, exactly like every other receiving path. Resolution
+      order: catalogue price → default unit cost → any stock already on the
+      ledger for this product/warehouse pair (a re-run import, say).
+    */
+    const unitCost = resolveCatalogueUnitCost(product, ledgerByPair.get(`${product.id}::${warehouse.id}`));
+    if (unitCost === null) {
+      rowErrors.push(
+        `Row ${rowNumber}: "${sku}" has no catalogue price or default unit cost set - set one on the Product Catalogue first, or add it to the product import file.`
+      );
+      return;
+    }
+
+    if (quantity > 0) {
       toPost.push({ productId: product.id, warehouseId: warehouse.id, quantity, unitCost });
     }
   });

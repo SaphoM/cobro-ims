@@ -30,6 +30,7 @@ import {
 } from '@/lib/data';
 import { checkPermission, type Permission } from '@/lib/permissions';
 import { canSeeCosts } from '@/lib/costs';
+import { resolveCatalogueUnitCost } from '@/lib/services/inventory-engine';
 import type { Product } from '@/lib/domain/inventory';
 import { formatWarehouseLabel } from '@/lib/warehouse-label';
 
@@ -51,8 +52,14 @@ export interface ScanProductView {
   unitOfMeasure: string;
   categoryName: string | null;
   reorderPoint: number | null;
+  packagingUom: string | null;
+  qtyPerPackage: number | null;
   /** The product's standing price. Null when unpriced, or withheld when the caller may not see costs. */
   unitPrice: number | null;
+  /** The catalogue's default unit cost (mainly for packaged products),
+   *  shown only when there's no standing price to fall back on. Null when
+   *  unset, or withheld when the caller may not see costs. */
+  defaultUnitCost: number | null;
   /** False when this caller is not permitted to see money - the UI shows a placeholder rather than a number. */
   costsVisible: boolean;
   rows: ScanStockRow[];
@@ -177,7 +184,10 @@ async function buildProductView(product: Product): Promise<ScanProductView> {
     unitOfMeasure: product.unitOfMeasure,
     categoryName: category?.name ?? null,
     reorderPoint: product.reorderPoint,
+    packagingUom: product.packagingUom,
+    qtyPerPackage: product.qtyPerPackage,
     unitPrice: costsVisible ? product.unitPrice : null,
+    defaultUnitCost: costsVisible ? product.defaultUnitCost : null,
     costsVisible,
     rows: costsVisible ? rows : rows.map((r) => ({ ...r, weightedAverageCost: 0 })),
     totalOnHand: rows.reduce((sum, row) => sum + row.quantityOnHand, 0),
@@ -214,8 +224,6 @@ export interface PostScanInput {
   direction: ScanDirection;
   warehouseId: string;
   quantity: number;
-  /** Scan-in only. Omitted/zero falls back to the ledger's current WAC. */
-  unitCost?: number | null;
 }
 
 /**
@@ -268,22 +276,24 @@ export async function postScanAction(input: PostScanInput): Promise<ScanResult> 
 
   const existing = await stockLedgerRepository.get(product.id, warehouse.id);
 
+  /*
+    Unit cost is never taken from the scan dialog, for any role: the Product
+    Catalogue's Price column is the only place a product's cost can be
+    changed (see pricing-actions.ts's setProductPriceAction). Resolution
+    order: catalogue price → default unit cost → this location's existing
+    WAC, and refused outright on scan-in if none of the three exist.
+  */
   let unitCost: number;
   if (input.direction === 'in') {
-    const supplied = Number(input.unitCost);
-    if (Number.isFinite(supplied) && supplied > 0) {
-      unitCost = supplied;
-    } else if (existing && existing.weightedAverageCost > 0) {
-      // No cost typed — carry the location's current weighted-average cost so
-      // the receipt doesn't silently value this stock at zero.
-      unitCost = existing.weightedAverageCost;
-    } else {
+    const resolved = resolveCatalogueUnitCost(product, existing);
+    if (resolved === null) {
       return failure(
-        `${product.sku} has no stock at ${formatWarehouseLabel(warehouse)} yet, so there's no weighted-average cost to fall back on - enter a unit cost before scanning it in.`,
+        `${product.sku} has no catalogue price, no default unit cost, and no existing stock at ${formatWarehouseLabel(warehouse)} - ask an administrator to set the price first.`,
         barcode,
         { needsUnitCost: true }
       );
     }
+    unitCost = resolved;
   } else {
     // Outbound movements are valued at the ledger's current WAC; the engine
     // ignores this field for the cost calculation, but it's what makes the

@@ -8,6 +8,7 @@ import { recordMovementAction } from '@/app/dashboard/actions';
 import { HIDDEN_COST } from '@/lib/ui/cost-display';
 import { beep } from '@/lib/ui/beep';
 import { formatCurrency } from '@/lib/ui/currency';
+import { PACKAGING_UOM_LABELS } from '@/lib/uom';
 
 interface Identified {
   id: string;
@@ -17,6 +18,8 @@ interface Identified {
   unitOfMeasure: string;
   unitPrice: number | null;
   costsVisible: boolean;
+  packagingUom: string | null;
+  qtyPerPackage: number | null;
 }
 
 /**
@@ -76,7 +79,6 @@ export function ScanMovement({
   onUnitCostChange,
   onProductIdentified,
   onPosted,
-  canEditPrice = false,
   triggerHeightClassName = 'h-9',
 }: {
   warehouseId: string;
@@ -87,12 +89,6 @@ export function ScanMovement({
   onUnitCostChange: (value: string) => void;
   onProductIdentified: (productId: string) => void;
   onPosted: (message: string) => void;
-  /** `manage_pricing` - Admin only. Gates CHANGING the unit cost, not seeing
-   *  it: every role that may see money still sees the figure here, as bold
-   *  read-only text. Gating it on the form alone would be theatre, since
-   *  this dialog posts the movement - and the server ignores a non-Admin's
-   *  submitted cost regardless (see recordMovementAction). */
-  canEditPrice?: boolean;
   /** Height utility class for the trigger button - defaults to the 36px
    *  (`h-9`) standard every other control on this form uses, so it lines up
    *  with Store/Type/Quantity/Unit cost when rendered inline with them.
@@ -274,6 +270,8 @@ export function ScanMovement({
           unitOfMeasure: res.product.unitOfMeasure,
           unitPrice: res.product.unitPrice,
           costsVisible: res.product.costsVisible,
+          packagingUom: res.product.packagingUom ?? null,
+          qtyPerPackage: res.product.qtyPerPackage ?? null,
         });
         // Mirror it into the form so the Product field shows what was scanned.
         onProductIdentified(res.product.id);
@@ -281,11 +279,9 @@ export function ScanMovement({
         // starting at 0 would make the operator scan the same item twice to
         // record one of it.
         resetScanEventsTo(1);
-        // Prefill from the product's own price rather than leaving whatever
-        // a previous scan left behind - a stale cost from the last item is
-        // worse than a fresh one the operator has to type. Still just a
-        // starting point: the field stays editable for a delivery that
-        // negotiated a different price this time.
+        // Always the product's own catalogue price, never a value carried
+        // over from the previous scan - this is what the server posts the
+        // movement at regardless, so the live total below must match it.
         onUnitCostChange(
           res.product.costsVisible && res.product.unitPrice !== null
             ? String(res.product.unitPrice)
@@ -667,6 +663,12 @@ export function ScanMovement({
                   >
                     {Number(quantity) || 0}
                   </div>
+                  {product.packagingUom && product.qtyPerPackage && (
+                    <div className="mt-0.5 text-[0.7rem] text-text-faint">
+                      {product.qtyPerPackage} {product.unitOfMeasure} = 1{' '}
+                      {PACKAGING_UOM_LABELS[product.packagingUom] ?? product.packagingUom}
+                    </div>
+                  )}
                 </div>
                 <RemoveOneControl
                   events={scanEvents}
@@ -679,14 +681,14 @@ export function ScanMovement({
             </div>
 
             <div className="mt-3 flex flex-col gap-3">
-              {product.costsVisible && !canEditPrice ? (
+              {product.costsVisible ? (
                 /*
-                  Visible but not editable - the usual case for Stores.
-                  Bold orange text, no field outline: setting what stock cost
-                  is a pricing decision (`manage_pricing`, Admin only), while
-                  seeing it is governed separately by `costsVisible`. The
-                  figure shown is the product's own catalogue price, which is
-                  what the server will post for this user no matter what the
+                  Visible but never editable, for every role including Admin -
+                  the Product Catalogue's Price column is the only place a
+                  product's cost can be changed (see products/price-cell.tsx).
+                  Bold orange text, no field outline. The figure shown is the
+                  product's own catalogue price, which is what the server
+                  posts this movement at regardless of what, if anything, the
                   form sends.
                 */
                 <div className="flex flex-col gap-1.5">
@@ -697,34 +699,6 @@ export function ScanMovement({
                     {product.unitPrice != null ? `${formatCurrency(product.unitPrice)}` : 'No price set'}
                   </div>
                 </div>
-              ) : product.costsVisible ? (
-                /*
-                  A plain, right-aligned number field - no +/- steppers. Unit
-                  cost is usually just confirmed as-is (it's prefilled from
-                  the product's price) or corrected once by typing a
-                  negotiated figure, not nudged up from zero the way a count
-                  is, so the steppers were an extra control with nothing to
-                  usefully add here.
-                */
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-[0.8rem] font-semibold text-text-muted">Unit cost (R)</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    aria-label="Unit cost in Rand"
-                    min={0}
-                    step={0.01}
-                    value={unitCost}
-                    disabled={busy}
-                    onChange={(e) => onUnitCostChange(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key !== 'Enter') return;
-                      e.preventDefault();
-                      void post();
-                    }}
-                    className="w-full rounded-xl border-2 border-accent/50 bg-surface-3 px-4 py-3 text-right text-[1.15rem] font-semibold tabular-nums text-text outline-none transition-colors focus:border-accent focus:ring-[3px] focus:ring-accent/[0.18] disabled:opacity-60 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  />
-                </label>
               ) : (
                 <label className="flex flex-col gap-1.5">
                   <span className="text-[0.8rem] font-semibold text-text-muted">Unit cost (R)</span>

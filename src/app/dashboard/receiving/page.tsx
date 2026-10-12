@@ -34,10 +34,9 @@ export default async function ReceivingPage({
     );
   }
 
-  // Unit cost is Admin-only to set (`manage_pricing`), and seeing money at
-  // all is the separate, Admin-controlled setting - same two rules the
-  // Overview's forms follow.
-  const canEditPrice = await hasPermission(session, 'manage_pricing');
+  // Seeing money at all is the separate, Admin-controlled setting - unit
+  // cost itself is never editable here for any role, only in the Product
+  // Catalogue.
   // Stores profiles only - Admin keeps the standard left-aligned submit.
   const role = await roleRepository.getById(session.roleId);
   const isStoresRole = role?.name === 'stores_manager' || role?.name === 'stores_clerk';
@@ -69,7 +68,6 @@ export default async function ReceivingPage({
         products={products}
         categories={categories}
         initialBarcode={barcode}
-        canEditPrice={canEditPrice}
         showCosts={showCosts}
         centerSubmit={isStoresRole}
       />

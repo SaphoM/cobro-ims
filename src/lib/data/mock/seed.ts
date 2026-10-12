@@ -257,12 +257,14 @@ export const warehouses: Warehouse[] = [
 ];
 
 export const products: Product[] = [
-  { id: 'prod-cem-42-5', sku: 'CEM-42.5-50KG', name: 'Cement 42.5N, 50kg bag', description: null, categoryId: null, unitOfMeasure: 'bag', barcode: '6001240912345', reorderPoint: 500, reorderQuantity: 1000, unitPrice: 118.0, isActive: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
-  { id: 'prod-block-140', sku: 'BLK-STD-140', name: 'Standard concrete block, 140mm', description: null, categoryId: null, unitOfMeasure: 'ea', barcode: '6001240912346', reorderPoint: 2000, reorderQuantity: 5000, unitPrice: 9.5, isActive: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
-  { id: 'prod-block-90', sku: 'BLK-STD-090', name: 'Standard concrete block, 90mm', description: null, categoryId: null, unitOfMeasure: 'ea', barcode: '6001240912347', reorderPoint: 2000, reorderQuantity: 5000, unitPrice: 7.25, isActive: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
-  { id: 'prod-paver-60', sku: 'PAV-60-CHARC', name: 'Interlocking paver 60mm, charcoal', description: null, categoryId: null, unitOfMeasure: 'm2', barcode: '6001240912348', reorderPoint: 300, reorderQuantity: 800, unitPrice: 189.0, isActive: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
-  { id: 'prod-aggregate-19', sku: 'AGG-19MM', name: 'Crushed stone aggregate, 19mm', description: null, categoryId: null, unitOfMeasure: 'ton', barcode: '6001240912349', reorderPoint: 50, reorderQuantity: 100, unitPrice: 520.0, isActive: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
-  { id: 'prod-rebar-y12', sku: 'REB-Y12-6M', name: 'Rebar Y12, 6m length', description: null, categoryId: null, unitOfMeasure: 'ea', barcode: '6001240912350', reorderPoint: 200, reorderQuantity: 500, unitPrice: 152.0, isActive: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+  { id: 'prod-cem-42-5', sku: 'CEM-42.5-50KG', name: 'Cement 42.5N, 50kg bag', description: null, categoryId: null, unitOfMeasure: 'bag', packagingUom: null, qtyPerPackage: null, defaultUnitCost: null, barcode: '6001240912345', reorderPoint: 500, reorderQuantity: 1000, unitPrice: 118.0, isActive: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+  { id: 'prod-block-140', sku: 'BLK-STD-140', name: 'Standard concrete block, 140mm', description: null, categoryId: null, unitOfMeasure: 'ea', packagingUom: null, qtyPerPackage: null, defaultUnitCost: null, barcode: '6001240912346', reorderPoint: 2000, reorderQuantity: 5000, unitPrice: 9.5, isActive: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+  { id: 'prod-block-90', sku: 'BLK-STD-090', name: 'Standard concrete block, 90mm', description: null, categoryId: null, unitOfMeasure: 'ea', packagingUom: null, qtyPerPackage: null, defaultUnitCost: null, barcode: '6001240912347', reorderPoint: 2000, reorderQuantity: 5000, unitPrice: 7.25, isActive: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+  { id: 'prod-paver-60', sku: 'PAV-60-CHARC', name: 'Interlocking paver 60mm, charcoal', description: null, categoryId: null, unitOfMeasure: 'm2', packagingUom: null, qtyPerPackage: null, defaultUnitCost: null, barcode: '6001240912348', reorderPoint: 300, reorderQuantity: 800, unitPrice: 189.0, isActive: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+  { id: 'prod-aggregate-19', sku: 'AGG-19MM', name: 'Crushed stone aggregate, 19mm', description: null, categoryId: null, unitOfMeasure: 'ton', packagingUom: null, qtyPerPackage: null, defaultUnitCost: null, barcode: '6001240912349', reorderPoint: 50, reorderQuantity: 100, unitPrice: 520.0, isActive: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+  { id: 'prod-rebar-y12', sku: 'REB-Y12-6M', name: 'Rebar Y12, 6m length', description: null, categoryId: null, unitOfMeasure: 'ea', packagingUom: null, qtyPerPackage: null, defaultUnitCost: null, barcode: '6001240912350', reorderPoint: 200, reorderQuantity: 500, unitPrice: 152.0, isActive: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+  // Packaged product for testing §12 bolt scenarios — 100 bolts per box, R5.00/bolt
+  { id: 'prod-bolt-m10', sku: 'BOLT-M10-BOX100', name: 'Bolt M10 × 50mm (box of 100)', description: null, categoryId: null, unitOfMeasure: 'ea', packagingUom: 'box', qtyPerPackage: 100, defaultUnitCost: 5.0, barcode: '6001240912351', reorderPoint: 200, reorderQuantity: 500, unitPrice: 6.5, isActive: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
 ];
 
 /** Initial stock ledger snapshot — as if this is the state after Discover-phase data migration. */
@@ -289,6 +291,9 @@ export const stockLedger: StockLedgerEntry[] = [
   // seed a store->station transfer by hand every time. Same WAC as the
   // store row above - it left there at that cost.
   { productId: 'prod-rebar-y12', warehouseId: 'wh-station-engineer', quantityOnHand: 8, quantityReserved: 0, weightedAverageCost: 118.75, updatedAt: '2026-08-20T09:00:00Z' },
+  // Seeded bolt stock: 1 box = 100 individual bolts received at R5.00/ea WAC.
+  // Supports §12 test scenarios without needing to receive stock first.
+  { productId: 'prod-bolt-m10', warehouseId: 'wh-dbn', quantityOnHand: 100, quantityReserved: 0, weightedAverageCost: 5.0, updatedAt: '2026-08-20T10:00:00Z' },
 ];
 
 export const suppliers: Supplier[] = [

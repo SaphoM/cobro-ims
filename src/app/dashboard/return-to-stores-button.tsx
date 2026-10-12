@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { requestReturnToStoresAction, type RequestReturnFormState } from '@/app/dashboard/actions';
 import { inputClass } from '@/lib/ui/form-control-classes';
+import { PACKAGING_UOM_LABELS } from '@/lib/uom';
 
 const initialState: RequestReturnFormState = { error: null, success: null };
 
@@ -28,6 +29,8 @@ export function ReturnToStoresButton({
   productName,
   unitOfMeasure,
   returnableQty,
+  packagingUom = null,
+  qtyPerPackage = null,
 }: {
   productId: string;
   productSku: string;
@@ -37,6 +40,8 @@ export function ReturnToStoresButton({
    *  committed to a pending peer pickup and is not offered here (see the
    *  server action's own guard). Not rendered at all when this is 0. */
   returnableQty: number;
+  packagingUom?: string | null;
+  qtyPerPackage?: number | null;
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(requestReturnToStoresAction, initialState);
@@ -66,6 +71,9 @@ export function ReturnToStoresButton({
       setOpen(false);
     }
   }, [state.success]);
+
+  const hasPackaging = !!(packagingUom && qtyPerPackage);
+  const pkgLabel = packagingUom ? (PACKAGING_UOM_LABELS[packagingUom] ?? packagingUom) : '';
 
   if (returnableQty <= 0) return null;
 
@@ -134,6 +142,11 @@ export function ReturnToStoresButton({
                   defaultValue={returnableQty}
                   className={inputClass}
                 />
+                {hasPackaging && (
+                  <span className="text-[0.72rem] text-text-faint">
+                    Enter in individual {unitOfMeasure}s — {qtyPerPackage} = 1 {pkgLabel}
+                  </span>
+                )}
               </label>
 
               {state.error && (

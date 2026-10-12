@@ -7,6 +7,7 @@ import {
 } from '@/lib/data';
 import { getSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
+import { canSeeCosts } from '@/lib/costs';
 import { AccessDenied } from '@/components/access-denied';
 import { AdjustmentForm } from '@/app/dashboard/adjustments/adjustment-form';
 import { decideAdjustmentAction } from '@/app/dashboard/adjustments/actions';
@@ -44,6 +45,7 @@ export default async function AdjustmentsPage({
 
   const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
   const reasonById = new Map(reasonCodes.map((r) => [r.id, r]));
+  const showCosts = await canSeeCosts(session);
 
   return (
     <div className="flex flex-col gap-6">
@@ -62,7 +64,14 @@ export default async function AdjustmentsPage({
         </div>
       )}
 
-      <AdjustmentForm products={products} warehouses={warehouses} reasonCodes={reasonCodes} categories={categories} initialBarcode={barcode} />
+      <AdjustmentForm
+        products={products}
+        warehouses={warehouses}
+        reasonCodes={reasonCodes}
+        categories={categories}
+        initialBarcode={barcode}
+        showCosts={showCosts}
+      />
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">

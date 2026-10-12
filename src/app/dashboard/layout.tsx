@@ -10,6 +10,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { NAV_ITEMS } from '@/lib/nav-items';
 import { getNotifications } from '@/lib/notifications';
 import { hasPermission } from '@/lib/permissions';
+import { MockUserSwitcher } from '@/app/dashboard/mock-user-switcher';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -175,8 +176,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </header>
 
         {isUsingMockData && (
-          <div className="no-print border-b border-accent/30 bg-accent/[0.08] px-4 py-2 text-center text-[0.8rem] text-accent-strong sm:px-6">
-            Running on mock data - no Supabase project is connected yet.
+          <div className="no-print flex items-center justify-center border-b border-accent/30 bg-accent/[0.08] px-4 py-2 sm:px-6">
+            <MockUserSwitcher currentUserId={session.id} />
           </div>
         )}
         {/* On desktop this is the ONLY vertical scroll area for section content,

@@ -98,6 +98,9 @@ export interface CreateProductInput {
   sku: string;
   name: string;
   unitOfMeasure: string;
+  packagingUom?: string | null;
+  qtyPerPackage?: number | null;
+  defaultUnitCost?: number | null;
   categoryId?: string | null;
   barcode?: string | null;
   reorderPoint?: number | null;
@@ -116,6 +119,9 @@ export interface AddBomLineInput {
 export interface UpdateProductInput {
   name: string;
   unitOfMeasure: string;
+  packagingUom?: string | null;
+  qtyPerPackage?: number | null;
+  defaultUnitCost?: number | null;
   categoryId?: string | null;
   barcode?: string | null;
   reorderPoint?: number | null;
@@ -228,7 +234,7 @@ export interface CustomerRepository {
 }
 
 export interface QuickReceiveInput {
-  supplierId: string;
+  supplierId: string | null;
   warehouseId: string;
   productId: string;
   quantity: number;

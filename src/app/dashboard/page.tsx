@@ -44,12 +44,6 @@ export default async function DashboardOverviewPage() {
   // which only ever appears on the viewer's own station row either way; the
   // action itself re-checks this independently regardless.
   const canReturn = session ? await hasPermission(session, 'request_stock_return') : false;
-  // Same permission the Product catalogue's price field requires - Admin
-  // only. Everyone else gets the quick requisition's Unit value AND the
-  // stock-movement form's Unit cost as a read-only display of the catalogue
-  // price, not an editable field. Seeing the figure is a separate rule
-  // (`showCosts` above) - this one is only about changing it.
-  const canEditPrice = session ? await hasPermission(session, 'manage_pricing') : false;
   // Same permission /dashboard/receiving gates its whole route on, and that
   // the receive action re-checks for itself - receiving is a Stores function
   // (Admin and both Stores roles), never an Engineer's.
@@ -67,7 +61,7 @@ export default async function DashboardOverviewPage() {
         ...entry,
         product,
         warehouse,
-        stockValue: stockValue(entry),
+        stockValue: stockValue(entry, product),
         isBelowReorderPoint:
           product.reorderPoint != null && entry.quantityOnHand < product.reorderPoint,
       };
@@ -278,7 +272,6 @@ export default async function DashboardOverviewPage() {
           warehouses={warehouses.filter((w) => w.type === 'store')}
           products={products}
           categories={categories}
-          canEditPrice={canEditPrice}
           showCosts={showCosts}
           centerSubmit={isStoresRole}
         />
@@ -314,7 +307,6 @@ export default async function DashboardOverviewPage() {
         canRequest={canRequest}
         canReturn={canReturn}
         showCosts={showCosts}
-        canEditPrice={canEditPrice}
         sessionUserId={session?.id ?? null}
         customers={customers}
         locationsByProduct={Object.fromEntries(locationsByProduct)}

@@ -2,8 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
-import { auditLogRepository, stockAdjustmentRepository } from '@/lib/data';
+import { auditLogRepository, productRepository, stockAdjustmentRepository, stockLedgerRepository } from '@/lib/data';
 import { hasPermission, requirePermission } from '@/lib/permissions';
+import { canSeeCosts } from '@/lib/costs';
+import { resolveCatalogueUnitCost } from '@/lib/services/inventory-engine';
 
 export interface AdjustmentFormState {
   error: string | null;
@@ -25,7 +27,6 @@ export async function requestAdjustmentAction(
   const productId = String(formData.get('productId') ?? '');
   const direction = String(formData.get('direction') ?? 'missing');
   const quantityRaw = Number(formData.get('quantity'));
-  const unitCostRaw = Number(formData.get('unitCost'));
 
   if (!warehouseId || !reasonCodeId || !productId) {
     return { error: 'Store, reason and product are required.', success: null };
@@ -33,8 +34,37 @@ export async function requestAdjustmentAction(
   if (!Number.isFinite(quantityRaw) || quantityRaw <= 0) {
     return { error: 'Quantity must be a positive number - direction is set separately.', success: null };
   }
-  if (!Number.isFinite(unitCostRaw) || unitCostRaw < 0) {
-    return { error: 'Unit cost must be zero or a positive number.', success: null };
+
+  /*
+    Unit cost is never taken from the form, for any role: the Product
+    Catalogue's Price column is the only place a product's cost can be
+    changed (see pricing-actions.ts's setProductPriceAction). Resolution
+    order: catalogue price → default unit cost → this location's existing
+    WAC. A "missing" (write-off) adjustment doesn't need a NEW price - the
+    engine values outbound movements at the ledger's current WAC regardless -
+    so it falls back to 0 only when there's truly nothing to resolve (the
+    approval step will refuse it for having no stock to remove anyway). A
+    "found" adjustment is WAC-affecting (inbound), so it's refused outright
+    when none of the three exist - guessing zero would corrupt the valuation.
+  */
+  const costsVisible = await canSeeCosts(session);
+  const [product, existing] = await Promise.all([
+    productRepository.getById(productId),
+    stockLedgerRepository.get(productId, warehouseId),
+  ]);
+  const resolvedUnitCost = resolveCatalogueUnitCost(product, existing);
+  let unitCost: number;
+  if (resolvedUnitCost !== null) {
+    unitCost = resolvedUnitCost;
+  } else if (direction !== 'found') {
+    unitCost = existing?.weightedAverageCost ?? 0;
+  } else {
+    return {
+      error: costsVisible
+        ? 'This item has no catalogue price, no default unit cost, and no existing stock at this store. Ask an administrator to set the price or default unit cost first.'
+        : 'This item has no catalogue price set yet, and prices are hidden for your role. Ask an administrator to set the price first.',
+      success: null,
+    };
   }
 
   try {
@@ -43,7 +73,7 @@ export async function requestAdjustmentAction(
       reasonCodeId,
       productId,
       quantityDelta: direction === 'found' ? quantityRaw : -quantityRaw,
-      unitCost: unitCostRaw,
+      unitCost,
       requestedBy: session.id,
     });
     await auditLogRepository.write({

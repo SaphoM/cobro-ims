@@ -14,6 +14,7 @@ import {
 } from '@/lib/data';
 import { checkPermission, hasPermission, type Permission } from '@/lib/permissions';
 import { canSeeCosts } from '@/lib/costs';
+import { resolveCatalogueUnitCost } from '@/lib/services/inventory-engine';
 import type { StockMovementType } from '@/lib/domain/inventory';
 
 export interface RecordMovementFormState {
@@ -73,7 +74,6 @@ export async function recordMovementAction(
   const warehouseId = String(formData.get('warehouseId') ?? '');
   const movementType = String(formData.get('movementType') ?? '') as StockMovementType;
   const quantityRaw = Number(formData.get('quantity'));
-  const unitCostRaw = Number(formData.get('unitCost'));
   const batchRef = String(formData.get('batchRef') ?? '').trim();
 
   if (!productId || !warehouseId || !movementType) {
@@ -95,58 +95,41 @@ export async function recordMovementAction(
   if (!Number.isFinite(quantityRaw) || quantityRaw <= 0) {
     return { error: 'Quantity must be a positive number - direction is set by the movement type.', success: null };
   }
-  if (!Number.isFinite(unitCostRaw) || unitCostRaw < 0) {
-    return { error: 'Unit cost must be zero or a positive number.', success: null };
-  }
 
   /*
-    When the caller may not see costs, the unit cost field is withheld from
-    them entirely - so whatever arrived in the form is not a figure they
-    chose and must not be trusted. Taking it at face value posts receipts at
-    zero, which silently drags the location's weighted-average cost down and
-    corrupts stock valuation.
+    Unit cost is never taken from the form, for any role: the Product
+    Catalogue's Price column is the only place a product's cost can be
+    changed (see pricing-actions.ts's setProductPriceAction), so every
+    movement - Admin's included - is costed from the catalogue, never from
+    whatever this request happened to submit. Resolution order: catalogue
+    price → default unit cost → this location's existing WAC.
 
-    Instead the movement inherits the location's existing WAC, which is the
-    correct value for stock arriving at a price this user isn't permitted to
-    set. If there is no existing stock there is no WAC to inherit, and
-    guessing zero would be exactly the corruption above - so that case is
-    refused and pointed at someone who can set the price.
-  */
-  /*
-    Setting what stock cost is a pricing decision - `manage_pricing`, Admin
-    only, the same authority that sets price on the catalogue. Everyone else
-    sees the figure but cannot choose it, so their submitted `unitCost` is
-    discarded here rather than merely hidden in the UI: the field being
-    read-only on the form and in the scan dialog is a courtesy, this is the
-    boundary. Their movement is costed from the product's own catalogue
-    price, which is exactly the figure those read-only displays show, so
-    what posts always matches what they were shown.
+    Inbound movements (receipt/transfer_in) are refused outright when none of
+    the three exist - guessing zero would silently drag the location's
+    weighted-average cost down and corrupt the valuation. Outbound movements
+    (dispatch/transfer_out/write_off/usage) never need a NEW price - they
+    just record what's already leaving at its current carried cost - so they
+    fall back to 0 only in the (practically unreachable) case of an outbound
+    movement with no existing stock, which the engine blocks anyway.
   */
   const costsVisible = await canSeeCosts(session);
-  const canEditPrice = await hasPermission(session, 'manage_pricing');
-  let unitCost = unitCostRaw;
-  if (!canEditPrice) {
-    const [product, existing] = await Promise.all([
-      productRepository.getById(productId),
-      stockLedgerRepository.get(productId, warehouseId),
-    ]);
-    if (product?.unitPrice != null && product.unitPrice > 0) {
-      unitCost = product.unitPrice;
-    } else if (existing && existing.weightedAverageCost > 0) {
-      // No catalogue price set, so inherit what this stock is already
-      // carried at here - never zero, which would silently drag the
-      // location's weighted-average cost down and corrupt the valuation.
-      unitCost = existing.weightedAverageCost;
-    } else if (!OUTBOUND_TYPES.includes(movementType)) {
-      return {
-        error: costsVisible
-          ? 'This item has no catalogue price and no stock at this store yet, so there is no cost to record it at. Ask an administrator to set the price first.'
-          : 'This is the first stock of this item at this store, so it needs a unit cost - and prices are hidden for your role. Ask an administrator to record this receipt, or to make prices visible.',
-        success: null,
-      };
-    } else {
-      unitCost = existing?.weightedAverageCost ?? 0;
-    }
+  const [product, existing] = await Promise.all([
+    productRepository.getById(productId),
+    stockLedgerRepository.get(productId, warehouseId),
+  ]);
+  const resolvedUnitCost = resolveCatalogueUnitCost(product, existing);
+  let unitCost: number;
+  if (resolvedUnitCost !== null) {
+    unitCost = resolvedUnitCost;
+  } else if (OUTBOUND_TYPES.includes(movementType)) {
+    unitCost = existing?.weightedAverageCost ?? 0;
+  } else {
+    return {
+      error: costsVisible
+        ? 'This item has no catalogue price and no stock at this store yet, so there is no cost to record it at. Ask an administrator to set the price first.'
+        : 'This is the first stock of this item at this store, so it needs a catalogue price - and prices are hidden for your role. Ask an administrator to set the price first.',
+      success: null,
+    };
   }
 
   const signedQuantity = OUTBOUND_TYPES.includes(movementType) ? -quantityRaw : quantityRaw;

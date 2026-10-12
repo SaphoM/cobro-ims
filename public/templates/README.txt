@@ -40,6 +40,22 @@ Columns:
   reorder_quantity    Optional. How much you'd typically reorder at
                       once. Informational only for now.
 
+  packaging_uom       Optional. The unit the item is purchased/stored
+                      in — e.g. box, bag, pack, pallet, drum, roll,
+                      carton. Set this when your stock arrives in
+                      containers that hold multiple individual units
+                      (e.g. a box of 100 bolts). Leave blank for items
+                      that aren't packaged.
+  qty_per_package     Required when packaging_uom is set. How many
+                      individual units are in one package (e.g. 100 if
+                      one box holds 100 bolts). Must be a positive
+                      number. Leave blank when packaging_uom is blank.
+  default_unit_cost   Optional. The cost of ONE individual unit (e.g.
+                      R0.50 per bolt, NOT R50 per box). This is the
+                      starting costing reference — actual weighted-
+                      average cost is recalculated from real receipts.
+                      Leave blank to set pricing manually in the app.
+
 The 12 rows already in the file are examples, not Cobro's real items —
 generic MRO spares (bearings, filters, grease, welding rods, PPE, etc.)
 showing the format and how much detail to fill in per column,
@@ -72,14 +88,32 @@ Columns:
                        currently uses DBN-FAC / PMB-WH / RBB-DEP as
                        placeholders, which will be replaced with
                        Cobro's real store/location codes.
-  quantity_on_hand     Required. How many/much you currently have on
-                       hand at that location, right now.
-  unit_cost            Required. What that stock is worth per unit —
-                       your best current cost estimate is fine if you
-                       don't have exact purchase records. This becomes
-                       the item's starting cost in the system; every
-                       purchase after that recalculates it
-                       automatically (weighted-average costing).
+  quantity_on_hand     Required (unless quantity_in_packages is used
+                       instead). How many individual units you
+                       currently hold at that location — e.g. 800 for
+                       800 individual bolts. Do not convert to
+                       packages; always express in the item's base
+                       unit (ea, kg, m, etc.). Supply EITHER this
+                       column OR quantity_in_packages, not both.
+  quantity_in_packages Optional convenience column for packaged items.
+                       If the product has packaging configured (a
+                       packaging_uom and qty_per_package in the
+                       product file), you can give the quantity as a
+                       number of packages here and the system will
+                       convert to individual units automatically.
+                       e.g. enter 8 here for 8 boxes of hose clamps
+                       (100/box = 800 individual clamps). Leave blank
+                       when using quantity_on_hand, and vice versa.
+                       If the product has no packaging configured,
+                       this column is rejected — use quantity_on_hand
+                       instead.
+There is no unit_cost column here — the Product Catalogue is the only
+place an item's cost is ever set (its unit_price or default_unit_cost
+in the product file, or the Price column in the app once it's
+loaded). Opening stock is costed from whichever of those the item
+already has, so set a price or default unit cost for every item
+BEFORE importing its opening stock — a row for an item with neither
+is rejected rather than guessed at.
 
 If the same item is held at more than one location, give it one row
 per location.
@@ -96,7 +130,7 @@ A FEW RULES THAT WILL MAKE THIS GO SMOOTHLY
 - Every sku must be unique in the product file, and every sku used in
   the opening-stock file must exist in the product file.
 - Don't leave a "Required" column blank.
-- Quantities and costs must be plain numbers (e.g. 40 or 85.00) — no
+- Quantities and prices must be plain numbers (e.g. 40 or 85.00) — no
   currency symbols, no commas as thousand-separators.
 - If you're not sure about a value, leave optional columns blank
   rather than guessing — we can always add detail later, but wrong

@@ -4,8 +4,11 @@ import { useActionState, useEffect, useRef, useState } from 'react';
 import { requestAdjustmentAction, type AdjustmentFormState } from '@/app/dashboard/adjustments/actions';
 import { CameraScanner } from '@/components/scanner/camera-scanner';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
+import { HIDDEN_COST } from '@/lib/ui/cost-display';
+import { formatCurrency } from '@/lib/ui/currency';
 import type { AdjustmentReasonCode, Product, ProductCategory, Warehouse } from '@/lib/domain/inventory';
 import { formatWarehouseLabel } from '@/lib/warehouse-label';
+import { PACKAGING_UOM_LABELS } from '@/lib/uom';
 
 const initialState: AdjustmentFormState = { error: null, success: null };
 
@@ -15,25 +18,34 @@ export function AdjustmentForm({
   reasonCodes,
   categories,
   initialBarcode,
+  showCosts,
 }: {
   products: Product[];
   warehouses: Warehouse[];
   reasonCodes: AdjustmentReasonCode[];
   categories: ProductCategory[];
   initialBarcode?: string;
+  /** The separate, Admin-controlled "show costs to all roles" setting. Off
+   *  means money is withheld entirely, so the read-only display shows the
+   *  withheld marker instead of a figure. */
+  showCosts: boolean;
 }) {
   const categoryById = new Map(categories.map((c) => [c.id, c]));
   const [state, formAction, pending] = useActionState(requestAdjustmentAction, initialState);
   const [scanMessage, setScanMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState(products[0]?.id ?? '');
   const productSelectRef = useRef<HTMLSelectElement>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
   const scanFormRef = useRef<HTMLFormElement>(null);
   const scanBarcodeRef = useRef<HTMLInputElement>(null);
 
+  const selectedProduct = products.find((p) => p.id === selectedProductId);
+
   function matchBarcode(barcode: string) {
     const match = products.find((p) => p.barcode === barcode);
-    if (match && productSelectRef.current) {
-      productSelectRef.current.value = match.id;
+    if (match) {
+      setSelectedProductId(match.id);
+      if (productSelectRef.current) productSelectRef.current.value = match.id;
       setScanMessage({ text: `Matched ${match.sku} - ${match.name}.`, ok: true });
       quantityRef.current?.focus();
     } else {
@@ -119,7 +131,14 @@ export function AdjustmentForm({
 
         <label className="flex flex-col gap-1.5 lg:col-span-2">
           <span className="text-[0.75rem] font-semibold text-text-muted">Product</span>
-          <select name="productId" required ref={productSelectRef} className={selectClass}>
+          <select
+            name="productId"
+            required
+            ref={productSelectRef}
+            value={selectedProductId}
+            onChange={(e) => setSelectedProductId(e.target.value)}
+            className={selectClass}
+          >
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.sku} - {p.name}
@@ -149,7 +168,12 @@ export function AdjustmentForm({
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Quantity</span>
+          <span className="text-[0.75rem] font-semibold text-text-muted">
+            Quantity
+            {selectedProduct && (
+              <span className="ml-1 font-normal text-text-faint">({selectedProduct.unitOfMeasure})</span>
+            )}
+          </span>
           <input
             ref={quantityRef}
             type="number"
@@ -160,11 +184,36 @@ export function AdjustmentForm({
             placeholder="0"
             className={inputClass}
           />
+          {selectedProduct?.packagingUom && selectedProduct.qtyPerPackage != null && (
+            <span className="text-[0.68rem] text-text-faint">
+              Enter in individual {selectedProduct.unitOfMeasure}s — {selectedProduct.qtyPerPackage} = 1{' '}
+              {PACKAGING_UOM_LABELS[selectedProduct.packagingUom] ?? selectedProduct.packagingUom}
+            </span>
+          )}
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[0.75rem] font-semibold text-text-muted">Unit cost (R)</span>
-          <input type="number" name="unitCost" min="0" step="0.01" required placeholder="0.00" className={inputClass} />
+          <span className="text-[0.75rem] font-semibold text-text-muted">
+            Unit cost (R)
+            {showCosts && <span className="ml-1 font-normal text-text-faint">from the catalogue</span>}
+          </span>
+          {/*
+            Read-only for every role - the Product Catalogue's Price column is
+            the only place a product's cost can be changed (see
+            products/price-cell.tsx). This figure is what
+            requestAdjustmentAction costs the movement at regardless of what,
+            if anything, this form submits - there is no unitCost field to
+            submit any more.
+          */}
+          <div className="flex h-9 items-center text-[0.95rem] font-bold text-accent-strong">
+            {!showCosts
+              ? HIDDEN_COST
+              : selectedProduct?.unitPrice != null
+                ? `${formatCurrency(selectedProduct.unitPrice)}`
+                : selectedProduct?.defaultUnitCost != null
+                  ? `${formatCurrency(selectedProduct.defaultUnitCost)} (default)`
+                  : 'No price set'}
+          </div>
         </label>
 
         <div className="flex items-end lg:col-span-6">

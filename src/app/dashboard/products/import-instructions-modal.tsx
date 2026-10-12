@@ -131,12 +131,13 @@ export function ImportInstructionsModal() {
                     <code className="font-mono-brand text-text">quantity_on_hand</code> - Required. How much
                     you currently have on hand at that location, right now.
                   </li>
-                  <li>
-                    <code className="font-mono-brand text-text">unit_cost</code> - Required. Your best current
-                    cost estimate - becomes the item&apos;s starting cost; every purchase after that
-                    recalculates it automatically (weighted-average costing).
-                  </li>
                 </ul>
+                <p className="mt-2">
+                  There is no unit_cost column here - the Product Catalogue is the only place an item&apos;s
+                  cost is ever set (its default_unit_cost in the product file, or the Price column in the app
+                  once it&apos;s loaded). Give every item a price or default unit cost before importing its
+                  opening stock - a row for an item with neither is rejected.
+                </p>
                 <p className="mt-2">
                   If the same item is held at more than one location, give it one row per location - but never
                   the same item and location twice, that&apos;s rejected as a duplicate rather than silently
@@ -148,7 +149,7 @@ export function ImportInstructionsModal() {
                 <ul className="space-y-1.5">
                   <li>Every sku must be unique in the product file, and every sku the opening-stock file uses must exist in the product file.</li>
                   <li>Don&apos;t leave a &quot;Required&quot; column blank.</li>
-                  <li>Quantities and costs must be plain numbers (e.g. 40 or 85.00) - no currency symbols, no thousand-separator commas.</li>
+                  <li>Quantities and prices must be plain numbers (e.g. 40 or 85.00) - no currency symbols, no thousand-separator commas.</li>
                   <li>If a value itself contains a comma (e.g. &quot;Rubber, full-face&quot;), wrap it in double quotes - Excel/Google Sheets do this for you automatically when saving as CSV.</li>
                   <li>Keep these as plain CSV files - if you edit in Excel, use &quot;Save As → CSV&quot; rather than saving as .xlsx.</li>
                   <li>Remove every example row before uploading - they&apos;re there to show the format only.</li>

@@ -234,6 +234,7 @@ export const mockProductRepository: ProductRepository = {
       throw new Error(`Barcode "${input.barcode}" is already assigned to ${clash.sku} - ${clash.name}.`);
     }
     const now = new Date().toISOString();
+    const qtyPerPackage = (input.packagingUom && input.qtyPerPackage != null) ? input.qtyPerPackage : null;
     const product: Product = {
       id: randomUUID(),
       sku: input.sku,
@@ -241,6 +242,9 @@ export const mockProductRepository: ProductRepository = {
       description: null,
       categoryId: input.categoryId ?? null,
       unitOfMeasure: input.unitOfMeasure,
+      packagingUom: input.packagingUom ?? null,
+      qtyPerPackage,
+      defaultUnitCost: input.defaultUnitCost ?? null,
       barcode: input.barcode ?? null,
       reorderPoint: input.reorderPoint ?? null,
       reorderQuantity: input.reorderQuantity ?? null,
@@ -270,6 +274,9 @@ export const mockProductRepository: ProductRepository = {
     }
     product.name = input.name;
     product.unitOfMeasure = input.unitOfMeasure;
+    product.packagingUom = input.packagingUom ?? null;
+    product.qtyPerPackage = (input.packagingUom && input.qtyPerPackage != null) ? input.qtyPerPackage : null;
+    if ('defaultUnitCost' in input) product.defaultUnitCost = input.defaultUnitCost ?? null;
     if ('categoryId' in input) product.categoryId = input.categoryId ?? null;
     product.barcode = input.barcode ?? null;
     product.reorderPoint = input.reorderPoint ?? null;

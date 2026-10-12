@@ -5,6 +5,8 @@ import type { Product, ProductCategory } from '@/lib/domain/inventory';
 import { PriceCell } from '@/app/dashboard/products/price-cell';
 import { updateProductAction, deleteProductAction, type CreateProductFormState } from '@/app/dashboard/products/actions';
 import { inputClass, selectClass } from '@/lib/ui/form-control-classes';
+import { formatCurrency } from '@/lib/ui/currency';
+import { STOCK_UOMS, PACKAGING_UOMS, PACKAGING_UOM_LABELS, supportsPackaging, calcPackageValue } from '@/lib/uom';
 
 const initial: CreateProductFormState = { error: null, success: null };
 
@@ -39,6 +41,16 @@ export function ProductRow({
   const [savePending, startSave] = useTransition();
   const [deletePending, startDelete] = useTransition();
 
+  // Edit-form local state for packaging fields
+  const [editUom, setEditUom] = useState(product.unitOfMeasure);
+  const [editPkgUom, setEditPkgUom] = useState(product.packagingUom ?? '');
+  const [editUnitCost, setEditUnitCost] = useState(product.defaultUnitCost != null ? String(product.defaultUnitCost) : '');
+  const [editQtyPerPkg, setEditQtyPerPkg] = useState(product.qtyPerPackage != null ? String(product.qtyPerPackage) : '');
+
+  const editPackageValue = (editPkgUom && supportsPackaging(editUom))
+    ? calcPackageValue(editUnitCost !== '' ? parseFloat(editUnitCost) : null, editQtyPerPkg !== '' ? parseFloat(editQtyPerPkg) : null)
+    : null;
+
   function handleSave(fd: FormData) {
     setSaveError(null);
     startSave(async () => {
@@ -70,7 +82,14 @@ export function ProductRow({
             <span className="text-text-faint">—</span>
           )}
         </td>
-        <td className="px-5 py-3 text-text-muted">{product.unitOfMeasure}</td>
+        <td className="px-5 py-3 text-text-muted">
+          <div>{product.unitOfMeasure}</div>
+          {product.packagingUom && product.qtyPerPackage != null && (
+            <div className="text-[0.72rem] text-text-faint">
+              {product.qtyPerPackage} / {PACKAGING_UOM_LABELS[product.packagingUom] ?? product.packagingUom}
+            </div>
+          )}
+        </td>
         <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{product.barcode ?? '-'}</td>
         <td className="px-5 py-3 text-right tabular-nums">
           <PriceCell
@@ -142,10 +161,93 @@ export function ProductRow({
                 <span className="text-[0.7rem] font-semibold text-text-muted">Name</span>
                 <input name="name" defaultValue={product.name} required className={inputClass} />
               </label>
+
               <label className="flex flex-col gap-1">
-                <span className="text-[0.7rem] font-semibold text-text-muted">Unit of measure</span>
-                <input name="unitOfMeasure" defaultValue={product.unitOfMeasure} required className={inputClass} />
+                <span className="text-[0.7rem] font-semibold text-text-muted">Stock UOM</span>
+                <select
+                  name="unitOfMeasure"
+                  value={editUom}
+                  onChange={(e) => {
+                    setEditUom(e.target.value);
+                    if (!supportsPackaging(e.target.value)) {
+                      setEditPkgUom('');
+                      setEditQtyPerPkg('');
+                    }
+                  }}
+                  required
+                  className={selectClass}
+                >
+                  {STOCK_UOMS.map((u) => (
+                    <option key={u.value} value={u.value}>{u.label}</option>
+                  ))}
+                </select>
               </label>
+
+              {supportsPackaging(editUom) && (
+                <label className="flex flex-col gap-1">
+                  <span className="text-[0.7rem] font-semibold text-text-muted">Packaging unit</span>
+                  <select
+                    name="packagingUom"
+                    value={editPkgUom}
+                    onChange={(e) => {
+                      setEditPkgUom(e.target.value);
+                      if (!e.target.value) setEditQtyPerPkg('');
+                    }}
+                    className={selectClass}
+                  >
+                    <option value="">— none —</option>
+                    {PACKAGING_UOMS.map((p) => (
+                      <option key={p} value={p}>{PACKAGING_UOM_LABELS[p] ?? p}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {supportsPackaging(editUom) && editPkgUom && (
+                <label className="flex flex-col gap-1">
+                  <span className="text-[0.7rem] font-semibold text-text-muted">
+                    {editUom === 'ea' ? 'Items' : 'Units'} / {PACKAGING_UOM_LABELS[editPkgUom] ?? editPkgUom}
+                  </span>
+                  <input
+                    type="number"
+                    name="qtyPerPackage"
+                    min="0.001"
+                    step="any"
+                    value={editQtyPerPkg}
+                    onChange={(e) => setEditQtyPerPkg(e.target.value)}
+                    placeholder="e.g. 100"
+                    className={inputClass}
+                  />
+                </label>
+              )}
+
+              <label className="flex flex-col gap-1">
+                <span className="text-[0.7rem] font-semibold text-text-muted">
+                  Default unit cost (R / {editUom})
+                </span>
+                <input
+                  type="number"
+                  name="defaultUnitCost"
+                  min="0"
+                  step="0.0001"
+                  value={editUnitCost}
+                  onChange={(e) => setEditUnitCost(e.target.value)}
+                  placeholder="Optional"
+                  className={inputClass}
+                />
+              </label>
+
+              {editPackageValue != null && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-[0.7rem] font-semibold text-text-muted">
+                    Indicative {PACKAGING_UOM_LABELS[editPkgUom] ?? editPkgUom} value
+                  </span>
+                  <div className="flex h-9 items-center rounded-lg border border-accent/20 bg-surface-2 px-3 text-[0.82rem] font-bold tabular-nums text-accent-strong">
+                    {formatCurrency(editPackageValue)}
+                  </div>
+                </div>
+              )}
+
               <label className="flex flex-col gap-1">
                 <span className="text-[0.7rem] font-semibold text-text-muted">Barcode</span>
                 <input name="barcode" defaultValue={product.barcode ?? ''} placeholder="Optional" className={inputClass} />
