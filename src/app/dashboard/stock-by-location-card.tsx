@@ -312,7 +312,7 @@ export function StockByLocationCard({
                     </td>
                   )}
                   <td className="px-5 py-3 text-right tabular-nums text-text">
-                    {row.quantityOnHand.toLocaleString()} {row.product.unitOfMeasure}
+                    {row.quantityOnHand.toLocaleString('en-ZA')} {row.product.unitOfMeasure}
                     {row.isBelowReorderPoint && (
                       <span className="ml-2 rounded-full bg-danger/15 px-2 py-0.5 text-[0.68rem] font-semibold text-danger-text">
                         Low

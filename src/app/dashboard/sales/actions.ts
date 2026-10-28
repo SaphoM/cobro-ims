@@ -33,7 +33,7 @@ async function stockElsewhere(productId: string, excludeWarehouseId: string): Pr
     .sort((a, b) => b.quantityOnHand - a.quantityOnHand);
 
   if (elsewhere.length === 0) return 'No store currently holds any stock of it.';
-  return `It does have stock at ${elsewhere.map((w) => `${w.label} (${w.quantityOnHand.toLocaleString()})`).join(', ')}.`;
+  return `It does have stock at ${elsewhere.map((w) => `${w.label} (${w.quantityOnHand.toLocaleString('en-ZA')})`).join(', ')}.`;
 }
 
 export async function createSalesOrderAction(

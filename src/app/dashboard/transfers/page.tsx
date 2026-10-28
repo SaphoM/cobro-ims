@@ -98,7 +98,7 @@ export default async function TransfersPage() {
                             <span className="text-text">{product.sku}</span>
                             {line && (
                               <span className="ml-1.5 text-text-faint">
-                                · {line.quantity.toLocaleString()} {product.unitOfMeasure}
+                                · {line.quantity.toLocaleString('en-ZA')} {product.unitOfMeasure}
                               </span>
                             )}
                             {product.categoryId && categoryById.get(product.categoryId) && (

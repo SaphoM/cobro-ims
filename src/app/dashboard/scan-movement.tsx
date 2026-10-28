@@ -413,7 +413,7 @@ export function ScanMovement({
         setError(res.error);
         return;
       }
-      const message = `${res.success ?? 'Posted.'} (${Number(quantity).toLocaleString()} ${product.unitOfMeasure} of ${product.sku})`;
+      const message = `${res.success ?? 'Posted.'} (${Number(quantity).toLocaleString('en-ZA')} ${product.unitOfMeasure} of ${product.sku})`;
       onPosted(message);
       setLastPosted(message);
       // Straight back to scanning the next item. The dialog stays open.

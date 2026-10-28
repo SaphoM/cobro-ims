@@ -47,7 +47,7 @@ export async function ensureStoresReturnReminders(): Promise<void> {
         salesOrderId: candidate.salesOrderId,
         title: `Return ${product.name} to Stores`,
         message:
-          `${candidate.quantityOnHand.toLocaleString()} ${product.unitOfMeasure} of ${product.name} (${product.sku}) ` +
+          `${candidate.quantityOnHand.toLocaleString('en-ZA')} ${product.unitOfMeasure} of ${product.name} (${product.sku}) ` +
           `from requisition ${order.orderNumber} has been sitting at your station for ${hours} hour${hours === 1 ? '' : 's'} ` +
           `without being used. Please return it to Stores if it is no longer needed.${reasonSuffix}`,
         href: '/dashboard/sales',

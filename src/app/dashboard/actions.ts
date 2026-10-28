@@ -241,7 +241,7 @@ export async function requestReturnToStoresAction(
   const returnable = Math.max((ledgerEntry?.quantityOnHand ?? 0) - (ledgerEntry?.quantityReserved ?? 0), 0);
   if (quantityRaw > returnable + 1e-9) {
     return {
-      error: `Only ${returnable.toLocaleString()} ${product?.unitOfMeasure ?? 'unit(s)'} at your station ${
+      error: `Only ${returnable.toLocaleString('en-ZA')} ${product?.unitOfMeasure ?? 'unit(s)'} at your station ${
         returnable === 1 ? 'is' : 'are'
       } unreserved and returnable.`,
       success: null,

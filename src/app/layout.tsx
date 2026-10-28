@@ -42,7 +42,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           and parser-blocking — an external or deferred script would let the
           dark default paint first and flash at every light-mode user.
         */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} suppressHydrationWarning />
       </head>
       <body className="min-h-full flex flex-col bg-bg text-text">{children}</body>
     </html>

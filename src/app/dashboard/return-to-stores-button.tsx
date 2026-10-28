@@ -123,7 +123,7 @@ export function ReturnToStoresButton({
               <input type="hidden" name="productId" value={productId} />
 
               <p className="text-[0.82rem] font-bold text-accent-strong">
-                {returnableQty.toLocaleString()} {unitOfMeasure} returnable from your station
+                {returnableQty.toLocaleString('en-ZA')} {unitOfMeasure} returnable from your station
               </p>
               <p className="text-[0.78rem] text-text-faint">
                 This puts the stock in transit toward Stores. It stops counting as stock you hold, but it only

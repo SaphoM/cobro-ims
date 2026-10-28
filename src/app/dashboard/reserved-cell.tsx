@@ -69,7 +69,7 @@ export function ReservedCell({
         title="See which requisitions hold this stock"
         className="rounded px-1.5 py-0.5 font-semibold text-accent-strong underline decoration-dotted underline-offset-4 transition-colors hover:bg-accent/10"
       >
-        {quantityReserved.toLocaleString()}
+        {quantityReserved.toLocaleString('en-ZA')}
       </button>
 
       {open && (
@@ -130,7 +130,7 @@ export function ReservedCell({
                       <span className="text-text-muted">
                         Reserved:{' '}
                         <span className="font-semibold text-text">
-                          {detail.totalReserved.toLocaleString()} {detail.unitOfMeasure}
+                          {detail.totalReserved.toLocaleString('en-ZA')} {detail.unitOfMeasure}
                         </span>
                       </span>
                     </div>
@@ -158,7 +158,7 @@ export function ReservedCell({
                                 {h.orderNumber}
                               </span>
                               <span className="text-[0.85rem] font-semibold text-text">
-                                {h.quantity.toLocaleString()} {detail.unitOfMeasure}
+                                {h.quantity.toLocaleString('en-ZA')} {detail.unitOfMeasure}
                               </span>
                             </div>
                             <div className="mt-1 flex flex-col gap-0.5 text-[0.8rem] text-text-muted">
@@ -181,7 +181,7 @@ export function ReservedCell({
                   {detail.unattributed > 0 && (
                     <div className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-[0.82rem] leading-relaxed text-text-muted">
                       <span className="font-semibold text-text">
-                        {detail.unattributed.toLocaleString()} {detail.unitOfMeasure}
+                        {detail.unattributed.toLocaleString('en-ZA')} {detail.unitOfMeasure}
                       </span>{' '}
                       {detail.holders.length > 0 ? 'of this reservation has' : 'is reserved but has'}{' '}
                       no requisition behind it. That is opening-balance data seeded onto the ledger
