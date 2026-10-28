@@ -147,7 +147,7 @@ export function ScanToReceiveButton({
 
             <div className="flex flex-col gap-3 px-5 py-4">
               <p className="text-[0.82rem] font-bold text-accent-strong">
-                {quantity.toLocaleString()} {unitOfMeasure} returning from {fromLabel}
+                {quantity.toLocaleString('en-ZA')} {unitOfMeasure} returning from {fromLabel}
               </p>
               <p className="text-[0.78rem] text-text-faint">
                 Scan (or type) the item&apos;s barcode to confirm it before completing the return.

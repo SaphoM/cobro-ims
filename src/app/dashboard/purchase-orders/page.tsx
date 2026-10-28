@@ -101,10 +101,10 @@ export default async function PurchaseOrdersPage() {
                       </td>
                       <td className="px-5 py-3 text-text-muted">{warehouse ? formatWarehouseLabel(warehouse) : ''}</td>
                       <td className="px-5 py-3 text-right tabular-nums text-text">
-                        {po.line.quantityOrdered.toLocaleString()} {product?.unitOfMeasure}
+                        {po.line.quantityOrdered.toLocaleString('en-ZA')} {product?.unitOfMeasure}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text-muted">
-                        {po.line.quantityReceived.toLocaleString()} {product?.unitOfMeasure}
+                        {po.line.quantityReceived.toLocaleString('en-ZA')} {product?.unitOfMeasure}
                       </td>
                       <td className="px-5 py-3">
                         <StatusPill status={po.status} />

@@ -77,7 +77,7 @@ export function EngineerScanCard({
         return;
       }
       setCheckoutDone(
-        `Checked out ${pendingCheckout.quantity.toLocaleString()} ${pendingCheckout.unitOfMeasure} of ${pendingCheckout.productSku} to ${myStationLabel}.`
+        `Checked out ${pendingCheckout.quantity.toLocaleString('en-ZA')} ${pendingCheckout.unitOfMeasure} of ${pendingCheckout.productSku} to ${myStationLabel}.`
       );
       setPendingCheckout(null);
     } finally {
@@ -171,7 +171,7 @@ export function EngineerScanCard({
                 <span>
                   Quantity:{' '}
                   <span className="font-semibold text-text">
-                    {pendingCheckout.quantity.toLocaleString()} {pendingCheckout.unitOfMeasure}
+                    {pendingCheckout.quantity.toLocaleString('en-ZA')} {pendingCheckout.unitOfMeasure}
                   </span>
                 </span>
                 <span>

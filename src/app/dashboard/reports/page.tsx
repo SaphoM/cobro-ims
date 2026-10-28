@@ -180,7 +180,7 @@ export default async function ReportsPage() {
                     <CategoryTag name={categoryNameBySku.get(r.sku)} />
                   </td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
-                    {r.quantityOnHand.toLocaleString()} {r.unitOfMeasure}
+                    {r.quantityOnHand.toLocaleString('en-ZA')} {r.unitOfMeasure}
                   </td>
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">
                     {pkgEquiv != null ? (
@@ -237,8 +237,8 @@ export default async function ReportsPage() {
                 <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{r.sku}</td>
                 <td className="px-5 py-3 text-text-muted">{r.productName}</td>
                 <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{r.barcode ?? '—'}</td>
-                <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityIssued.toLocaleString()}</td>
-                <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityUsed.toLocaleString()}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityIssued.toLocaleString('en-ZA')}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityUsed.toLocaleString('en-ZA')}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text-muted">{formatCurrency(r.unitValue)}</td>
                 <td className="px-5 py-3 text-right tabular-nums font-semibold text-text">
                   {formatCurrency(r.totalMaterialCost)}
@@ -280,11 +280,11 @@ export default async function ReportsPage() {
                     <CategoryTag name={categoryNameBySku.get(r.sku)} />
                   </td>
                   <td className="px-5 py-3 text-right tabular-nums text-danger">
-                    {r.quantityOnHand.toLocaleString()} {r.unitOfMeasure}
+                    {r.quantityOnHand.toLocaleString('en-ZA')} {r.unitOfMeasure}
                   </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.reorderPoint.toLocaleString()}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.reorderPoint.toLocaleString('en-ZA')}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
-                    {r.suggestedReorderQuantity?.toLocaleString() ?? '-'}
+                    {r.suggestedReorderQuantity?.toLocaleString('en-ZA') ?? '-'}
                   </td>
                 </tr>
               ))}
@@ -355,7 +355,7 @@ export default async function ReportsPage() {
                     {r.productName}
                     <CategoryTag name={categoryNameBySku.get(r.sku)} />
                   </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOnHand.toLocaleString()}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOnHand.toLocaleString('en-ZA')}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
                     {formatCurrency(r.value)}
                   </td>
@@ -394,7 +394,7 @@ export default async function ReportsPage() {
                   {r.sku}
                   <CategoryTag name={categoryNameBySku.get(r.sku)} />
                 </td>
-                <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantity.toLocaleString()}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantity.toLocaleString('en-ZA')}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
                   {formatCurrency(r.value)}
                 </td>
@@ -475,7 +475,7 @@ export default async function ReportsPage() {
                   </td>
                   <td className="px-5 py-3 text-text-muted">{formatStoreCode(r.warehouseCode)}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
-                    {r.quantity.toLocaleString()} {r.unitOfMeasure}
+                    {r.quantity.toLocaleString('en-ZA')} {r.unitOfMeasure}
                   </td>
                   <td className="px-5 py-3">
                     <span
@@ -521,10 +521,10 @@ export default async function ReportsPage() {
                   {r.sku}
                   <CategoryTag name={categoryNameBySku.get(r.sku)} />
                 </td>
-                <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOrdered.toLocaleString()}</td>
-                <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.quantityReceived.toLocaleString()}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOrdered.toLocaleString('en-ZA')}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.quantityReceived.toLocaleString('en-ZA')}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-text">
-                  {r.quantityOutstanding > 0 ? r.quantityOutstanding.toLocaleString() : '-'}
+                  {r.quantityOutstanding > 0 ? r.quantityOutstanding.toLocaleString('en-ZA') : '-'}
                 </td>
                 <td className="px-5 py-3 text-text-muted capitalize">{r.status.replace('_', ' ')}</td>
               </tr>
@@ -597,7 +597,7 @@ export default async function ReportsPage() {
                     {r.sku}
                     <CategoryTag name={categoryNameBySku.get(r.sku)} />
                   </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOutstanding.toLocaleString()}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantityOutstanding.toLocaleString('en-ZA')}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
                     {formatCurrency(r.outstandingValue)}
                   </td>
@@ -647,7 +647,7 @@ export default async function ReportsPage() {
                   <td className="px-5 py-3 text-text-muted capitalize">{r.movementType.replace('_', ' ')}</td>
                   <td className={`px-5 py-3 text-right tabular-nums ${r.quantity < 0 ? 'text-danger' : 'text-text'}`}>
                     {r.quantity > 0 ? '+' : ''}
-                    {r.quantity.toLocaleString()}
+                    {r.quantity.toLocaleString('en-ZA')}
                   </td>
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">{formatCurrency(r.unitCost)}</td>
                   <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text-muted">{r.batchRef ?? '-'}</td>
@@ -691,7 +691,7 @@ export default async function ReportsPage() {
                     <CategoryTag name={categoryNameBySku.get(r.sku)} />
                   </td>
                   <td className="px-5 py-3 text-text-muted">{formatStoreCode(r.warehouseCode)}</td>
-                  <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantity.toLocaleString()}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text">{r.quantity.toLocaleString('en-ZA')}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">{formatCurrency(r.unitCost)}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
                     {formatCurrency(r.value)}
@@ -727,7 +727,7 @@ export default async function ReportsPage() {
                 <tr key={i} className="border-t border-accent/[0.08]">
                   <td className="px-5 py-3 text-text-muted capitalize">{r.movementType.replace('_', ' ')}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.count}</td>
-                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.totalUnits.toLocaleString()}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-text-muted">{r.totalUnits.toLocaleString('en-ZA')}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-text">
                     {formatCurrency(r.totalValue)}
                   </td>

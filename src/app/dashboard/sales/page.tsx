@@ -179,7 +179,7 @@ export default async function SalesPage({
                         {sourceWarehouse ? formatWarehouseLabel(sourceWarehouse) : ''}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text">
-                        {o.quantityOrdered.toLocaleString()} {product?.unitOfMeasure}
+                        {o.quantityOrdered.toLocaleString('en-ZA')} {product?.unitOfMeasure}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums text-text">
                         {formatCurrency(o.quantityOrdered * o.unitPrice)}

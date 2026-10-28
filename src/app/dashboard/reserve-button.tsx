@@ -151,7 +151,7 @@ export function ReserveButton({ productId, warehouseId }: { productId: string; w
                             {r.orderNumber}
                           </span>
                           <span className="text-[0.85rem] font-semibold text-text">
-                            {r.quantity.toLocaleString()} {data.unitOfMeasure}
+                            {r.quantity.toLocaleString('en-ZA')} {data.unitOfMeasure}
                           </span>
                         </div>
                         <div className="mt-1 flex flex-col gap-0.5 text-[0.8rem] text-text-muted">

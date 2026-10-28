@@ -239,7 +239,7 @@ export function ReceiveForm({
               </div>
               {packageCount != null && (
                 <div className="text-[0.72rem] text-text-faint">
-                  = {receivedCount.toLocaleString()} {selectedProduct.unitOfMeasure}s
+                  = {receivedCount.toLocaleString('en-ZA')} {selectedProduct.unitOfMeasure}s
                 </div>
               )}
             </div>
@@ -471,7 +471,7 @@ export function ReceiveForm({
                 {expectedQuantity != null && <span className="text-text-faint"> / {expectedQuantity}</span>}
               </span>
               {packageCount != null && (
-                <span className="text-[0.72rem] text-text-faint">= {receivedCount.toLocaleString()} {selectedProduct?.unitOfMeasure}s</span>
+                <span className="text-[0.72rem] text-text-faint">= {receivedCount.toLocaleString('en-ZA')} {selectedProduct?.unitOfMeasure}s</span>
               )}
               {receivedCount > 0 && (
                 <button

@@ -244,7 +244,7 @@ export default async function DashboardOverviewPage() {
   return (
     <div className="flex flex-col gap-6">
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatTile label="SKUs tracked" value={products.length.toLocaleString()} />
+        <StatTile label="SKUs tracked" value={products.length.toLocaleString('en-ZA')} />
         <StatTile
           label="Stock on hand (value)"
           value={

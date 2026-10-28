@@ -253,7 +253,7 @@ export function SalesOrderForm({
             <p
               className={`text-[0.82rem] font-bold ${availableQty === 0 ? 'text-danger' : 'text-accent-strong'}`}
             >
-              {availableQty.toLocaleString()} {selectedProduct?.unitOfMeasure ?? ''} available at{' '}
+              {availableQty.toLocaleString('en-ZA')} {selectedProduct?.unitOfMeasure ?? ''} available at{' '}
               {selectedWarehouse ? formatWarehouseLabel(selectedWarehouse) : '—'}
               {availableQty === 0 && ' — none on hand here'}
               {selectedCategory && (

@@ -101,7 +101,7 @@ export function ProductRow({
           />
         </td>
         <td className="px-5 py-3 text-right tabular-nums text-text-muted">
-          {product.reorderPoint?.toLocaleString() ?? '-'}
+          {product.reorderPoint?.toLocaleString('en-ZA') ?? '-'}
         </td>
         <td className="px-5 py-3 text-right">
           <div className="flex items-center justify-end gap-3">

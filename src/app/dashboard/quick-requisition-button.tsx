@@ -174,14 +174,14 @@ export function QuickRequisitionButton({
 
               <div>
                 <p className={`text-[0.82rem] font-bold ${availableQty === 0 ? 'text-danger' : 'text-accent-strong'}`}>
-                  {availableQty.toLocaleString()} {unitOfMeasure} available at {warehouseLabel}
+                  {availableQty.toLocaleString('en-ZA')} {unitOfMeasure} available at {warehouseLabel}
                   {availableQty === 0 && ' - none on hand here'}
                 </p>
                 {elsewhere.length > 0 && (
                   <p className="mt-1 text-[0.78rem] text-text-faint">
                     Also on hand at{' '}
                     {elsewhere
-                      .map((l) => `${l.label} (${l.qty.toLocaleString()} ${unitOfMeasure})`)
+                      .map((l) => `${l.label} (${l.qty.toLocaleString('en-ZA')} ${unitOfMeasure})`)
                       .join(', ')}
                     .
                   </p>

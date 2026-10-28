@@ -472,7 +472,7 @@ export function ScanStation({
             <div className="text-right">
               <div className="text-[0.72rem] uppercase tracking-wide text-text-faint">Total on hand</div>
               <div className="font-display text-[1.15rem] text-text">
-                {result.product.totalOnHand.toLocaleString()} {result.product.unitOfMeasure}
+                {result.product.totalOnHand.toLocaleString('en-ZA')} {result.product.unitOfMeasure}
               </div>
             </div>
           </div>
@@ -507,15 +507,15 @@ export function ScanStation({
                           {touched && (
                             <span className="ml-2 text-[0.72rem] font-semibold text-accent-strong">
                               {result.posted!.direction === 'in' ? '+' : '−'}
-                              {result.posted!.quantity.toLocaleString()} just now
+                              {result.posted!.quantity.toLocaleString('en-ZA')} just now
                             </span>
                           )}
                         </td>
                         <td className="px-5 py-3 text-right tabular-nums text-text">
-                          {row.quantityOnHand.toLocaleString()} {result.product!.unitOfMeasure}
+                          {row.quantityOnHand.toLocaleString('en-ZA')} {result.product!.unitOfMeasure}
                         </td>
                         <td className="px-5 py-3 text-right tabular-nums text-text-muted">
-                          {row.quantityReserved.toLocaleString()}
+                          {row.quantityReserved.toLocaleString('en-ZA')}
                         </td>
                         <td className="px-5 py-3 text-right tabular-nums text-text-muted">
                           {formatCurrency(row.weightedAverageCost)}
@@ -548,8 +548,8 @@ export function ScanStation({
           <div>
             <h2 className="font-display text-[1.05rem] font-medium text-text">This session</h2>
             <p className="text-[0.82rem] text-text-muted">
-              {postedCount} movement{postedCount === 1 ? '' : 's'} posted · {unitsIn.toLocaleString()} in ·{' '}
-              {unitsOut.toLocaleString()} out{stationWarehouseId ? ` · ${unitsUsed.toLocaleString()} used` : ''}
+              {postedCount} movement{postedCount === 1 ? '' : 's'} posted · {unitsIn.toLocaleString('en-ZA')} in ·{' '}
+              {unitsOut.toLocaleString('en-ZA')} out{stationWarehouseId ? ` · ${unitsUsed.toLocaleString('en-ZA')} used` : ''}
             </p>
           </div>
           {log.length > 0 && (
@@ -597,7 +597,7 @@ export function ScanStation({
                   </span>
                   {row.ok && row.onHandAfter !== null && (
                     <span className="text-[0.8rem] text-text-muted">
-                      → {row.onHandAfter.toLocaleString()} {row.unitOfMeasure} on hand at {row.warehouseCode}
+                      → {row.onHandAfter.toLocaleString('en-ZA')} {row.unitOfMeasure} on hand at {row.warehouseCode}
                     </span>
                   )}
                 </div>

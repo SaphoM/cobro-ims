@@ -122,7 +122,7 @@ export default async function BomPage({
                           <td className="px-5 py-3 font-mono-brand text-[0.76rem] text-text">{component?.sku}</td>
                           <td className="px-5 py-3 text-text-muted">{component?.name}</td>
                           <td className="px-5 py-3 text-right tabular-nums text-text">
-                            {line.quantity.toLocaleString()} {component?.unitOfMeasure}
+                            {line.quantity.toLocaleString('en-ZA')} {component?.unitOfMeasure}
                           </td>
                           <td className="px-5 py-3 text-right">
                             {canManageBom && (
@@ -189,7 +189,7 @@ export default async function BomPage({
                             {component?.sku} <span className="text-text-faint">- {component?.name}</span>
                           </td>
                           <td className="px-5 py-3 text-right tabular-nums text-text">
-                            {(line.quantity * explosionQty).toLocaleString()} {component?.unitOfMeasure}
+                            {(line.quantity * explosionQty).toLocaleString('en-ZA')} {component?.unitOfMeasure}
                           </td>
                         </tr>
                       );

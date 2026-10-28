@@ -145,7 +145,7 @@ async function stockElsewhere(productId: string, excludeWarehouseId: string): Pr
     .sort((a, b) => b.quantityOnHand - a.quantityOnHand);
 
   if (elsewhere.length === 0) return 'No warehouse currently holds any stock of it.';
-  return `It does have stock at ${elsewhere.map((w) => `${w.label} (${w.quantityOnHand.toLocaleString()})`).join(', ')}.`;
+  return `It does have stock at ${elsewhere.map((w) => `${w.label} (${w.quantityOnHand.toLocaleString('en-ZA')})`).join(', ')}.`;
 }
 
 async function buildProductView(product: Product): Promise<ScanProductView> {
@@ -322,9 +322,9 @@ export async function postScanAction(input: PostScanInput): Promise<ScanResult> 
         );
       }
       return failure(
-        `Only ${onHand.toLocaleString()} ${product.unitOfMeasure} of ${product.sku} on hand at ${formatWarehouseLabel(warehouse)} - ` +
-          `${verb === 'use' ? 'using' : 'scanning out'} ${quantity.toLocaleString()} would take it negative. Lower Qty ` +
-          `per scan to ${onHand.toLocaleString()} or less, or split it across multiple scans.${elsewhere}`,
+        `Only ${onHand.toLocaleString('en-ZA')} ${product.unitOfMeasure} of ${product.sku} on hand at ${formatWarehouseLabel(warehouse)} - ` +
+          `${verb === 'use' ? 'using' : 'scanning out'} ${quantity.toLocaleString('en-ZA')} would take it negative. Lower Qty ` +
+          `per scan to ${onHand.toLocaleString('en-ZA')} or less, or split it across multiple scans.${elsewhere}`,
         barcode
       );
     }
@@ -360,7 +360,7 @@ export async function postScanAction(input: PostScanInput): Promise<ScanResult> 
     const directionLabel = input.direction === 'in' ? 'IN' : input.direction === 'use' ? 'USED' : 'OUT';
     return {
       ok: true,
-      message: `${directionLabel} ${quantity.toLocaleString()} ${product.unitOfMeasure} · ${product.sku} @ ${formatWarehouseLabel(warehouse)}`,
+      message: `${directionLabel} ${quantity.toLocaleString('en-ZA')} ${product.unitOfMeasure} · ${product.sku} @ ${formatWarehouseLabel(warehouse)}`,
       barcode,
       product: await buildProductView(product),
       notFound: false,
