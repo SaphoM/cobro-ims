@@ -19,6 +19,10 @@ export default async function ProductsPage() {
   // no add-product form, no bulk-import section, no link into Product
   // labels (a page they can't open anyway - see /dashboard/labels).
   const canManageCatalogue = session ? await hasPermission(session, 'manage_catalogue') : false;
+  // Stores Manager/Clerk may add products without gaining edit/delete/bulk-import rights.
+  const canCreateProducts = session
+    ? (await hasPermission(session, 'create_products')) || canManageCatalogue
+    : false;
   // Same permission /dashboard/labels itself gates on - `hasPermission`
   // resolves the per-user override, so a Stores Clerk whose label permission
   // was revoked also loses the "Print labels" row link here, not just the
@@ -70,7 +74,7 @@ export default async function ProductsPage() {
       </section>
       )}
 
-      {canManageCatalogue && <NewProductForm categories={categories} />}
+      {canCreateProducts && <NewProductForm categories={categories} />}
 
       <section className="rounded-2xl border border-accent/[0.14] bg-surface">
         <div className="border-b border-accent/[0.14] px-5 py-4">
@@ -94,7 +98,7 @@ export default async function ProductsPage() {
               {sorted.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-5 py-6 text-[0.85rem] text-text-faint">
-                    No products have been added yet.{canManageCatalogue ? ' Add your first product above.' : ''}
+                    No products have been added yet.{canCreateProducts ? ' Add your first product above.' : ''}
                   </td>
                 </tr>
               )}
