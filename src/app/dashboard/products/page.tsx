@@ -44,7 +44,7 @@ export default async function ProductsPage() {
         </p>
       </div>
 
-      {canManageCatalogue && (
+      {canCreateProducts && (
       <section className="rounded-2xl border border-accent/[0.14] bg-surface p-5">
         <h2 className="mb-1 font-display text-[1.05rem] font-medium text-text">Bulk data import</h2>
         <p className="mb-4 text-[0.83rem] text-text-muted">

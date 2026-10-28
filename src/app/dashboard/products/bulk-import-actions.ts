@@ -55,7 +55,7 @@ export async function importProductsAction(
 ): Promise<BulkImportFormState> {
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
-  if (!(await hasPermission(session, 'manage_catalogue'))) {
+  if (!(await hasPermission(session, 'create_products')) && !(await hasPermission(session, 'manage_catalogue'))) {
     return { error: 'Your role does not have permission to manage the product catalogue.', success: null };
   }
 
@@ -220,7 +220,7 @@ export async function importOpeningStockAction(
 ): Promise<BulkImportFormState> {
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
-  if (!(await hasPermission(session, 'manage_catalogue'))) {
+  if (!(await hasPermission(session, 'create_products')) && !(await hasPermission(session, 'manage_catalogue'))) {
     return { error: 'Your role does not have permission to manage the product catalogue.', success: null };
   }
 
