@@ -20,6 +20,11 @@ import type { User } from '@/lib/domain/inventory';
 
 export type Permission =
   | 'manage_catalogue'
+  /** Add a new product to the catalogue. Deliberately separate from
+   *  `manage_catalogue` (which also covers edit/delete/bulk import/BOM),
+   *  so Stores roles can add products without gaining edit/delete rights.
+   *  Admin gets it via '*'. */
+  | 'create_products'
   | 'manage_purchase_orders'
   | 'manage_receiving'
   | 'manage_transfers'
@@ -180,6 +185,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
     'view_reports',
     'view_audit_log',
     'create_product_labels',
+    'create_products',
   ],
   stores_clerk: [
     'manage_purchase_orders',
@@ -190,6 +196,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[] | '*'> = {
     'view_reports',
     'view_audit_log',
     'create_product_labels',
+    'create_products',
   ],
   // Deliberately narrow: create_requisitions and request_stock_return are
   // the only inventory-adjacent permissions this role holds, and both are

@@ -20,7 +20,10 @@ export async function createProductAction(
 ): Promise<CreateProductFormState> {
   const session = await getSession();
   if (!session) return { error: 'Your session has expired. Please sign in again.', success: null };
-  if (!(await hasPermission(session, 'manage_catalogue'))) {
+  // Creating a product is its own permission (`create_products`), granted to
+  // Stores Manager/Clerk in addition to Admin. `manage_catalogue` still
+  // implies it, so Admin (and any future full-catalogue manager) keeps working.
+  if (!(await hasPermission(session, 'create_products')) && !(await hasPermission(session, 'manage_catalogue'))) {
     return { error: 'Your role does not have permission to manage the product catalogue.', success: null };
   }
 
