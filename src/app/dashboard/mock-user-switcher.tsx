@@ -1,6 +1,7 @@
 'use client';
 
 import { useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { switchMockUserAction } from '@/app/dashboard/mock-user-actions';
 
 const MOCK_USERS = [
@@ -13,6 +14,7 @@ const MOCK_USERS = [
 ];
 
 export function MockUserSwitcher({ currentUserId }: { currentUserId: string }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -20,8 +22,9 @@ export function MockUserSwitcher({ currentUserId }: { currentUserId: string }) {
     if (userId === currentUserId) return;
     const fd = new FormData();
     fd.set('userId', userId);
-    startTransition(() => {
-      void switchMockUserAction(fd);
+    startTransition(async () => {
+      await switchMockUserAction(fd);
+      router.refresh();
     });
   }
 
@@ -42,7 +45,7 @@ export function MockUserSwitcher({ currentUserId }: { currentUserId: string }) {
           </option>
         ))}
       </select>
-      {pending && <span className="text-[0.72rem] text-text-faint">Switching…</span>}
+      {pending && <span className="text-[0.78rem] text-text-faint">Switching…</span>}
     </div>
   );
 }
